@@ -31,6 +31,10 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   }
 
   const handleLogout = async () => {
+    if (!auth) {
+      router.push("/login");
+      return;
+    }
     await signOut(auth);
     router.push("/login");
   };

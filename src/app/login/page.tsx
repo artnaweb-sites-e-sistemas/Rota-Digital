@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { auth, isFirebaseAuthConfigured } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,11 +18,24 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (!isFirebaseAuthConfigured || !auth) {
+      setError("Firebase nao configurado. Defina as variaveis NEXT_PUBLIC_FIREBASE_* na Vercel.");
+      return;
+    }
+
     try {
       await signInWithEmailAndPassword(auth, email, password);
       router.push("/dashboard");
-    } catch (err: any) {
-      setError("Falha no login. Verifique suas credenciais.");
+    } catch (err: unknown) {
+      const message =
+        typeof err === "object" &&
+        err !== null &&
+        "code" in err &&
+        (err as { code?: string }).code === "auth/invalid-api-key"
+          ? "Chave da API Firebase invalida. Revise NEXT_PUBLIC_FIREBASE_API_KEY na Vercel."
+          : "Falha no login. Verifique suas credenciais.";
+      setError(message);
     }
   };
 

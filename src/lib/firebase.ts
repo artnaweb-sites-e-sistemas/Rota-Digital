@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { getAuth, type Auth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
@@ -12,13 +12,29 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
 };
 
+const isFirebaseAuthConfigured = Boolean(
+  firebaseConfig.apiKey &&
+    firebaseConfig.authDomain &&
+    firebaseConfig.projectId &&
+    firebaseConfig.appId
+);
+
 // Initialize Firebase
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-const auth =
-  typeof window !== "undefined"
-    ? getAuth(app)
-    : (null as unknown as ReturnType<typeof getAuth>);
+const auth: Auth | null = (() => {
+  if (typeof window === "undefined") return null;
+  if (!isFirebaseAuthConfigured) {
+    console.error("Firebase auth config is missing. Check NEXT_PUBLIC_FIREBASE_* variables.");
+    return null;
+  }
+  try {
+    return getAuth(app);
+  } catch (error) {
+    console.error("Failed to initialize Firebase auth:", error);
+    return null;
+  }
+})();
 const db = getFirestore(app);
 const storage = getStorage(app);
 
-export { app, auth, db, storage };
+export { app, auth, db, storage, isFirebaseAuthConfigured };
