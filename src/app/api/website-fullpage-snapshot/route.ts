@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 
 export const runtime = "nodejs";
+export const maxDuration = 120;
 
 function bufferToBody(buf: Buffer): Blob {
   return new Blob([Uint8Array.from(buf)]);

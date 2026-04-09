@@ -10,6 +10,7 @@ import {
 } from "@/lib/instagram-public-profile";
 
 export const runtime = "nodejs";
+export const maxDuration = 120;
 
 /** Buffer → corpo de `Response` (compatível com o tipo `BodyInit` do worker TS). */
 function bufferToBody(buf: Buffer): Blob {
