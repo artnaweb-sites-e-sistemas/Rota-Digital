@@ -156,7 +156,7 @@ type GeminiInlineImagePart = {
 
 async function fetchText(url: string): Promise<{ status: number; text: string }> {
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 10000);
+  const timer = setTimeout(() => ctrl.abort(), 8000);
   try {
     const res = await fetch(url, {
       method: "GET",
@@ -179,7 +179,7 @@ async function fetchJson<T>(
   headers?: Record<string, string>
 ): Promise<T | null> {
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 12000);
+  const timer = setTimeout(() => ctrl.abort(), 8000);
   try {
     const res = await fetch(url, {
       method: "GET",
@@ -202,7 +202,7 @@ async function fetchJson<T>(
 async function resolveFinalUrl(url?: string): Promise<string | undefined> {
   if (!url) return undefined;
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 12000);
+  const timer = setTimeout(() => ctrl.abort(), 6000);
   try {
     const res = await fetch(url, {
       method: "GET",
@@ -288,7 +288,7 @@ async function downloadImageAsInlinePart(
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     const ctrl = new AbortController();
-    const timeoutMs = imageUrl.includes("/api/instagram-profile-snapshot") ? 75000 : 15000;
+    const timeoutMs = imageUrl.includes("/api/") ? 18000 : 10000;
     timer = setTimeout(() => ctrl.abort(), timeoutMs);
     const res = await fetch(imageUrl, {
       method: "GET",
@@ -648,6 +648,9 @@ async function collectInstagramEvidence(url?: string): Promise<InstagramEvidence
       console.warn("[IG_DEBUG][collectInstagramEvidence] Handle inválido.", { url });
       return { url, isAccessible: false };
     }
+    const phaseStart = Date.now();
+    const BUDGET_MS = 18000;
+    const hasTimeBudget = () => Date.now() - phaseStart < BUDGET_MS;
     console.info("[IG_DEBUG][collectInstagramEvidence] Iniciando coleta.", { url, handle });
 
     let bio: string | undefined;
@@ -731,7 +734,7 @@ async function collectInstagramEvidence(url?: string): Promise<InstagramEvidence
     // --- Estratégia 2: HTML da página oficial (JSON embutido / meta). ---
     const needsHtmlFallback =
       !bio || typeof followers !== "number" || typeof posts !== "number" || !profileImageUrl;
-    if (needsHtmlFallback) {
+    if (needsHtmlFallback && hasTimeBudget()) {
       try {
         const { text } = await fetchInstagramPublicPage(url);
         if (isInstagramLoginWallHtml(text)) {
@@ -819,8 +822,9 @@ async function collectInstagramEvidence(url?: string): Promise<InstagramEvidence
     ];
     const needsMirrorFallback =
       !bio || typeof followers !== "number" || typeof posts !== "number";
-    if (needsMirrorFallback) {
+    if (needsMirrorFallback && hasTimeBudget()) {
       for (const mirror of mirrors) {
+        if (!hasTimeBudget()) break;
         try {
           const { text } = await fetchText(mirror.url);
           const lower = text.toLowerCase();
@@ -878,7 +882,7 @@ async function collectInstagramEvidence(url?: string): Promise<InstagramEvidence
 
     // --- Estratégia 4: Microlink como scraper de metadados ---
     const needsMicrolinkFallback = !bio || !profileImageUrl;
-    if (needsMicrolinkFallback) {
+    if (needsMicrolinkFallback && hasTimeBudget()) {
       try {
         const mlData = await fetchJson<{
           data?: { description?: string; image?: { url?: string } };
@@ -904,7 +908,7 @@ async function collectInstagramEvidence(url?: string): Promise<InstagramEvidence
     // --- Estratégia 5 (opcional): Playwright local — só roda fora de serverless ---
     const needsPlaywrightEnrichment =
       !bio || typeof followers !== "number" || typeof posts !== "number" || !profileImageUrl;
-    if (needsPlaywrightEnrichment) {
+    if (needsPlaywrightEnrichment && hasTimeBudget()) {
       try {
         const { captureInstagramProfileViaPlaywright } = await import("@/lib/instagram-playwright");
         const playwrightCapture = await captureInstagramProfileViaPlaywright(handle);
@@ -1442,27 +1446,32 @@ export async function POST(req: NextRequest) {
 
     const requestOrigin = req.nextUrl.origin;
     const hasBrowserless = Boolean(process.env.BROWSERLESS_API_KEY?.trim());
-    const externalWebsiteSnapshotUrl = await resolveScreenshotUrl(
-      normalizedWebsiteUrl,
-      1400,
-      true,
-      { denyInstagram: true, fullPage: true }
-    );
+
     const internalWebsiteSnapshotUrl = buildWebsiteFullPageSnapshotUrl(normalizedWebsiteUrl);
-    let siteHeroSnapshotUrl = hasBrowserless
-      ? (internalWebsiteSnapshotUrl || externalWebsiteSnapshotUrl)
-      : (externalWebsiteSnapshotUrl || internalWebsiteSnapshotUrl);
+    const internalInstagramSnapshotUrl = instagramEvidence.handle
+      ? buildInstagramProfileSnapshotUrl(instagramEvidence.handle)
+      : undefined;
+    const instagramBioLinkTargetUrl =
+      instagramEvidence.bioLinkResolvedUrl || instagramEvidence.bioLinkUrl;
+    const internalInstagramBioLinkSnapshotUrl = buildWebsiteFullPageSnapshotUrl(
+      instagramBioLinkTargetUrl
+    );
     const proxiedInstagramProfileImageUrl = buildImageProxyUrl(instagramEvidence.profileImageUrl);
     const proxiedInstagramRecentPostImageUrl = buildImageProxyUrl(instagramEvidence.recentPostImageUrl);
     const logoImageUrl = normalizedWebsiteUrl
       ? `https://www.google.com/s2/favicons?sz=256&domain_url=${encodeURIComponent(normalizedWebsiteUrl)}`
       : undefined;
-    const externalInstagramScreenshotUrl = normalizedInstagramUrl
-      ? await resolveScreenshotUrl(normalizedInstagramUrl, 1200, false)
-      : undefined;
-    const internalInstagramSnapshotUrl = instagramEvidence.handle
-      ? buildInstagramProfileSnapshotUrl(instagramEvidence.handle)
-      : undefined;
+
+    const [externalWebsiteSnapshotUrl, externalInstagramScreenshotUrl, externalInstagramBioLinkSnapshotUrl] =
+      await Promise.all([
+        resolveScreenshotUrl(normalizedWebsiteUrl, 1400, true, { denyInstagram: true, fullPage: true }),
+        normalizedInstagramUrl ? resolveScreenshotUrl(normalizedInstagramUrl, 1200, false) : Promise.resolve(undefined),
+        resolveScreenshotUrl(instagramBioLinkTargetUrl, 1400, true, { denyInstagram: true, fullPage: true }),
+      ]);
+
+    let siteHeroSnapshotUrl = hasBrowserless
+      ? (internalWebsiteSnapshotUrl || externalWebsiteSnapshotUrl)
+      : (externalWebsiteSnapshotUrl || internalWebsiteSnapshotUrl);
     const instagramSnapshotCandidates = hasBrowserless
       ? [
           internalInstagramSnapshotUrl,
@@ -1480,44 +1489,30 @@ export async function POST(req: NextRequest) {
     if (siteHeroSnapshotUrl && siteHeroSnapshotUrl === instagramSnapshotUrl) {
       siteHeroSnapshotUrl = undefined;
     }
-    const instagramBioLinkTargetUrl =
-      instagramEvidence.bioLinkResolvedUrl || instagramEvidence.bioLinkUrl;
-    const externalInstagramBioLinkSnapshotUrl = await resolveScreenshotUrl(
-      instagramBioLinkTargetUrl,
-      1400,
-      true,
-      { denyInstagram: true, fullPage: true }
-    );
-    const internalInstagramBioLinkSnapshotUrl = buildWebsiteFullPageSnapshotUrl(
-      instagramBioLinkTargetUrl
-    );
     let instagramBioLinkSnapshotUrl = hasBrowserless
       ? (internalInstagramBioLinkSnapshotUrl || externalInstagramBioLinkSnapshotUrl)
       : (externalInstagramBioLinkSnapshotUrl || internalInstagramBioLinkSnapshotUrl);
     const instagramProfileImageUrl = proxiedInstagramProfileImageUrl || undefined;
+
     const websiteCandidateUrls = hasBrowserless
       ? [internalWebsiteSnapshotUrl, externalWebsiteSnapshotUrl]
       : [externalWebsiteSnapshotUrl, internalWebsiteSnapshotUrl];
-    const { part: websiteImagePart, selectedUrl: selectedWebsiteSnapshotUrl } =
-      await downloadFirstAvailableImagePart(requestOrigin, websiteCandidateUrls);
-    if (selectedWebsiteSnapshotUrl) {
-      siteHeroSnapshotUrl = selectedWebsiteSnapshotUrl;
-    }
-
-    const { part: instagramImagePart, selectedUrl: selectedInstagramSnapshotUrl } =
-      await downloadFirstAvailableImagePart(requestOrigin, instagramSnapshotCandidates);
-    if (selectedInstagramSnapshotUrl) {
-      instagramSnapshotUrl = selectedInstagramSnapshotUrl;
-    }
-
     const bioLinkCandidateUrls = hasBrowserless
       ? [internalInstagramBioLinkSnapshotUrl, externalInstagramBioLinkSnapshotUrl]
       : [externalInstagramBioLinkSnapshotUrl, internalInstagramBioLinkSnapshotUrl];
-    const { part: instagramBioLinkImagePart, selectedUrl: selectedBioLinkSnapshotUrl } =
-      await downloadFirstAvailableImagePart(requestOrigin, bioLinkCandidateUrls);
-    if (selectedBioLinkSnapshotUrl) {
-      instagramBioLinkSnapshotUrl = selectedBioLinkSnapshotUrl;
-    }
+
+    const [websiteDownload, instagramDownload, bioLinkDownload] = await Promise.all([
+      downloadFirstAvailableImagePart(requestOrigin, websiteCandidateUrls),
+      downloadFirstAvailableImagePart(requestOrigin, instagramSnapshotCandidates),
+      downloadFirstAvailableImagePart(requestOrigin, bioLinkCandidateUrls),
+    ]);
+    const { part: websiteImagePart, selectedUrl: selectedWebsiteSnapshotUrl } = websiteDownload;
+    const { part: instagramImagePart, selectedUrl: selectedInstagramSnapshotUrl } = instagramDownload;
+    const { part: instagramBioLinkImagePart, selectedUrl: selectedBioLinkSnapshotUrl } = bioLinkDownload;
+
+    if (selectedWebsiteSnapshotUrl) siteHeroSnapshotUrl = selectedWebsiteSnapshotUrl;
+    if (selectedInstagramSnapshotUrl) instagramSnapshotUrl = selectedInstagramSnapshotUrl;
+    if (selectedBioLinkSnapshotUrl) instagramBioLinkSnapshotUrl = selectedBioLinkSnapshotUrl;
     console.info("[IG_DEBUG][generate-route] URLs de evidência selecionadas.", {
       hasBrowserless,
       siteHeroSnapshotUrl: siteHeroSnapshotUrl || null,
