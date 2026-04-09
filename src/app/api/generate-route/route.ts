@@ -992,6 +992,32 @@ function parseModelJson(text: string): Record<string, unknown> {
   }
 }
 
+async function repairModelJsonWithGemini(
+  genAI: GoogleGenerativeAI,
+  rawText: string
+): Promise<Record<string, unknown>> {
+  const repairModel = genAI.getGenerativeModel(
+    {
+      model: "gemini-2.0-flash-lite",
+    },
+    { apiVersion: "v1" }
+  );
+
+  const repairPrompt = [
+    "Converta o conteúdo abaixo para um JSON VÁLIDO.",
+    "Regras:",
+    "- Preserve os mesmos campos e valores sempre que possível.",
+    "- Não adicione comentários.",
+    "- Não adicione texto fora do JSON.",
+    "- Retorne apenas um único objeto JSON válido.",
+    "",
+    rawText,
+  ].join("\n");
+
+  const repaired = await repairModel.generateContent(repairPrompt);
+  return parseModelJson(repaired.response.text());
+}
+
 function buildWebsiteResearchNote(e: WebsiteEvidence): string {
   if (e.isAccessible === false) {
     return `não foi possível acessar a home durante a coleta automática.`;
@@ -1496,7 +1522,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const aiData = parseModelJson(responseText);
+    let aiData: Record<string, unknown>;
+    try {
+      aiData = parseModelJson(responseText);
+    } catch (parseError) {
+      console.warn("[AI_JSON_PARSE] Resposta inválida, tentando reparo automático.", {
+        error: parseError instanceof Error ? parseError.message : String(parseError),
+      });
+      aiData = await repairModelJsonWithGemini(genAI, responseText);
+    }
 
     const proposalRaw =
       typeof aiData.proposalPageHtml === "string"
