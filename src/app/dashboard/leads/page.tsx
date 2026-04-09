@@ -157,7 +157,12 @@ export default function LeadsPage() {
             </div>
             <div className="space-y-2">
               <Label>Status</Label>
-              <Select value={status} onValueChange={(val: string) => setStatus(val as LeadStatus)}>
+              <Select
+                value={status}
+                onValueChange={(val) => {
+                  if (val) setStatus(val as LeadStatus);
+                }}
+              >
                 <SelectTrigger className="bg-zinc-800 border-zinc-700">
                   <SelectValue placeholder="Selecione o status" />
                 </SelectTrigger>

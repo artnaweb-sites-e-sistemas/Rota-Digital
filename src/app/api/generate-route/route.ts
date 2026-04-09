@@ -13,7 +13,6 @@ import {
   isInstagramLoginWallHtml,
   sanitizeInstagramAssetUrl,
 } from "@/lib/instagram-public-profile";
-import { captureInstagramProfileViaPlaywright } from "@/lib/instagram-playwright";
 
 function newPublicSlug(): string {
   return randomBytes(12)
@@ -640,6 +639,7 @@ async function collectInstagramEvidence(url?: string): Promise<InstagramEvidence
     let dataSource: InstagramEvidence["dataSource"] = "none";
 
     // --- Estratégia 0: Playwright usando sessão local do Chrome (preferencial) ---
+    const { captureInstagramProfileViaPlaywright } = await import("@/lib/instagram-playwright");
     const playwrightCapture = await captureInstagramProfileViaPlaywright(handle);
     if (playwrightCapture?.profile) {
       bio = playwrightCapture.profile.bio;

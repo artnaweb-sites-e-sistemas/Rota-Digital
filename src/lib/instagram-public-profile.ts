@@ -95,6 +95,15 @@ export function buildInstagramRequestHeaders(
   };
 }
 
+/** Cabeçalhos para APIs públicas do Instagram (GraphQL embutido na página). */
+export function buildInstagramPublicHeaders(): Record<string, string> {
+  return buildInstagramRequestHeaders({
+    "x-ig-app-id": "936619743392459",
+    Accept: "application/json",
+    "X-Requested-With": "XMLHttpRequest",
+  });
+}
+
 export function sanitizeInstagramAssetUrl(url?: string): string | undefined {
   if (!url) return undefined;
   const trimmed = url.trim();

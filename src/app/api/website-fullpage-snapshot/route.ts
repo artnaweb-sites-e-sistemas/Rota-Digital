@@ -1,8 +1,10 @@
 import { NextRequest } from "next/server";
 
-import { captureWebsiteFullPageViaPlaywright } from "@/lib/website-playwright";
-
 export const runtime = "nodejs";
+
+function bufferToBody(buf: Buffer): Blob {
+  return new Blob([Uint8Array.from(buf)]);
+}
 
 function isPrivateHost(hostname: string): boolean {
   const host = hostname.toLowerCase();
@@ -31,6 +33,7 @@ export async function GET(req: NextRequest) {
     return new Response("Invalid or private URL", { status: 400 });
   }
 
+  const { captureWebsiteFullPageViaPlaywright } = await import("@/lib/website-playwright");
   const capture = await captureWebsiteFullPageViaPlaywright(url);
   if (!capture?.screenshot) {
     return new Response("Website snapshot unavailable", {
@@ -39,7 +42,7 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  return new Response(capture.screenshot, {
+  return new Response(bufferToBody(capture.screenshot), {
     status: 200,
     headers: {
       "Content-Type": capture.mimeType || "image/jpeg",

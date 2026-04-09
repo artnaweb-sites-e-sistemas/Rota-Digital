@@ -209,17 +209,15 @@ async function copyDirSkippingLockedFiles(
   let skipped = 0;
   await fs.mkdir(dest, { recursive: true });
 
-  let entries: Awaited<ReturnType<typeof fs.readdir>>;
-  try {
-    entries = await fs.readdir(src, { withFileTypes: true });
-  } catch {
+  const entries = await fs.readdir(src, { withFileTypes: true }).catch(() => null);
+  if (!entries) {
     skipped++;
     return { copied, skipped };
   }
 
   for (const entry of entries) {
-    const srcPath = path.join(src, entry.name);
-    const destPath = path.join(dest, entry.name);
+    const srcPath = path.join(/* turbopackIgnore: true */ src, entry.name);
+    const destPath = path.join(/* turbopackIgnore: true */ dest, entry.name);
 
     if (entry.isDirectory()) {
       const skipDirs = ["Cache", "Code Cache", "GPUCache", "DawnCache", "GrShaderCache", "ShaderCache", "Service Worker"];
@@ -256,17 +254,19 @@ async function createEphemeralUserDataDirSnapshot(config: {
   profileDirectory?: string;
 }): Promise<string | null> {
   const profileDirName = config.profileDirectory || "Default";
-  const sourceProfilePath = path.join(config.userDataDir, profileDirName);
-  const sourceLocalStatePath = path.join(config.userDataDir, "Local State");
-  const tempRoot = path.join(os.tmpdir(), `rd-ig-profile-${Date.now()}`);
+  const sourceProfilePath = path.join(/* turbopackIgnore: true */ config.userDataDir, profileDirName);
+  const sourceLocalStatePath = path.join(/* turbopackIgnore: true */ config.userDataDir, "Local State");
+  const tempRoot = path.join(/* turbopackIgnore: true */ os.tmpdir(), `rd-ig-profile-${Date.now()}`);
 
   try {
     await fs.mkdir(tempRoot, { recursive: true });
     const { copied, skipped } = await copyDirSkippingLockedFiles(
       sourceProfilePath,
-      path.join(tempRoot, profileDirName)
+      path.join(/* turbopackIgnore: true */ tempRoot, profileDirName)
     );
-    await fs.copyFile(sourceLocalStatePath, path.join(tempRoot, "Local State")).catch(() => undefined);
+    await fs
+      .copyFile(sourceLocalStatePath, path.join(/* turbopackIgnore: true */ tempRoot, "Local State"))
+      .catch(() => undefined);
     console.info("[IG_DEBUG][instagram-playwright] Snapshot do perfil criado.", {
       copied,
       skipped,
@@ -602,14 +602,6 @@ export async function captureInstagramProfileViaPlaywright(
   } finally {
     captureInFlight.delete(normalizedHandle);
   }
-}
-
-export function buildInstagramPublicHeaders(): Record<string, string> {
-  return buildInstagramRequestHeaders({
-    "x-ig-app-id": "936619743392459",
-    Accept: "application/json",
-    "X-Requested-With": "XMLHttpRequest",
-  });
 }
 
 async function dismissInstagramOverlays(page: Page): Promise<void> {

@@ -1,15 +1,20 @@
 import { NextRequest } from "next/server";
 import { ImageResponse } from "next/og";
 import {
+  buildInstagramPublicHeaders,
   buildInstagramRequestHeaders,
   fetchInstagramPublicPage,
   isInstagramLoginWallBio,
   isInstagramLoginWallHtml,
   sanitizeInstagramAssetUrl,
 } from "@/lib/instagram-public-profile";
-import { buildInstagramPublicHeaders, captureInstagramProfileViaPlaywright } from "@/lib/instagram-playwright";
 
 export const runtime = "nodejs";
+
+/** Buffer → corpo de `Response` (compatível com o tipo `BodyInit` do worker TS). */
+function bufferToBody(buf: Buffer): Blob {
+  return new Blob([Uint8Array.from(buf)]);
+}
 
 type SnapshotCacheEntry = {
   contentType: string;
@@ -31,7 +36,7 @@ function getCachedSnapshotResponse(cacheKey: string): Response | null {
     snapshotResponseCache.delete(cacheKey);
     return null;
   }
-  return new Response(hit.payload, {
+  return new Response(bufferToBody(hit.payload), {
     status: 200,
     headers: {
       "Content-Type": hit.contentType,
@@ -273,13 +278,14 @@ export async function GET(req: NextRequest) {
     start,
   });
 
+  const { captureInstagramProfileViaPlaywright } = await import("@/lib/instagram-playwright");
   const capture = await captureInstagramProfileViaPlaywright(handle);
   if (capture?.screenshot) {
     console.info("[IG_DEBUG][instagram-profile-snapshot] Retornando captura real do perfil.");
     const payload = Buffer.from(capture.screenshot);
     const captureContentType = capture.mimeType || "image/png";
     setCachedSnapshotResponse(cacheKey, captureContentType, payload);
-    return new Response(payload, {
+    return new Response(bufferToBody(payload), {
       status: 200,
       headers: {
         "Content-Type": captureContentType,
@@ -438,7 +444,7 @@ export async function GET(req: NextRequest) {
     );
     const payload = Buffer.from(await image.arrayBuffer());
     setCachedSnapshotResponse(cacheKey, "image/png", payload);
-    return new Response(payload, {
+    return new Response(bufferToBody(payload), {
       status: 200,
       headers: {
         "Content-Type": "image/png",
@@ -575,7 +581,7 @@ export async function GET(req: NextRequest) {
   );
   const payload = Buffer.from(await image.arrayBuffer());
   setCachedSnapshotResponse(cacheKey, "image/png", payload);
-  return new Response(payload, {
+  return new Response(bufferToBody(payload), {
     status: 200,
     headers: {
       "Content-Type": "image/png",
