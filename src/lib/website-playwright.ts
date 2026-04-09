@@ -82,9 +82,18 @@ async function takeWebsiteScreenshot(page: Page): Promise<{ screenshot: Buffer; 
   return { screenshot: jpeg65, mimeType: "image/jpeg" };
 }
 
+function isServerlessEnvironment(): boolean {
+  return Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+}
+
 export async function captureWebsiteFullPageViaPlaywright(
   url: string
 ): Promise<WebsiteCaptureResult | null> {
+  if (isServerlessEnvironment()) {
+    console.info("[IG_DEBUG][website-playwright] Ambiente serverless detectado, pulando Playwright.", { url });
+    return null;
+  }
+
   const cached = getCachedWebsiteCapture(url);
   if (cached) return cached;
 

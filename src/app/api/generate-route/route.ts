@@ -568,20 +568,24 @@ async function resolveScreenshotUrl(
   allowWordpressFallback = true,
   options?: {
     denyInstagram?: boolean;
+    fullPage?: boolean;
   }
 ): Promise<string | undefined> {
   if (!targetUrl) return undefined;
   if (options?.denyInstagram && isInstagramDomainUrl(targetUrl)) return undefined;
   const encoded = encodeURIComponent(targetUrl);
-  // 1) Tenta Microlink (geralmente retorna screenshot limpo).
-  const api = `https://api.microlink.io/?url=${encoded}&screenshot=true&meta=false&palette=false`;
+  const fullPageParam = options?.fullPage ? "&fullPage=true" : "";
+  const scrollToParam = options?.fullPage ? "&scrollTo=bottom" : "";
+  const viewportParam = options?.fullPage
+    ? "&viewport.width=1440&viewport.height=900&viewport.deviceScaleFactor=1"
+    : "";
+  const api = `https://api.microlink.io/?url=${encoded}&screenshot=true&meta=false&palette=false${fullPageParam}${scrollToParam}${viewportParam}`;
   const data = await fetchJson<{
     data?: { screenshot?: { url?: string } };
   }>(api);
   const shot = data?.data?.screenshot?.url;
   if (shot) return shot;
   if (!allowWordpressFallback) return undefined;
-  // 2) Fallback: mShots
   return `https://s.wordpress.com/mshots/v1/${encoded}?w=${width}`;
 }
 
@@ -659,35 +663,8 @@ async function collectInstagramEvidence(url?: string): Promise<InstagramEvidence
     let bioLinkResolvedUrl: string | undefined;
     let dataSource: InstagramEvidence["dataSource"] = "none";
 
-    // --- Estratégia 0: Playwright usando sessão local do Chrome (preferencial) ---
-    const { captureInstagramProfileViaPlaywright } = await import("@/lib/instagram-playwright");
-    const playwrightCapture = await captureInstagramProfileViaPlaywright(handle);
-    if (playwrightCapture?.profile) {
-      bio = playwrightCapture.profile.bio;
-      followers = playwrightCapture.profile.followers;
-      following = playwrightCapture.profile.following;
-      posts = playwrightCapture.profile.posts;
-      profileImageUrl = playwrightCapture.profile.profileImageUrl;
-      bioLinkTitle = playwrightCapture.profile.bioLinkTitle;
-      bioLinkUrl = unwrapInstagramOutboundUrl(playwrightCapture.profile.bioLinkUrl);
-      hasLinkInBio = Boolean(bioLinkUrl);
-      dataSource = "playwright";
-      console.info("[IG_DEBUG][collectInstagramEvidence] Estratégia 0 (Playwright) OK.", {
-        handle,
-        hasBio: Boolean(bio),
-        followers,
-        posts,
-        hasProfileImage: Boolean(profileImageUrl),
-      });
-    }
-
-    // --- Estratégia 1: API interna do Instagram (funciona quando o server tem cookies/session) ---
-    const shouldQueryInternalApi =
-      !bio ||
-      typeof followers !== "number" ||
-      typeof posts !== "number" ||
-      !bioLinkUrl;
-    const profileInfo = !shouldQueryInternalApi ? null : await fetchJson<{
+    // --- Estratégia 1: API interna do Instagram (funciona sem Playwright, prioridade em produção) ---
+    const profileInfo = await fetchJson<{
       data?: {
         user?: {
           biography?: string;
@@ -751,8 +728,10 @@ async function collectInstagramEvidence(url?: string): Promise<InstagramEvidence
       });
     }
 
-    // --- Estratégia 2: HTML da página oficial (JSON embutido / meta). Evita “login wall”. ---
-    if (!bio) {
+    // --- Estratégia 2: HTML da página oficial (JSON embutido / meta). ---
+    const needsHtmlFallback =
+      !bio || typeof followers !== "number" || typeof posts !== "number" || !profileImageUrl;
+    if (needsHtmlFallback) {
       try {
         const { text } = await fetchInstagramPublicPage(url);
         if (isInstagramLoginWallHtml(text)) {
@@ -838,7 +817,9 @@ async function collectInstagramEvidence(url?: string): Promise<InstagramEvidence
       { name: "picuki", url: `https://www.picuki.com/profile/${handle}` },
       { name: "gramhir", url: `https://gramhir.com/profile/${handle}` },
     ];
-    if (!bio) {
+    const needsMirrorFallback =
+      !bio || typeof followers !== "number" || typeof posts !== "number";
+    if (needsMirrorFallback) {
       for (const mirror of mirrors) {
         try {
           const { text } = await fetchText(mirror.url);
@@ -896,7 +877,8 @@ async function collectInstagramEvidence(url?: string): Promise<InstagramEvidence
     }
 
     // --- Estratégia 4: Microlink como scraper de metadados ---
-    if (!bio) {
+    const needsMicrolinkFallback = !bio || !profileImageUrl;
+    if (needsMicrolinkFallback) {
       try {
         const mlData = await fetchJson<{
           data?: { description?: string; image?: { url?: string } };
@@ -913,6 +895,37 @@ async function collectInstagramEvidence(url?: string): Promise<InstagramEvidence
         }
       } catch (error) {
         console.warn("[IG_DEBUG][collectInstagramEvidence] Estratégia 4 (Microlink) falhou.", {
+          handle,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    // --- Estratégia 5 (opcional): Playwright local — só roda fora de serverless ---
+    const needsPlaywrightEnrichment =
+      !bio || typeof followers !== "number" || typeof posts !== "number" || !profileImageUrl;
+    if (needsPlaywrightEnrichment) {
+      try {
+        const { captureInstagramProfileViaPlaywright } = await import("@/lib/instagram-playwright");
+        const playwrightCapture = await captureInstagramProfileViaPlaywright(handle);
+        if (playwrightCapture?.profile) {
+          bio = bio || playwrightCapture.profile.bio;
+          followers = followers ?? playwrightCapture.profile.followers;
+          following = following ?? playwrightCapture.profile.following;
+          posts = posts ?? playwrightCapture.profile.posts;
+          profileImageUrl = profileImageUrl || playwrightCapture.profile.profileImageUrl;
+          bioLinkTitle = bioLinkTitle || playwrightCapture.profile.bioLinkTitle;
+          bioLinkUrl = bioLinkUrl || unwrapInstagramOutboundUrl(playwrightCapture.profile.bioLinkUrl);
+          hasLinkInBio = hasLinkInBio || Boolean(bioLinkUrl);
+          if (dataSource === "none") dataSource = "playwright";
+          console.info("[IG_DEBUG][collectInstagramEvidence] Estratégia 5 (Playwright) OK.", {
+            handle,
+            hasBio: Boolean(bio),
+            followers,
+          });
+        }
+      } catch (error) {
+        console.warn("[IG_DEBUG][collectInstagramEvidence] Estratégia 5 (Playwright) ignorada.", {
           handle,
           error: error instanceof Error ? error.message : String(error),
         });
@@ -1409,7 +1422,7 @@ export async function POST(req: NextRequest) {
       normalizedWebsiteUrl,
       1400,
       true,
-      { denyInstagram: true }
+      { denyInstagram: true, fullPage: true }
     );
     const internalWebsiteSnapshotUrl = buildWebsiteFullPageSnapshotUrl(normalizedWebsiteUrl);
     let siteHeroSnapshotUrl = externalWebsiteSnapshotUrl || internalWebsiteSnapshotUrl;
@@ -1418,9 +1431,13 @@ export async function POST(req: NextRequest) {
     const logoImageUrl = normalizedWebsiteUrl
       ? `https://www.google.com/s2/favicons?sz=256&domain_url=${encodeURIComponent(normalizedWebsiteUrl)}`
       : undefined;
+    const externalInstagramScreenshotUrl = normalizedInstagramUrl
+      ? await resolveScreenshotUrl(normalizedInstagramUrl, 1200, false)
+      : undefined;
     const instagramSnapshotCandidates = [
       proxiedInstagramRecentPostImageUrl,
       proxiedInstagramProfileImageUrl,
+      externalInstagramScreenshotUrl,
       instagramEvidence.handle
         ? buildInstagramProfileSnapshotUrl(instagramEvidence.handle)
         : undefined,
@@ -1435,7 +1452,7 @@ export async function POST(req: NextRequest) {
       instagramBioLinkTargetUrl,
       1400,
       true,
-      { denyInstagram: true }
+      { denyInstagram: true, fullPage: true }
     );
     const internalInstagramBioLinkSnapshotUrl = buildWebsiteFullPageSnapshotUrl(
       instagramBioLinkTargetUrl

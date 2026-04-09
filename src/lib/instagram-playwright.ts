@@ -555,11 +555,21 @@ async function captureWithCookieContext(handle: string): Promise<PlaywrightInsta
   }
 }
 
+function isServerlessEnvironment(): boolean {
+  return Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+}
+
 export async function captureInstagramProfileViaPlaywright(
   handle: string
 ): Promise<PlaywrightInstagramCaptureResult | null> {
   const normalizedHandle = handle.replace(/^@+/, "").trim().toLowerCase();
   if (!normalizedHandle) return null;
+
+  if (isServerlessEnvironment()) {
+    console.info("[IG_DEBUG][instagram-playwright] Ambiente serverless detectado, pulando Playwright.", { handle: normalizedHandle });
+    return null;
+  }
+
   const cached = getCachedCapture(normalizedHandle);
   if (cached?.screenshot || cached?.profile) {
     return cached;
