@@ -1305,16 +1305,39 @@ Use pesquisa na web quando necessário para enriquecer a análise (site da empre
 - "diagnosticScores.comment": comentário humano, específico e acionável. Se a nota for menor que 10, termine dizendo o que precisa ser feito para chegar a 10/10.
 - Quando o texto de "diagnosticScores.comment", "websiteResearchNote", "instagramResearchNote" ou "recommendedChannels.description" ficar longo, divida em 2 parágrafos curtos para facilitar a leitura.
 
-**Regra crítica anti-alucinação**
-- Nunca invente número de seguidores, métricas, páginas, recursos ou funcionalidades.
-- Para cor/paleta/contraste/hierarquia visual, use somente as capturas visuais enviadas nesta requisição.
-- Se não houver captura visual de um canal, escreva "não verificado visualmente" e evite afirmar cores ou detalhes estéticos desse canal.
-- Não use fallback textual para "simular" análise visual. Sem imagem real do canal, assuma limitação e informe explicitamente.
-- Quando houver captura do Instagram, extraia apenas o que for visualmente legível no print. Se houver dúvida, use "não legível na captura".
-- Nunca invente ou adivinhe a bio do Instagram. O campo "instagramBioExcerpt" DEVE ser vazio ("") se a bio não foi fornecida acima em "Instagram bio".
-- Nunca invente comportamento do link da bio. Se o destino final verificado for WhatsApp, diga que leva direto para WhatsApp.
-- Se algum dado não estiver verificado, escreva explicitamente "não verificado".
-- Se o website for diretório/listagem/placeholder, trate como maturidade baixa para website.
+**REGRA ABSOLUTA: NUNCA INVENTE INFORMAÇÃO**
+Esta é a regra mais importante de todo o relatório. Quebre qualquer outra regra antes de quebrar esta.
+
+PROIBIDO INVENTAR (lista exaustiva):
+- Número de seguidores, posts, seguindo, curtidas ou qualquer métrica numérica.
+- Conteúdo da bio do Instagram. Se "Instagram bio" acima diz "não verificada", o campo "instagramBioExcerpt" DEVE ser "".
+- Cores, paleta, identidade visual, estética do feed — SOMENTE se houver captura visual real.
+- Funcionalidades, páginas ou seções do site que não foram verificadas.
+- Comportamento do link da bio. Se "destino final verificado" diz "não verificado", NÃO diga que leva para WhatsApp, Linktree ou qualquer lugar.
+- Tipo de conteúdo dos posts (ex.: "posts com dicas", "fotos de trabalhos"). Só descreva se viu na captura.
+- Qualquer afirmação sobre a aparência visual de um canal sem captura.
+
+QUANDO A CAPTURA FALHOU OU NÃO ESTÁ DISPONÍVEL:
+- Se "Captura visual do Instagram antes da análise" = "não disponível" E "Instagram bio" = "não verificada" E "Instagram seguidores" = "não verificado":
+  -> Escreva explicitamente: "Não foi possível acessar o perfil do Instagram durante a análise automatizada. As informações abaixo são baseadas apenas no que foi possível verificar externamente."
+  -> NÃO descreva o feed, a estética, o tipo de conteúdo ou a qualidade visual do perfil.
+  -> NÃO invente seguidores, bio ou qualquer dado.
+  -> A nota de tópicos relacionados ao Instagram deve refletir essa limitação.
+- Se "Captura visual do website antes da análise" = "não disponível":
+  -> Escreva: "Não foi possível capturar visualmente o site durante a análise."
+  -> NÃO descreva cores, layout, hierarquia visual ou design do site.
+
+QUANDO O INSTAGRAM NÃO FOI INFORMADO:
+- Se "Instagram / redes" = "Não informado", isso significa que o lead não tem (ou não forneceu) Instagram.
+- Neste caso, a IA PODE e DEVE comentar sobre a ausência de presença no Instagram como um ponto de melhoria.
+- Isso é diferente de "o Instagram foi informado mas não conseguimos acessar" — neste caso, não invente dados.
+
+COMO DIFERENCIAR:
+- Instagram informado + dados coletados = use os dados reais.
+- Instagram informado + coleta falhou = diga que não foi possível verificar, NÃO invente.
+- Instagram não informado = comente a ausência como oportunidade de melhoria.
+
+REGRA DE OURO: na dúvida entre afirmar algo e dizer "não verificado", SEMPRE diga "não verificado".
 
 Responda **somente** com um único objeto JSON válido (sem markdown fora do JSON), com esta estrutura:
 
@@ -1418,6 +1441,7 @@ export async function POST(req: NextRequest) {
     });
 
     const requestOrigin = req.nextUrl.origin;
+    const hasBrowserless = Boolean(process.env.BROWSERLESS_API_KEY?.trim());
     const externalWebsiteSnapshotUrl = await resolveScreenshotUrl(
       normalizedWebsiteUrl,
       1400,
@@ -1425,7 +1449,9 @@ export async function POST(req: NextRequest) {
       { denyInstagram: true, fullPage: true }
     );
     const internalWebsiteSnapshotUrl = buildWebsiteFullPageSnapshotUrl(normalizedWebsiteUrl);
-    let siteHeroSnapshotUrl = externalWebsiteSnapshotUrl || internalWebsiteSnapshotUrl;
+    let siteHeroSnapshotUrl = hasBrowserless
+      ? (internalWebsiteSnapshotUrl || externalWebsiteSnapshotUrl)
+      : (externalWebsiteSnapshotUrl || internalWebsiteSnapshotUrl);
     const proxiedInstagramProfileImageUrl = buildImageProxyUrl(instagramEvidence.profileImageUrl);
     const proxiedInstagramRecentPostImageUrl = buildImageProxyUrl(instagramEvidence.recentPostImageUrl);
     const logoImageUrl = normalizedWebsiteUrl
@@ -1434,14 +1460,22 @@ export async function POST(req: NextRequest) {
     const externalInstagramScreenshotUrl = normalizedInstagramUrl
       ? await resolveScreenshotUrl(normalizedInstagramUrl, 1200, false)
       : undefined;
-    const instagramSnapshotCandidates = [
-      proxiedInstagramRecentPostImageUrl,
-      proxiedInstagramProfileImageUrl,
-      externalInstagramScreenshotUrl,
-      instagramEvidence.handle
-        ? buildInstagramProfileSnapshotUrl(instagramEvidence.handle)
-        : undefined,
-    ];
+    const internalInstagramSnapshotUrl = instagramEvidence.handle
+      ? buildInstagramProfileSnapshotUrl(instagramEvidence.handle)
+      : undefined;
+    const instagramSnapshotCandidates = hasBrowserless
+      ? [
+          internalInstagramSnapshotUrl,
+          proxiedInstagramRecentPostImageUrl,
+          proxiedInstagramProfileImageUrl,
+          externalInstagramScreenshotUrl,
+        ]
+      : [
+          proxiedInstagramRecentPostImageUrl,
+          proxiedInstagramProfileImageUrl,
+          externalInstagramScreenshotUrl,
+          internalInstagramSnapshotUrl,
+        ];
     let instagramSnapshotUrl = instagramSnapshotCandidates.find(Boolean);
     if (siteHeroSnapshotUrl && siteHeroSnapshotUrl === instagramSnapshotUrl) {
       siteHeroSnapshotUrl = undefined;
@@ -1457,14 +1491,15 @@ export async function POST(req: NextRequest) {
     const internalInstagramBioLinkSnapshotUrl = buildWebsiteFullPageSnapshotUrl(
       instagramBioLinkTargetUrl
     );
-    let instagramBioLinkSnapshotUrl =
-      externalInstagramBioLinkSnapshotUrl || internalInstagramBioLinkSnapshotUrl;
+    let instagramBioLinkSnapshotUrl = hasBrowserless
+      ? (internalInstagramBioLinkSnapshotUrl || externalInstagramBioLinkSnapshotUrl)
+      : (externalInstagramBioLinkSnapshotUrl || internalInstagramBioLinkSnapshotUrl);
     const instagramProfileImageUrl = proxiedInstagramProfileImageUrl || undefined;
+    const websiteCandidateUrls = hasBrowserless
+      ? [internalWebsiteSnapshotUrl, externalWebsiteSnapshotUrl]
+      : [externalWebsiteSnapshotUrl, internalWebsiteSnapshotUrl];
     const { part: websiteImagePart, selectedUrl: selectedWebsiteSnapshotUrl } =
-      await downloadFirstAvailableImagePart(requestOrigin, [
-        externalWebsiteSnapshotUrl,
-        internalWebsiteSnapshotUrl,
-      ]);
+      await downloadFirstAvailableImagePart(requestOrigin, websiteCandidateUrls);
     if (selectedWebsiteSnapshotUrl) {
       siteHeroSnapshotUrl = selectedWebsiteSnapshotUrl;
     }
@@ -1475,15 +1510,16 @@ export async function POST(req: NextRequest) {
       instagramSnapshotUrl = selectedInstagramSnapshotUrl;
     }
 
+    const bioLinkCandidateUrls = hasBrowserless
+      ? [internalInstagramBioLinkSnapshotUrl, externalInstagramBioLinkSnapshotUrl]
+      : [externalInstagramBioLinkSnapshotUrl, internalInstagramBioLinkSnapshotUrl];
     const { part: instagramBioLinkImagePart, selectedUrl: selectedBioLinkSnapshotUrl } =
-      await downloadFirstAvailableImagePart(requestOrigin, [
-        externalInstagramBioLinkSnapshotUrl,
-        internalInstagramBioLinkSnapshotUrl,
-      ]);
+      await downloadFirstAvailableImagePart(requestOrigin, bioLinkCandidateUrls);
     if (selectedBioLinkSnapshotUrl) {
       instagramBioLinkSnapshotUrl = selectedBioLinkSnapshotUrl;
     }
     console.info("[IG_DEBUG][generate-route] URLs de evidência selecionadas.", {
+      hasBrowserless,
       siteHeroSnapshotUrl: siteHeroSnapshotUrl || null,
       instagramSnapshotUrl: instagramSnapshotUrl || null,
       instagramBioLinkSnapshotUrl: instagramBioLinkSnapshotUrl || null,

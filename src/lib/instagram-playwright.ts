@@ -446,18 +446,33 @@ async function captureWithPersistentChrome(handle: string): Promise<PlaywrightIn
   }
 }
 
+function getBrowserlessWsEndpoint(): string | undefined {
+  const token = process.env.BROWSERLESS_API_KEY?.trim();
+  if (!token) return undefined;
+  return `wss://production-sfo.browserless.io?token=${token}`;
+}
+
+async function connectOrLaunchBrowser(): Promise<Awaited<ReturnType<typeof chromium.launch>>> {
+  const wsEndpoint = getBrowserlessWsEndpoint();
+  if (wsEndpoint) {
+    console.info("[IG_DEBUG][instagram-playwright] Conectando via Browserless.");
+    return chromium.connectOverCDP(wsEndpoint);
+  }
+  return chromium.launch({
+    headless: true,
+    args: [
+      "--disable-blink-features=AutomationControlled",
+      "--disable-dev-shm-usage",
+      "--no-sandbox",
+    ],
+  });
+}
+
 async function captureWithCookieContext(handle: string): Promise<PlaywrightInstagramCaptureResult | null> {
   const profileUrl = `https://www.instagram.com/${encodeURIComponent(handle)}/`;
   let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
   try {
-    browser = await chromium.launch({
-      headless: true,
-      args: [
-        "--disable-blink-features=AutomationControlled",
-        "--disable-dev-shm-usage",
-        "--no-sandbox",
-      ],
-    });
+    browser = await connectOrLaunchBrowser();
 
     const context = await browser.newContext({
       viewport: { width: 1280, height: 1700 },
@@ -565,8 +580,10 @@ export async function captureInstagramProfileViaPlaywright(
   const normalizedHandle = handle.replace(/^@+/, "").trim().toLowerCase();
   if (!normalizedHandle) return null;
 
-  if (isServerlessEnvironment()) {
-    console.info("[IG_DEBUG][instagram-playwright] Ambiente serverless detectado, pulando Playwright.", { handle: normalizedHandle });
+  const hasBrowserless = Boolean(getBrowserlessWsEndpoint());
+
+  if (isServerlessEnvironment() && !hasBrowserless) {
+    console.info("[IG_DEBUG][instagram-playwright] Serverless sem Browserless, pulando Playwright.", { handle: normalizedHandle });
     return null;
   }
 
@@ -581,21 +598,24 @@ export async function captureInstagramProfileViaPlaywright(
   }
 
   const job = (async (): Promise<PlaywrightInstagramCaptureResult | null> => {
-    const persistent = await captureWithPersistentChrome(normalizedHandle);
-    if (persistent) {
-      console.info("[IG_DEBUG][instagram-playwright] Captura via perfil do Chrome concluída.", {
-        handle: normalizedHandle,
-        hasBio: Boolean(persistent.profile?.bio),
-        followers: persistent.profile?.followers ?? null,
-      });
-      setCachedCapture(normalizedHandle, persistent);
-      return persistent;
+    if (!isServerlessEnvironment()) {
+      const persistent = await captureWithPersistentChrome(normalizedHandle);
+      if (persistent) {
+        console.info("[IG_DEBUG][instagram-playwright] Captura via perfil do Chrome concluída.", {
+          handle: normalizedHandle,
+          hasBio: Boolean(persistent.profile?.bio),
+          followers: persistent.profile?.followers ?? null,
+        });
+        setCachedCapture(normalizedHandle, persistent);
+        return persistent;
+      }
     }
 
     const cookieBased = await captureWithCookieContext(normalizedHandle);
     if (cookieBased) {
-      console.info("[IG_DEBUG][instagram-playwright] Captura via contexto com cookies concluída.", {
+      console.info("[IG_DEBUG][instagram-playwright] Captura via Browserless/cookies concluída.", {
         handle: normalizedHandle,
+        hasBrowserless,
         hasBio: Boolean(cookieBased.profile?.bio),
         followers: cookieBased.profile?.followers ?? null,
       });

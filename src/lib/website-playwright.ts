@@ -1,4 +1,4 @@
-import { chromium, type Page } from "playwright";
+import { chromium, type Page, type Browser } from "playwright";
 
 type WebsiteCaptureResult = {
   screenshot: Buffer;
@@ -82,18 +82,28 @@ async function takeWebsiteScreenshot(page: Page): Promise<{ screenshot: Buffer; 
   return { screenshot: jpeg65, mimeType: "image/jpeg" };
 }
 
-function isServerlessEnvironment(): boolean {
-  return Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+function getBrowserlessWsEndpoint(): string | undefined {
+  const token = process.env.BROWSERLESS_API_KEY?.trim();
+  if (!token) return undefined;
+  return `wss://production-sfo.browserless.io?token=${token}`;
+}
+
+async function connectBrowser(): Promise<Browser> {
+  const wsEndpoint = getBrowserlessWsEndpoint();
+  if (wsEndpoint) {
+    console.info("[website-playwright] Conectando via Browserless.");
+    return chromium.connectOverCDP(wsEndpoint);
+  }
+  console.info("[website-playwright] Lançando Chromium local.");
+  return chromium.launch({
+    headless: true,
+    args: ["--disable-dev-shm-usage", "--no-sandbox"],
+  });
 }
 
 export async function captureWebsiteFullPageViaPlaywright(
   url: string
 ): Promise<WebsiteCaptureResult | null> {
-  if (isServerlessEnvironment()) {
-    console.info("[IG_DEBUG][website-playwright] Ambiente serverless detectado, pulando Playwright.", { url });
-    return null;
-  }
-
   const cached = getCachedWebsiteCapture(url);
   if (cached) return cached;
 
@@ -101,12 +111,9 @@ export async function captureWebsiteFullPageViaPlaywright(
   if (inFlight) return inFlight;
 
   const job = (async (): Promise<WebsiteCaptureResult | null> => {
-    let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
+    let browser: Browser | undefined;
     try {
-      browser = await chromium.launch({
-        headless: true,
-        args: ["--disable-dev-shm-usage", "--no-sandbox"],
-      });
+      browser = await connectBrowser();
       const context = await browser.newContext({
         viewport: { width: 1440, height: 1900 },
         locale: "pt-BR",
@@ -125,7 +132,7 @@ export async function captureWebsiteFullPageViaPlaywright(
       setCachedWebsiteCapture(url, result);
       return result;
     } catch (error) {
-      console.warn("[IG_DEBUG][website-playwright] Falha na captura full-page.", {
+      console.warn("[website-playwright] Falha na captura full-page.", {
         url,
         error: error instanceof Error ? error.message : String(error),
       });
