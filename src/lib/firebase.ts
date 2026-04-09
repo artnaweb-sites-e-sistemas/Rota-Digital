@@ -14,7 +14,10 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-const auth = getAuth(app);
+const auth =
+  typeof window !== "undefined"
+    ? getAuth(app)
+    : (null as unknown as ReturnType<typeof getAuth>);
 const db = getFirestore(app);
 const storage = getStorage(app);
 
