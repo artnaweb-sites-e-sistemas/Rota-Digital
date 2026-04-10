@@ -1149,11 +1149,13 @@ export function RotaDigitalReportView({
       {/* Header */}
       <div
         className={cn(
-          "no-print flex flex-col justify-between gap-4 sm:flex-row sm:gap-6",
-          isDashboard ? "items-start sm:items-start" : "items-stretch sm:items-center",
+          "no-print justify-between gap-4 sm:gap-6",
+          isDashboard
+            ? "flex flex-col items-start sm:flex-row sm:items-start"
+            : "flex flex-row items-start justify-between gap-3 sm:items-center",
         )}
       >
-        <div className="flex items-center gap-3">
+        <div className={cn("flex items-center gap-3", !isDashboard && "min-w-0 flex-1")}>
           {isDashboard ? (
             <Button
               variant="ghost"
@@ -1164,7 +1166,7 @@ export function RotaDigitalReportView({
               <ArrowLeft size={20} />
             </Button>
           ) : null}
-          <div>
+          <div className="min-w-0">
             <h1 className="text-2xl font-bold text-foreground">Rota Digital</h1>
             {isDashboard ? (
               <p className="text-sm text-muted-foreground">
@@ -1176,7 +1178,12 @@ export function RotaDigitalReportView({
                   {report.leadCompany}
                 </Link>
               </p>
-            ) : null}
+            ) : (
+              <p className="mt-1 text-sm leading-snug text-muted-foreground sm:hidden">
+                Gerado para{" "}
+                <span className="font-medium text-foreground">{report.leadCompany}</span>
+              </p>
+            )}
           </div>
         </div>
         {isDashboard ? (
@@ -1227,9 +1234,9 @@ export function RotaDigitalReportView({
             )}
           </div>
         ) : (
-          <div className="flex flex-wrap items-center justify-end gap-3 sm:gap-4">
+          <div className="flex shrink-0 items-center gap-3 sm:gap-4">
             <PublicThemeToggle className="no-print" />
-            <p className="max-w-[min(100%,28rem)] text-right text-sm leading-snug text-muted-foreground">
+            <p className="hidden max-w-[min(100%,28rem)] text-right text-sm leading-snug text-muted-foreground sm:block">
               Gerado para{" "}
               <span className="font-medium text-foreground">{report.leadCompany}</span>
             </p>
