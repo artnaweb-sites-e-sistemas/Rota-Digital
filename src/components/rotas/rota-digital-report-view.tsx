@@ -75,6 +75,16 @@ const PRIORITY_COLORS: Record<string, string> = {
     "border border-emerald-500/35 bg-emerald-500/12 text-emerald-900 dark:bg-emerald-500/20 dark:text-emerald-200 dark:border-emerald-400/40",
 };
 
+/** Fundo opaco na aba de prioridade (só mobile) — evita “vazado” sobre o BorderGlow e o fundo da página. */
+const CHANNEL_PRIORITY_TAB_MOBILE_SURFACE: Record<string, string> = {
+  Alta:
+    "max-md:!bg-red-950/95 max-md:dark:!bg-red-950/92 max-md:!text-red-100 max-md:dark:!text-red-200",
+  Média:
+    "max-md:!bg-amber-950/94 max-md:dark:!bg-amber-950/90 max-md:!text-amber-100 max-md:dark:!text-amber-200",
+  Baixa:
+    "max-md:!bg-emerald-950/94 max-md:dark:!bg-emerald-950/90 max-md:!text-emerald-100 max-md:dark:!text-emerald-200",
+};
+
 /** Borda do BorderGlow em repouso (antes do hover), alinhada à prioridade. */
 const PRIORITY_FRAME_BORDER: Record<string, string> = {
   Alta: "border-red-500/35",
@@ -706,8 +716,21 @@ function EvidenceImage({
   const [scrollOffset, setScrollOffset] = useState(0);
   const [restOffset, setRestOffset] = useState(0);
   const [transitionMs, setTransitionMs] = useState(2200);
+  /** Pan animado só em desktop (mouse); em touch evita travar a rolagem da página. */
+  const [allowHoverPan, setAllowHoverPan] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(hover: hover) and (pointer: fine)");
+    const sync = () => setAllowHoverPan(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+
+  const panInteractive = hoverScroll && allowHoverPan;
   const resolvedSrc = (() => {
     if (!src) return src;
     try {
@@ -743,7 +766,7 @@ function EvidenceImage({
 
   /** Scroll no hover: modo scroll “clássico” ou `fitContain` só em `cover` (box preenchida + pan vertical). */
   const scrollMeasureActive =
-    hoverScroll && (!fitContain || (fitContain && fitContainMode === "cover"));
+    panInteractive && (!fitContain || (fitContain && fitContainMode === "cover"));
 
   useEffect(() => {
     setFailed(false);
@@ -787,7 +810,7 @@ function EvidenceImage({
 
   if (fitContain) {
     if (fitContainMode === "cover") {
-      if (hoverScroll) {
+      if (panInteractive) {
         return (
           <div
             ref={containerRef}
@@ -809,7 +832,7 @@ function EvidenceImage({
                 transform: `translateY(-${hoverPanTranslateY}px)`,
                 // Pan longo só com o mouse em cima; em repouso não “anima” sozinho.
                 transition: hovered ? `transform ${transitionMs}ms ease-in-out` : "none",
-                willChange: "transform",
+                willChange: hovered ? "transform" : "auto",
               }}
             />
             {scrollOffset > 0 ? (
@@ -865,7 +888,7 @@ function EvidenceImage({
     );
   }
 
-  if (!hoverScroll) {
+  if (!panInteractive) {
     return (
       <img
         src={resolvedSrc}
@@ -895,13 +918,9 @@ function EvidenceImage({
           minHeight: "auto",
           objectFit: "unset",
           objectPosition: "unset",
-          transform: `translateY(-${
-            hovered && scrollOffset > 0
-              ? (restOffset > 0 ? 0 : scrollOffset)
-              : restOffset
-          }px)`,
-          transition: `transform ${transitionMs}ms ease-in-out`,
-          willChange: "transform",
+          transform: `translateY(-${hoverPanTranslateY}px)`,
+          transition: hovered ? `transform ${transitionMs}ms ease-in-out` : "none",
+          willChange: hovered ? "transform" : "auto",
         }}
       />
       {scrollOffset > 0 ? (
@@ -1115,55 +1134,79 @@ function ChannelCard({ channel }: { channel: DigitalChannel }) {
   const glow = glowByPriority[channel.priority] || glowByPriority.Média;
   const idleBorder =
     PRIORITY_FRAME_BORDER[channel.priority] || PRIORITY_FRAME_BORDER.Média;
+  const priorityBadgeCls = PRIORITY_COLORS[channel.priority] || PRIORITY_COLORS.Média;
+  const priorityTabMobileSurface =
+    CHANNEL_PRIORITY_TAB_MOBILE_SURFACE[channel.priority] ||
+    CHANNEL_PRIORITY_TAB_MOBILE_SURFACE.Média;
+  const priorityBadgeLabelText = channelPriorityBadgeLabel(channel.priority);
   return (
-    <BorderGlow
-      edgeSensitivity={30}
-      glowColor={glow.glowColor}
-      backgroundColor="var(--card)"
-      borderRadius={10}
-      glowRadius={28}
-      glowIntensity={0.8}
-      coneSpread={25}
-      animated={false}
-      colors={glow.colors}
-      fillOpacity={0.35}
-      contentInset={0}
-      className={`overflow-hidden rounded-lg ${idleBorder}`}
-    >
-      <div className="rounded-lg bg-card space-y-3 px-5 py-5 sm:px-7 sm:py-5 dark:bg-muted/50">
-        <div className="flex items-start justify-between gap-2">
-          <h4 className="m-0 min-w-0 flex-1 font-normal leading-none" title={channel.name}>
-            <span className={TOPIC_PILL_CLASS}>
-              <span className="truncate">{channel.name}</span>
-            </span>
-          </h4>
-          <Badge className={`text-xs shrink-0 ${PRIORITY_COLORS[channel.priority] || PRIORITY_COLORS.Média}`}>
-            {channelPriorityBadgeLabel(channel.priority)}
-          </Badge>
-        </div>
-        <ReportProseBlocks text={channel.description} size="sm" sentencesPerBlock={1} />
-        {channel.actions.length > 0 && (
-          <ul className="space-y-2.5">
-            {channel.actions.map((action, i) => (
-              <li key={i} className="flex items-start gap-3 text-[13px] leading-relaxed">
-                <div
-                  className={cn(
-                    "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border ring-1",
-                    CHANNEL_ACTION_ICON_SHELL[channel.priority] || CHANNEL_ACTION_ICON_SHELL.Média,
-                  )}
-                  aria-hidden
-                >
-                  <ArrowRight size={13} className="shrink-0 opacity-95" strokeWidth={2.25} />
-                </div>
-                <span className="min-w-0 flex-1 text-muted-foreground dark:text-zinc-300">
-                  {action}
-                </span>
-              </li>
-            ))}
-          </ul>
+    <div className="relative max-md:pt-1 md:pt-0">
+      {/*
+        Aba só no mobile: fora do BorderGlow + z-0. Descendentes do glow são sempre pintados
+        por cima da borda do frame — assim o selo fica atrás da moldura inteira.
+      */}
+      <Badge
+        className={cn(
+          "md:hidden",
+          "pointer-events-none absolute right-5 top-0 z-0 inline-flex h-auto min-h-7 -translate-y-[calc(100%-8px)] shrink-0 items-center justify-center gap-1 rounded-t-md rounded-b-none border-x border-t border-b-0 px-2.5 pb-2 pt-1.5 text-[11px] font-medium leading-snug whitespace-nowrap",
+          priorityBadgeCls,
+          priorityTabMobileSurface,
         )}
-      </div>
-    </BorderGlow>
+      >
+        {priorityBadgeLabelText}
+      </Badge>
+      <BorderGlow
+        edgeSensitivity={30}
+        glowColor={glow.glowColor}
+        backgroundColor="var(--card)"
+        borderRadius={10}
+        glowRadius={28}
+        glowIntensity={0.8}
+        coneSpread={25}
+        animated={false}
+        colors={glow.colors}
+        fillOpacity={0.35}
+        contentInset={0}
+        className={cn(
+          "relative z-10 rounded-lg md:overflow-hidden max-md:overflow-visible",
+          idleBorder,
+        )}
+      >
+        <div className="overflow-visible rounded-lg bg-card space-y-3 px-5 py-5 sm:px-7 sm:py-5 dark:bg-card">
+          <div className="flex items-start justify-between gap-2">
+            <h4 className="m-0 min-w-0 flex-1 font-normal leading-none" title={channel.name}>
+              <span className={TOPIC_PILL_CLASS}>
+                <span className="truncate">{channel.name}</span>
+              </span>
+            </h4>
+            <Badge className={cn("hidden shrink-0 text-xs md:inline-flex", priorityBadgeCls)}>
+              {priorityBadgeLabelText}
+            </Badge>
+          </div>
+          <ReportProseBlocks text={channel.description} size="sm" sentencesPerBlock={1} />
+          {channel.actions.length > 0 && (
+            <ul className="space-y-2.5">
+              {channel.actions.map((action, i) => (
+                <li key={i} className="flex items-center gap-3 text-[13px] leading-relaxed">
+                  <div
+                    className={cn(
+                      "flex h-7 w-7 shrink-0 items-center justify-center rounded-md border ring-1",
+                      CHANNEL_ACTION_ICON_SHELL[channel.priority] || CHANNEL_ACTION_ICON_SHELL.Média,
+                    )}
+                    aria-hidden
+                  >
+                    <ArrowRight size={13} className="shrink-0 opacity-95" strokeWidth={2.25} />
+                  </div>
+                  <span className="min-w-0 flex-1 text-muted-foreground dark:text-zinc-300">
+                    {action}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </BorderGlow>
+    </div>
   );
 }
 
@@ -1818,7 +1861,7 @@ export function RotaDigitalReportView({
         {/* Canais Recomendados - Lista Compacta */}
         <Card
           className={cn(
-            "flex flex-col border-border bg-card/95 md:col-span-4",
+            "flex flex-col overflow-visible border-border bg-card/95 md:col-span-4",
             ROTA_REPORT_CARD_BOX,
           )}
         >
@@ -1832,44 +1875,49 @@ export function RotaDigitalReportView({
               </CardTitle>
             </div>
           </CardHeader>
-          <CardContent className="flex flex-1 flex-col gap-4">
+          <CardContent className="flex flex-1 flex-col gap-3 overflow-visible">
             <div className="flex items-baseline gap-1.5">
               <span className="text-4xl font-bold tracking-tight tabular-nums text-foreground">
                 {report.recommendedChannels.length}
               </span>
               <span className="text-sm font-medium text-muted-foreground">canais</span>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 overflow-visible">
               {sortedChannels.slice(0, 3).map((ch, i) => (
                 <div
                   key={ch.name}
-                  className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-card p-2.5 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]"
+                  className={cn("relative overflow-visible", i === 0 && "mt-1.5")}
                 >
-                  <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
-                    <div className="flex min-w-0 items-center gap-2">
-                      {i === 0 ? (
-                        <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-400 shadow-[0_0_10px_rgba(129,140,248,0.75)]" />
-                      ) : (
-                        <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground" />
-                      )}
-                      <span className="truncate text-[12px] font-semibold text-foreground">
-                        {ch.name}
-                      </span>
+                  <div className="relative z-10 flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-card p-2.5 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]">
+                    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
+                      <div className="flex min-w-0 items-center gap-2">
+                        {i === 0 ? (
+                          <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-400 shadow-[0_0_10px_rgba(129,140,248,0.75)]" />
+                        ) : (
+                          <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground" />
+                        )}
+                        <span className="truncate text-[12px] font-semibold text-foreground">
+                          {ch.name}
+                        </span>
+                      </div>
                     </div>
-                    {i === 0 ? (
-                      <span className="inline-flex shrink-0 items-center rounded-full border border-indigo-600/40 bg-indigo-500/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-indigo-950 dark:border-indigo-400/45 dark:bg-indigo-500/20 dark:text-indigo-200 print:border-indigo-900/40 print:bg-indigo-100 print:text-indigo-950">
-                        Prioridade
-                      </span>
-                    ) : null}
+                    <Badge
+                      className={cn(
+                        "h-5 max-w-[min(100%,11rem)] shrink-0 border px-2 py-0 text-[10px] font-semibold leading-tight tracking-tight",
+                        PRIORITY_COLORS[ch.priority] || PRIORITY_COLORS.Média,
+                      )}
+                    >
+                      {channelPriorityBadgeLabel(ch.priority)}
+                    </Badge>
                   </div>
-                  <Badge
-                    className={cn(
-                      "h-5 shrink-0 border px-2 py-0 text-[10px] font-bold uppercase tracking-tight",
-                      PRIORITY_COLORS[ch.priority] || PRIORITY_COLORS.Média,
-                    )}
-                  >
-                    {channelPriorityBadgeLabel(ch.priority)}
-                  </Badge>
+                  {i === 0 ? (
+                    <span
+                      className="absolute right-4 top-0 z-0 inline-flex -translate-y-[calc(100%-6px)] shrink-0 items-center rounded-t-md rounded-b-none border-x border-t border-indigo-600/40 border-b-0 bg-indigo-500/15 px-2 pb-2 pt-0.5 text-[9px] font-bold uppercase tracking-wider text-indigo-950 dark:border-indigo-400/45 dark:bg-indigo-500/20 dark:text-indigo-200 print:border-indigo-900/40 print:bg-indigo-100 print:text-indigo-950"
+                      aria-hidden
+                    >
+                      Principal
+                    </span>
+                  ) : null}
                 </div>
               ))}
               {sortedChannels.length > 3 && (
@@ -2161,10 +2209,17 @@ export function RotaDigitalReportView({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ul className="space-y-4">
+            <ul className="space-y-0">
               {report.strengths.map((s, i) => (
-                <li key={i} className="flex items-start gap-3 text-sm leading-relaxed text-foreground/90">
-                  <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-green-500/60" />
+                <li
+                  key={i}
+                  className={cn(
+                    "relative flex items-center gap-3 py-3.5 text-sm leading-relaxed text-foreground/90 sm:py-4",
+                    i > 0 &&
+                      "before:pointer-events-none before:absolute before:left-0 before:right-[8%] before:top-0 before:h-px before:rounded-full before:bg-gradient-to-r before:from-green-500/45 before:via-emerald-500/25 before:to-transparent before:content-[''] dark:before:from-green-400/35 dark:before:via-emerald-400/18 print:before:hidden",
+                  )}
+                >
+                  <CheckCircle2 size={16} className="shrink-0 text-green-500/60" />
                   <span>{s}</span>
                 </li>
               ))}
@@ -2187,10 +2242,17 @@ export function RotaDigitalReportView({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ul className="space-y-4">
+            <ul className="space-y-0">
               {report.weaknesses.map((w, i) => (
-                <li key={i} className="flex items-start gap-3 text-sm leading-relaxed text-foreground/90">
-                  <AlertCircle size={16} className="mt-0.5 shrink-0 text-red-500/60" />
+                <li
+                  key={i}
+                  className={cn(
+                    "relative flex items-center gap-3 py-3.5 text-sm leading-relaxed text-foreground/90 sm:py-4",
+                    i > 0 &&
+                      "before:pointer-events-none before:absolute before:left-0 before:right-[8%] before:top-0 before:h-px before:rounded-full before:bg-gradient-to-r before:from-red-500/45 before:via-rose-500/25 before:to-transparent before:content-[''] dark:before:from-red-400/35 dark:before:via-rose-400/18 print:before:hidden",
+                  )}
+                >
+                  <AlertCircle size={16} className="shrink-0 text-red-500/60" />
                   <span>{w}</span>
                 </li>
               ))}
@@ -2213,10 +2275,17 @@ export function RotaDigitalReportView({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ul className="space-y-4">
+            <ul className="space-y-0">
               {report.opportunities.map((o, i) => (
-                <li key={i} className="flex items-start gap-3 text-sm leading-relaxed text-foreground/90">
-                  <Star size={16} className="mt-0.5 shrink-0 text-blue-500/60" />
+                <li
+                  key={i}
+                  className={cn(
+                    "relative flex items-center gap-3 py-3.5 text-sm leading-relaxed text-foreground/90 sm:py-4",
+                    i > 0 &&
+                      "before:pointer-events-none before:absolute before:left-0 before:right-[8%] before:top-0 before:h-px before:rounded-full before:bg-gradient-to-r before:from-blue-500/45 before:via-sky-500/25 before:to-transparent before:content-[''] dark:before:from-blue-400/35 dark:before:via-sky-400/18 print:before:hidden",
+                  )}
+                >
+                  <Star size={16} className="shrink-0 text-blue-500/60" />
                   <span>{o}</span>
                 </li>
               ))}
@@ -2226,7 +2295,12 @@ export function RotaDigitalReportView({
       </div>
 
       {/* Recommended Channels */}
-      <Card className={cn("border-border bg-card/95 print-white", ROTA_REPORT_CARD_BOX)}>
+      <Card
+        className={cn(
+          "overflow-visible border-border bg-card/95 print-white",
+          ROTA_REPORT_CARD_BOX,
+        )}
+      >
         <CardHeader className="pb-4">
           <div className="flex items-center gap-2.5">
             <SectionHeaderIcon Icon={Sparkles} tone="indigo" />
@@ -2235,8 +2309,8 @@ export function RotaDigitalReportView({
             </CardTitle>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+        <CardContent className="overflow-visible">
+          <div className="grid grid-cols-1 gap-10 md:grid-cols-2 md:gap-5">
             {sortedChannels.map((channel, i) => (
               <ChannelCard key={i} channel={channel} />
             ))}
@@ -2263,10 +2337,17 @@ export function RotaDigitalReportView({
             </div>
           </CardHeader>
           <CardContent>
-            <ul className="space-y-4">
+            <ul className="space-y-0">
               {report.quickWins.map((win, i) => (
-                <li key={i} className="flex items-start gap-4 text-sm leading-relaxed text-foreground/90">
-                  <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-yellow-500/10 text-[11px] font-bold text-yellow-900 ring-1 ring-yellow-600/25 dark:text-yellow-500/90 dark:ring-yellow-500/20">
+                <li
+                  key={i}
+                  className={cn(
+                    "relative flex items-center gap-4 py-3.5 text-sm leading-relaxed text-foreground/90 sm:py-4",
+                    i > 0 &&
+                      "before:pointer-events-none before:absolute before:left-0 before:right-[8%] before:top-0 before:h-px before:rounded-full before:bg-gradient-to-r before:from-yellow-500/45 before:via-amber-500/25 before:to-transparent before:content-[''] dark:before:from-yellow-400/35 dark:before:via-amber-400/18 print:before:hidden",
+                  )}
+                >
+                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-yellow-500/10 text-[11px] font-bold text-yellow-900 ring-1 ring-yellow-600/25 dark:text-yellow-500/90 dark:ring-yellow-500/20">
                     {i + 1}
                   </div>
                   <span>{win}</span>
@@ -2293,10 +2374,17 @@ export function RotaDigitalReportView({
             </div>
           </CardHeader>
           <CardContent>
-            <ul className="space-y-4">
+            <ul className="space-y-0">
               {report.longTermActions.map((action, i) => (
-                <li key={i} className="flex items-start gap-4 text-sm leading-relaxed text-foreground/90">
-                  <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-purple-500/10 text-[11px] font-bold text-purple-900 ring-1 ring-purple-600/25 dark:text-purple-500/90 dark:ring-purple-500/20">
+                <li
+                  key={i}
+                  className={cn(
+                    "relative flex items-center gap-4 py-3.5 text-sm leading-relaxed text-foreground/90 sm:py-4",
+                    i > 0 &&
+                      "before:pointer-events-none before:absolute before:left-0 before:right-[8%] before:top-0 before:h-px before:rounded-full before:bg-gradient-to-r before:from-purple-500/45 before:via-fuchsia-500/25 before:to-transparent before:content-[''] dark:before:from-purple-400/38 dark:before:via-fuchsia-400/18 print:before:hidden",
+                  )}
+                >
+                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-purple-500/10 text-[11px] font-bold text-purple-900 ring-1 ring-purple-600/25 dark:text-purple-500/90 dark:ring-purple-500/20">
                     {i + 1}
                   </div>
                   <span>{action}</span>
@@ -2329,7 +2417,7 @@ export function RotaDigitalReportView({
               {report.nextSteps.map((step, i) => (
                 <div
                   key={i}
-                  className="flex items-start gap-4 rounded-xl border border-border/90 bg-card/75 p-4 transition-colors hover:border-indigo-500/40"
+                  className="flex items-center gap-4 rounded-xl border border-border/90 bg-card/75 p-4 transition-colors hover:border-indigo-500/40"
                 >
                   <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-indigo-500/40 bg-indigo-500/10">
                     <span className="text-[11px] font-bold text-indigo-800 dark:text-indigo-300">{i + 1}</span>
