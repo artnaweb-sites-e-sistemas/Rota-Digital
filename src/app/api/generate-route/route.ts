@@ -221,6 +221,56 @@ async function resolveFinalUrl(url?: string): Promise<string | undefined> {
   }
 }
 
+async function listGeminiGenerateContentModels(apiKey: string): Promise<string[]> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 7000);
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1/models?key=${encodeURIComponent(apiKey)}`,
+      {
+        method: "GET",
+        signal: ctrl.signal,
+        cache: "no-store",
+      }
+    );
+    if (!res.ok) return [];
+    const payload = (await res.json()) as {
+      models?: Array<{
+        name?: string;
+        supportedGenerationMethods?: string[];
+      }>;
+    };
+    const available = (payload.models || [])
+      .filter((model) =>
+        Array.isArray(model.supportedGenerationMethods)
+          ? model.supportedGenerationMethods.includes("generateContent")
+          : false
+      )
+      .map((model) => (model.name || "").replace(/^models\//, "").trim())
+      .filter(Boolean);
+
+    if (!available.length) return [];
+
+    const preferredOrder = [
+      "gemini-2.5-flash",
+      "gemini-2.5-pro",
+      "gemini-2.0-flash",
+      "gemini-2.0-flash-lite",
+      "gemini-1.5-flash",
+      "gemini-1.5-pro",
+      "gemini-1.5-flash-latest",
+    ];
+    const preferred = preferredOrder.filter((name) => available.includes(name));
+    const flashFamily = available.filter((name) => /flash/i.test(name) && !preferred.includes(name));
+    const remaining = available.filter((name) => !preferred.includes(name) && !flashFamily.includes(name));
+    return [...preferred, ...flashFamily, ...remaining].slice(0, 8);
+  } catch {
+    return [];
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function buildInstagramProfileSnapshotUrl(handle?: string): string | undefined {
   if (!handle) return undefined;
   return `/api/instagram-profile-snapshot?handle=${encodeURIComponent(handle)}`;
@@ -1034,15 +1084,9 @@ function parseModelJson(text: string): Record<string, unknown> {
 
 async function repairModelJsonWithGemini(
   genAI: GoogleGenerativeAI,
-  rawText: string
+  rawText: string,
+  candidateModels: string[]
 ): Promise<Record<string, unknown>> {
-  const repairModel = genAI.getGenerativeModel(
-    {
-      model: "gemini-2.5-flash",
-    },
-    { apiVersion: "v1" }
-  );
-
   const repairPrompt = [
     "Converta o conteúdo abaixo para um JSON VÁLIDO.",
     "Regras:",
@@ -1053,9 +1097,26 @@ async function repairModelJsonWithGemini(
     "",
     rawText,
   ].join("\n");
-
-  const repaired = await repairModel.generateContent(repairPrompt);
-  return parseModelJson(repaired.response.text());
+  let lastError: unknown = null;
+  for (const modelName of candidateModels) {
+    try {
+      const repairModel = genAI.getGenerativeModel(
+        {
+          model: modelName,
+        },
+        { apiVersion: "v1" }
+      );
+      const repaired = await repairModel.generateContent(repairPrompt);
+      return parseModelJson(repaired.response.text());
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw new Error(
+    `Falha ao reparar JSON com os modelos disponíveis. Último erro: ${
+      lastError instanceof Error ? lastError.message : "desconhecido"
+    }`
+  );
 }
 
 function buildWebsiteResearchNote(e: WebsiteEvidence): string {
@@ -1540,10 +1601,8 @@ export async function POST(req: NextRequest) {
       instagramBioLinkImagePart,
     });
 
-    const candidateModels = [
-      "gemini-2.5-flash",
-      "gemini-1.5-flash-latest",
-    ];
+    const discoveredModels = await listGeminiGenerateContentModels(process.env.GEMINI_API_KEY);
+    const candidateModels = discoveredModels.length ? discoveredModels : ["gemini-2.5-flash"];
 
     let responseText = "";
     let lastError: unknown = null;
@@ -1626,7 +1685,7 @@ export async function POST(req: NextRequest) {
       console.warn("[AI_JSON_PARSE] Resposta inválida, tentando reparo automático.", {
         error: parseError instanceof Error ? parseError.message : String(parseError),
       });
-      aiData = await repairModelJsonWithGemini(genAI, responseText);
+      aiData = await repairModelJsonWithGemini(genAI, responseText, candidateModels);
     }
 
     const proposalRaw =
