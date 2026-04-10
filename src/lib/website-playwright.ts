@@ -1,4 +1,5 @@
 import { chromium, type Page, type Browser } from "playwright";
+import { convertImageBufferToWebp } from "@/lib/image-webp";
 
 type WebsiteCaptureResult = {
   screenshot: Buffer;
@@ -69,7 +70,11 @@ async function takeWebsiteScreenshot(page: Page): Promise<{ screenshot: Buffer; 
     })
   );
   if (jpeg80.length <= 4 * 1024 * 1024) {
-    return { screenshot: jpeg80, mimeType: "image/jpeg" };
+    const converted = await convertImageBufferToWebp(jpeg80, {
+      quality: 74,
+      fallbackMimeType: "image/jpeg",
+    });
+    return { screenshot: converted.buffer, mimeType: converted.mimeType };
   }
 
   const jpeg65 = Buffer.from(
@@ -79,7 +84,11 @@ async function takeWebsiteScreenshot(page: Page): Promise<{ screenshot: Buffer; 
       fullPage: true,
     })
   );
-  return { screenshot: jpeg65, mimeType: "image/jpeg" };
+  const converted = await convertImageBufferToWebp(jpeg65, {
+    quality: 68,
+    fallbackMimeType: "image/jpeg",
+  });
+  return { screenshot: converted.buffer, mimeType: converted.mimeType };
 }
 
 function getBrowserlessWsEndpoint(): string | undefined {

@@ -111,7 +111,7 @@ async function uploadImageFromUrl(
       });
       return null;
     }
-    const contentType = res.headers.get("content-type") || "image/jpeg";
+    const contentType = res.headers.get("content-type") || "image/webp";
     if (!contentType.startsWith("image/")) {
       console.warn("[IG_DEBUG][evidence-storage] Conteúdo não é imagem.", {
         fetchUrl,
@@ -189,7 +189,7 @@ export async function persistEvidenceImagesToStorage(params: {
 
   try {
     const logo = report.evidences.logoImageUrl
-      ? await uploadWithReuse(report.evidences.logoImageUrl, `${base}/logo.jpg`)
+      ? await uploadWithReuse(report.evidences.logoImageUrl, `${base}/logo.webp`)
       : null;
     if (logo) next.evidences.logoImageUrl = logo;
   } catch { /* não bloqueia */ }
@@ -198,7 +198,7 @@ export async function persistEvidenceImagesToStorage(params: {
     const instagram = report.evidences.instagramSnapshotUrl
       ? await uploadWithReuse(
           report.evidences.instagramSnapshotUrl,
-          `${base}/instagram.jpg`
+          `${base}/instagram.webp`
         )
       : null;
     if (instagram) next.evidences.instagramSnapshotUrl = instagram;
@@ -208,7 +208,7 @@ export async function persistEvidenceImagesToStorage(params: {
     const bioLinkSnapshot = report.evidences.instagramBioLinkSnapshotUrl
       ? await uploadWithReuse(
           report.evidences.instagramBioLinkSnapshotUrl,
-          `${base}/instagram-bio-link.jpg`
+          `${base}/instagram-bio-link.webp`
         )
       : null;
     if (bioLinkSnapshot) next.evidences.instagramBioLinkSnapshotUrl = bioLinkSnapshot;
@@ -216,7 +216,7 @@ export async function persistEvidenceImagesToStorage(params: {
 
   try {
     const site = report.evidences.siteHeroSnapshotUrl
-      ? await uploadWithReuse(report.evidences.siteHeroSnapshotUrl, `${base}/site.jpg`)
+      ? await uploadWithReuse(report.evidences.siteHeroSnapshotUrl, `${base}/site.webp`)
       : null;
     if (site) next.evidences.siteHeroSnapshotUrl = site;
   } catch { /* não bloqueia */ }
@@ -229,7 +229,7 @@ export async function persistEvidenceImagesToStorage(params: {
       try {
         const uploaded = await uploadWithReuse(
           item.evidenceImageUrl,
-          `${base}/diagnostic-${i + 1}.jpg`
+          `${base}/diagnostic-${i + 1}.webp`
         );
         if (uploaded) {
           scores[i] = { ...item, evidenceImageUrl: uploaded };

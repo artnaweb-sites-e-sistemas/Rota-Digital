@@ -2,6 +2,50 @@ import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 import type { DiagnosticScore, RotaDigitalReport } from "@/types/report";
+import type { AiRecommendedChannelsPolicy, AiServicesFocusPolicy } from "@/types/user-settings";
+import { buildRecommendedChannelsPolicyPromptSection } from "@/lib/ai-recommended-channels-prompt";
+import { buildServicesFocusPromptSection } from "@/lib/ai-services-focus-prompt";
+import {
+  buildScoringStrictnessPromptSection,
+  sanitizeAiScoringStrictness,
+} from "@/lib/ai-scoring-strictness-prompt";
+import { sanitizeAiRecommendedChannelIds } from "@/lib/ai-recommended-channel-options";
+import {
+  sanitizeAiCustomServiceLabels,
+  sanitizeAiServiceOfferingIds,
+} from "@/lib/ai-agency-services";
+import { getUserAiPromptSettingsAdmin } from "@/lib/user-settings-admin";
+
+type GeminiUsageMetadata = {
+  promptTokenCount?: number;
+  candidatesTokenCount?: number;
+  totalTokenCount?: number;
+};
+
+type ModelCostPer1M = {
+  inputUsd: number;
+  outputUsd: number;
+};
+
+const MODEL_COST_PER_1M_USD: Record<string, ModelCostPer1M> = {
+  "gemini-2.5-flash": { inputUsd: 0.15, outputUsd: 0.6 },
+  "gemini-2.0-flash": { inputUsd: 0.1, outputUsd: 0.4 },
+  "gemini-2.0-flash-lite": { inputUsd: 0.075, outputUsd: 0.3 },
+};
+
+const USD_TO_BRL_ESTIMATE = 5.2;
+
+function estimateCostUsdFromUsage(modelName: string, usage?: GeminiUsageMetadata): number | undefined {
+  if (!usage) return undefined;
+  const pricing = MODEL_COST_PER_1M_USD[modelName];
+  if (!pricing) return undefined;
+  const promptTokens = Number(usage.promptTokenCount || 0);
+  const outputTokens = Number(usage.candidatesTokenCount || 0);
+  const estimated =
+    (promptTokens / 1_000_000) * pricing.inputUsd +
+    (outputTokens / 1_000_000) * pricing.outputUsd;
+  return Number.isFinite(estimated) ? Number(estimated.toFixed(8)) : undefined;
+}
 
 function parseModelJson(text: string): Record<string, unknown> {
   const trimmed = text.trim();
@@ -44,9 +88,30 @@ export async function POST(req: NextRequest) {
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     const models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite"];
+
+    const storedAi = await getUserAiPromptSettingsAdmin(report.userId);
+    let channelPolicy: AiRecommendedChannelsPolicy =
+      storedAi?.aiRecommendedChannelsPolicy === "restricted" ? "restricted" : "open";
+    const channelIds = sanitizeAiRecommendedChannelIds(storedAi?.aiRecommendedChannelIds);
+    if (channelPolicy === "restricted" && channelIds.length === 0) {
+      channelPolicy = "open";
+    }
+    const channelsPolicyBlock = `${buildRecommendedChannelsPolicyPromptSection(channelPolicy, channelIds)}\n\n`;
+
+    let servicesPolicy: AiServicesFocusPolicy =
+      storedAi?.aiServicesFocusPolicy === "restricted" ? "restricted" : "open";
+    const serviceOfferingIds = sanitizeAiServiceOfferingIds(storedAi?.aiServiceOfferingIds);
+    const customServiceLabels = sanitizeAiCustomServiceLabels(storedAi?.aiCustomServiceLabels);
+    if (servicesPolicy === "restricted" && serviceOfferingIds.length === 0 && customServiceLabels.length === 0) {
+      servicesPolicy = "open";
+    }
+    const servicesFocusBlock = `${buildServicesFocusPromptSection(servicesPolicy, serviceOfferingIds, customServiceLabels)}\n\n`;
+    const scoringStrictness = sanitizeAiScoringStrictness(storedAi?.aiScoringStrictness);
+    const scoringStrictnessBlock = `${buildScoringStrictnessPromptSection(scoringStrictness)}\n\n`;
+
     const prompt = `Você vai reanalisar e ajustar um relatório já existente.
 
-Regra principal de escrita:
+${channelsPolicyBlock}${servicesFocusBlock}${scoringStrictnessBlock}Regra principal de escrita:
 - Use linguagem simples, direta e fácil de entender.
 - Evite termos técnicos complexos.
 - Se usar termo técnico, explique em uma frase curta.
@@ -111,6 +176,8 @@ Retorne SOMENTE um JSON válido com os campos atualizados:
 }`;
 
     let responseText = "";
+    let selectedModelName = "";
+    let selectedUsage: GeminiUsageMetadata | undefined;
     let lastError: unknown = null;
 
     for (const modelName of models) {
@@ -118,6 +185,8 @@ Retorne SOMENTE um JSON válido com os campos atualizados:
         const model = genAI.getGenerativeModel({ model: modelName }, { apiVersion: "v1" });
         const result = await model.generateContent(prompt);
         responseText = result.response.text();
+        selectedModelName = modelName;
+        selectedUsage = result.response.usageMetadata as GeminiUsageMetadata | undefined;
         break;
       } catch (err) {
         lastError = err;
@@ -150,6 +219,31 @@ Retorne SOMENTE um JSON válido com os campos atualizados:
         }))
       : report.diagnosticScores || [];
 
+    const reanalysisEstimatedCostUsd = estimateCostUsdFromUsage(selectedModelName, selectedUsage);
+    const reanalysisEstimatedCostBrl =
+      typeof reanalysisEstimatedCostUsd === "number"
+        ? Number((reanalysisEstimatedCostUsd * USD_TO_BRL_ESTIMATE).toFixed(6))
+        : undefined;
+    const reanalysisTotalTokens = Number(selectedUsage?.totalTokenCount || 0) || 0;
+    const previousReanalysis = report.aiUsage?.reanalysis || [];
+    const nextReanalysisEntry = {
+      model: selectedModelName || undefined,
+      promptTokens: Number(selectedUsage?.promptTokenCount || 0) || undefined,
+      candidateTokens: Number(selectedUsage?.candidatesTokenCount || 0) || undefined,
+      totalTokens: reanalysisTotalTokens || undefined,
+      estimatedCostUsd: reanalysisEstimatedCostUsd,
+      estimatedCostBrl: reanalysisEstimatedCostBrl,
+      createdAt: Date.now(),
+    };
+    const totalTokens =
+      Number(report.aiUsage?.totalTokens || 0) + reanalysisTotalTokens;
+    const totalEstimatedCostUsd =
+      Number(report.aiUsage?.totalEstimatedCostUsd || 0) +
+      Number(reanalysisEstimatedCostUsd || 0);
+    const totalEstimatedCostBrl =
+      Number(report.aiUsage?.totalEstimatedCostBrl || 0) +
+      Number(reanalysisEstimatedCostBrl || 0);
+
     return NextResponse.json({
       report: {
         executiveSummary: String(aiData.executiveSummary || report.executiveSummary || ""),
@@ -181,6 +275,13 @@ Retorne SOMENTE um JSON válido com os campos atualizados:
           typeof aiData.proposalPageHtml === "string" && aiData.proposalPageHtml.trim()
             ? aiData.proposalPageHtml
             : report.proposalHtml,
+        aiUsage: {
+          generation: report.aiUsage?.generation,
+          reanalysis: [...previousReanalysis, nextReanalysisEntry],
+          totalTokens: totalTokens || undefined,
+          totalEstimatedCostUsd: Number(totalEstimatedCostUsd.toFixed(8)) || undefined,
+          totalEstimatedCostBrl: Number(totalEstimatedCostBrl.toFixed(6)) || undefined,
+        },
       },
     });
   } catch (error: unknown) {

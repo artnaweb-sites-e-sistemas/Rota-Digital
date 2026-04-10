@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { convertImageBufferToWebp } from "@/lib/image-webp";
 
 const ALLOWED_IMAGE_HOSTS = [
   "cdninstagram.com",
@@ -54,12 +55,16 @@ export async function GET(req: NextRequest) {
     }
 
     const contentType = upstream.headers.get("content-type") || "image/jpeg";
-    const buffer = await upstream.arrayBuffer();
+    const buffer = Buffer.from(await upstream.arrayBuffer());
+    const converted = await convertImageBufferToWebp(buffer, {
+      quality: 74,
+      fallbackMimeType: contentType,
+    });
 
-    return new NextResponse(buffer, {
+    return new NextResponse(Uint8Array.from(converted.buffer), {
       status: 200,
       headers: {
-        "Content-Type": contentType,
+        "Content-Type": converted.mimeType,
         "Cache-Control": "public, max-age=3600, s-maxage=3600",
       },
     });

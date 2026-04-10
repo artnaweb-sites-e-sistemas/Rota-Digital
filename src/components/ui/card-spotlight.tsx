@@ -36,7 +36,7 @@ export function CardSpotlight({ className, children, ...props }: CardSpotlightPr
       onMouseMove={handleMove}
       onMouseLeave={handleLeave}
       className={cn(
-        "relative overflow-hidden rounded-xl border border-zinc-800/90 bg-zinc-950/85",
+        "relative overflow-hidden rounded-xl border border-border bg-card shadow-sm dark:border-zinc-800/90 dark:bg-zinc-950/85 dark:shadow-none",
         className,
       )}
       {...props}

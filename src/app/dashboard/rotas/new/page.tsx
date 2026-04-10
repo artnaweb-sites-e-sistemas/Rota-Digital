@@ -2,11 +2,27 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Loader2, Sparkles } from "lucide-react";
+import { ChevronDown, Loader2, Search, Sparkles, UserPlus } from "lucide-react";
 
 import { useAuth } from "@/lib/auth-context";
-import { getLeads, updateLead } from "@/lib/leads";
+import { createLead, getLeads, updateLead } from "@/lib/leads";
 import { getReportByLead, saveReport, updateReport } from "@/lib/reports";
+import { getUserAiPromptSettings } from "@/lib/user-settings";
+import { AI_RECOMMENDED_CHANNEL_OPTIONS, sanitizeAiRecommendedChannelIds } from "@/lib/ai-recommended-channel-options";
+import {
+  AI_AGENCY_SERVICE_OPTIONS,
+  MAX_CUSTOM_SERVICE_LABEL_LEN,
+  MAX_CUSTOM_SERVICE_LABELS,
+  parseCustomServiceLabelsFromMultiline,
+  sanitizeAiCustomServiceLabels,
+  sanitizeAiServiceOfferingIds,
+} from "@/lib/ai-agency-services";
+import { sanitizeAiScoringStrictness } from "@/lib/ai-scoring-strictness-prompt";
+import type {
+  AiRecommendedChannelsPolicy,
+  AiScoringStrictness,
+  AiServicesFocusPolicy,
+} from "@/types/user-settings";
 import { persistEvidenceImagesToStorage } from "@/lib/evidence-storage";
 import { Lead } from "@/types/lead";
 import type { RotaDigitalReport } from "@/types/report";
@@ -16,13 +32,63 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { GenerateRouteProgressOverlay } from "@/components/rotas/generate-route-progress-overlay";
+import { cn } from "@/lib/utils";
 
+const MAX_AI_GUIDELINES_ROUTE = 3000;
 const FINAL_PROGRESS_MS = 3000;
 const ESTIMATED_PROGRESS_TO_88_MS = 1 * 60 * 1000;
+const LEAD_STATUS_OPTIONS = ["Novo", "Em Contato", "Qualificado", "Convertido", "Perdido"] as const;
+
+const SCORING_OPTIONS: { id: AiScoringStrictness; label: string }[] = [
+  { id: "free", label: "Livre" },
+  { id: "low", label: "Baixa" },
+  { id: "medium", label: "Média" },
+  { id: "high", label: "Alta" },
+];
+
+function scoringCompactClass(id: AiScoringStrictness, selected: boolean): string {
+  if (!selected) {
+    return "border-border bg-muted/30 text-muted-foreground hover:bg-muted/50";
+  }
+  switch (id) {
+    case "free":
+      return "border-muted-foreground/40 bg-muted text-foreground";
+    case "low":
+      return "border-emerald-500/50 bg-emerald-500/10 text-emerald-900 dark:text-emerald-100";
+    case "medium":
+      return "border-amber-500/50 bg-amber-500/10 text-amber-900 dark:text-amber-100";
+    case "high":
+      return "border-red-500/50 bg-red-500/10 text-red-900 dark:text-red-100";
+  }
+}
 
 function easeOutCubic(t: number): number {
   return 1 - (1 - t) ** 3;
+}
+
+function normalizeSearchText(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .trim();
+}
+
+function formatPhoneBr(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 11);
+  if (!digits) return "";
+  if (digits.length <= 2) return `(${digits}`;
+  if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
 }
 
 /** Anima de `from` até 100% em `durationMs` (requestAnimationFrame). */
@@ -60,13 +126,33 @@ export default function NewRotaPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [leadId, setLeadId] = useState<string>("");
+  const [leadQuery, setLeadQuery] = useState("");
+  const [leadSearchOpen, setLeadSearchOpen] = useState(false);
   const [websiteUrl, setWebsiteUrl] = useState("");
   const [instagramUrl, setInstagramUrl] = useState("");
   const [servicesOffered, setServicesOffered] = useState("");
   const [objective, setObjective] = useState("");
+  const [isLeadDialogOpen, setIsLeadDialogOpen] = useState(false);
+  const [newLeadName, setNewLeadName] = useState("");
+  const [newLeadCompany, setNewLeadCompany] = useState("");
+  const [newLeadEmail, setNewLeadEmail] = useState("");
+  const [newLeadPhone, setNewLeadPhone] = useState("");
+  const [newLeadStatus, setNewLeadStatus] = useState<(typeof LEAD_STATUS_OPTIONS)[number]>("Novo");
+  const [newLeadSaving, setNewLeadSaving] = useState(false);
+  const [newLeadError, setNewLeadError] = useState<string | null>(null);
   const [progressOverlayOpen, setProgressOverlayOpen] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState(0);
   const [completingFinalStretch, setCompletingFinalStretch] = useState(false);
+  /** IA: espelha configurações salvas ao carregar; alterações valem só para esta geração. */
+  const [aiSettingsLoading, setAiSettingsLoading] = useState(true);
+  const [aiBasePromptGuidelines, setAiBasePromptGuidelines] = useState("");
+  const [aiChannelPolicy, setAiChannelPolicy] = useState<AiRecommendedChannelsPolicy>("open");
+  const [aiChannelIds, setAiChannelIds] = useState<string[]>([]);
+  const [aiServicesPolicy, setAiServicesPolicy] = useState<AiServicesFocusPolicy>("open");
+  const [aiServiceIds, setAiServiceIds] = useState<string[]>([]);
+  const [aiCustomServicesText, setAiCustomServicesText] = useState("");
+  const [aiCustomServicesOpen, setAiCustomServicesOpen] = useState(false);
+  const [aiScoringStrictness, setAiScoringStrictness] = useState<AiScoringStrictness>("free");
   const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const analysisProgressRef = useRef(0);
   const progressStartedAtRef = useRef(0);
@@ -75,6 +161,21 @@ export default function NewRotaPage() {
     () => leads.find((lead) => lead.id === leadId) ?? null,
     [leads, leadId]
   );
+
+  const leadSuggestions = useMemo(() => {
+    const q = normalizeSearchText(leadQuery);
+    if (!q) {
+      return [...leads]
+        .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+        .slice(0, 5);
+    }
+    return leads
+      .filter((lead) => {
+        const hay = normalizeSearchText(`${lead.name} ${lead.company} ${lead.email} ${lead.phone || ""}`);
+        return hay.includes(q);
+      })
+      .slice(0, 8);
+  }, [leads, leadQuery]);
 
   useEffect(() => {
     const run = async () => {
@@ -94,10 +195,55 @@ export default function NewRotaPage() {
   }, [user]);
 
   useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      setAiSettingsLoading(true);
+      try {
+        const data = await getUserAiPromptSettings(user.uid);
+        if (cancelled) return;
+        setAiBasePromptGuidelines((data?.aiBasePromptGuidelines || "").trim());
+        setAiChannelPolicy(data?.aiRecommendedChannelsPolicy === "restricted" ? "restricted" : "open");
+        setAiChannelIds(
+          data?.aiRecommendedChannelIds?.length ? [...data.aiRecommendedChannelIds] : [],
+        );
+        setAiServicesPolicy(data?.aiServicesFocusPolicy === "restricted" ? "restricted" : "open");
+        setAiServiceIds(data?.aiServiceOfferingIds?.length ? [...data.aiServiceOfferingIds] : []);
+        const custom = data?.aiCustomServiceLabels?.length ? [...data.aiCustomServiceLabels] : [];
+        setAiCustomServicesText(custom.join("\n"));
+        setAiCustomServicesOpen(custom.length > 0);
+        setAiScoringStrictness(sanitizeAiScoringStrictness(data?.aiScoringStrictness));
+      } catch (e) {
+        console.error(e);
+        if (!cancelled) {
+          setAiBasePromptGuidelines("");
+          setAiChannelPolicy("open");
+          setAiChannelIds([]);
+          setAiServicesPolicy("open");
+          setAiServiceIds([]);
+          setAiCustomServicesText("");
+          setAiCustomServicesOpen(false);
+          setAiScoringStrictness("free");
+        }
+      } finally {
+        if (!cancelled) setAiSettingsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  useEffect(() => {
     const initialLeadId = searchParams.get("leadId");
     if (!initialLeadId) return;
     setLeadId((current) => current || initialLeadId);
   }, [searchParams]);
+
+  useEffect(() => {
+    if (!selectedLead) return;
+    setLeadQuery(`${selectedLead.name} - ${selectedLead.company}`);
+  }, [selectedLead?.id]);
 
   useEffect(() => {
     return () => {
@@ -115,10 +261,47 @@ export default function NewRotaPage() {
     }
   };
 
+  const toggleAiChannel = (id: string) => {
+    setAiChannelIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
+  const toggleAiService = (id: string) => {
+    setAiServiceIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
   const handleGenerate = async () => {
     if (!user || !selectedLead) return;
+    if (aiSettingsLoading) {
+      setError("Aguarde carregar as configurações de IA.");
+      return;
+    }
     if (!websiteUrl.trim() && !instagramUrl.trim()) {
       setError("Preencha ao menos Site ou Instagram para a análise.");
+      return;
+    }
+    const guidelinesTrim = aiBasePromptGuidelines.trim();
+    if (guidelinesTrim.length > MAX_AI_GUIDELINES_ROUTE) {
+      setError(`Diretrizes da IA: no máximo ${MAX_AI_GUIDELINES_ROUTE} caracteres.`);
+      return;
+    }
+    if (aiChannelPolicy === "restricted" && sanitizeAiRecommendedChannelIds(aiChannelIds).length === 0) {
+      setError('Em “Canais”, escolha ao menos um canal ou mude para “Livre”.');
+      return;
+    }
+    const parsedCustom =
+      aiServicesPolicy === "restricted" && aiCustomServicesOpen
+        ? parseCustomServiceLabelsFromMultiline(aiCustomServicesText)
+        : [];
+    if (
+      aiServicesPolicy === "restricted" &&
+      sanitizeAiServiceOfferingIds(aiServiceIds).length === 0 &&
+      parsedCustom.length === 0
+    ) {
+      setError('Em “Serviços”, marque ao menos um serviço, preencha “Outros” ou mude para “Livre”.');
+      return;
+    }
+    if (aiServicesPolicy === "restricted" && aiCustomServicesOpen && parsedCustom.length === 0) {
+      setError('Preencha “Outros serviços” ou desmarque a opção.');
       return;
     }
 
@@ -157,6 +340,22 @@ export default function NewRotaPage() {
     }, 250);
 
     try {
+      const aiRecommendedChannelsPolicy: AiRecommendedChannelsPolicy =
+        aiChannelPolicy === "restricted" ? "restricted" : "open";
+      const aiRecommendedChannelIds = sanitizeAiRecommendedChannelIds(
+        aiChannelPolicy === "restricted" ? aiChannelIds : [],
+      );
+      const aiServicesFocusPolicy: AiServicesFocusPolicy =
+        aiServicesPolicy === "restricted" ? "restricted" : "open";
+      const aiServiceOfferingIds = sanitizeAiServiceOfferingIds(
+        aiServicesPolicy === "restricted" ? aiServiceIds : [],
+      );
+      const aiCustomServiceLabels = sanitizeAiCustomServiceLabels(
+        aiServicesPolicy === "restricted" && aiCustomServicesOpen
+          ? parseCustomServiceLabelsFromMultiline(aiCustomServicesText)
+          : [],
+      );
+      const scoringForPayload = sanitizeAiScoringStrictness(aiScoringStrictness);
       const payload = {
         leadId: selectedLead.id,
         userId: user.uid,
@@ -169,6 +368,13 @@ export default function NewRotaPage() {
         instagramUrl: instagramUrl.trim(),
         servicesOffered: servicesOffered.trim(),
         objective: objective.trim(),
+        aiBasePromptGuidelines: guidelinesTrim,
+        aiRecommendedChannelsPolicy,
+        aiRecommendedChannelIds,
+        aiServicesFocusPolicy,
+        aiServiceOfferingIds,
+        aiCustomServiceLabels,
+        aiScoringStrictness: scoringForPayload,
       };
       const parseApiResponse = async (res: Response) => {
         const rawBody = await res.text();
@@ -292,6 +498,52 @@ export default function NewRotaPage() {
     }
   };
 
+  const openCreateLeadDialog = () => {
+    setNewLeadName(leadQuery.trim());
+    setNewLeadCompany("");
+    setNewLeadEmail("");
+    setNewLeadPhone("");
+    setNewLeadStatus("Novo");
+    setNewLeadError(null);
+    setIsLeadDialogOpen(true);
+    setLeadSearchOpen(false);
+  };
+
+  const handleCreateLead = async () => {
+    if (!user) return;
+    if (!newLeadName.trim() || !newLeadCompany.trim()) {
+      setNewLeadError("Nome e empresa são obrigatórios.");
+      return;
+    }
+    setNewLeadSaving(true);
+    setNewLeadError(null);
+    try {
+      const newId = await createLead({
+        userId: user.uid,
+        name: newLeadName.trim(),
+        company: newLeadCompany.trim(),
+        email: newLeadEmail.trim(),
+        phone: newLeadPhone.trim(),
+        status: newLeadStatus,
+      });
+      const freshLeads = await getLeads(user.uid);
+      setLeads(freshLeads);
+      const created = freshLeads.find((l) => l.id === newId) ?? null;
+      if (created) {
+        setLeadId(created.id);
+        setLeadQuery(`${created.name} - ${created.company}`);
+      } else {
+        setLeadId(newId);
+      }
+      setIsLeadDialogOpen(false);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Erro ao criar lead.";
+      setNewLeadError(msg);
+    } finally {
+      setNewLeadSaving(false);
+    }
+  };
+
   return (
     <div className="space-y-6 w-full">
       <GenerateRouteProgressOverlay
@@ -320,24 +572,68 @@ export default function NewRotaPage() {
             <>
               <div className="space-y-2">
                 <Label>Lead</Label>
-                <Select value={leadId || null} onValueChange={(value) => setLeadId(value ?? "")}>
-                  <SelectTrigger className="w-full min-w-0 justify-between">
-                    {selectedLead ? (
-                      <span className="truncate text-left">
-                        {selectedLead.name} - {selectedLead.company}
-                      </span>
-                    ) : (
-                      <SelectValue placeholder="Selecione o lead" />
-                    )}
-                  </SelectTrigger>
-                  <SelectContent>
-                    {leads.map((lead) => (
-                      <SelectItem key={lead.id} value={lead.id}>
-                        {lead.name} - {lead.company}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="relative">
+                  <Search
+                    className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                    aria-hidden
+                  />
+                  <Input
+                    value={leadQuery}
+                    onChange={(e) => {
+                      setLeadQuery(e.target.value);
+                      setLeadSearchOpen(true);
+                      if (!e.target.value.trim()) setLeadId("");
+                    }}
+                    onFocus={() => setLeadSearchOpen(true)}
+                    onBlur={() => {
+                      window.setTimeout(() => setLeadSearchOpen(false), 120);
+                    }}
+                    placeholder="Digite o nome da empresa ou do lead"
+                    className="pl-9"
+                  />
+                  {leadSearchOpen ? (
+                    <div className="absolute z-20 mt-2 w-full overflow-hidden rounded-xl border border-border bg-background shadow-lg">
+                      {leadSuggestions.length > 0 ? (
+                        <div className="max-h-64 overflow-y-auto py-1">
+                          {leadSuggestions.map((lead) => (
+                            <button
+                              key={lead.id}
+                              type="button"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => {
+                                setLeadId(lead.id);
+                                setLeadQuery(`${lead.name} - ${lead.company}`);
+                                setLeadSearchOpen(false);
+                              }}
+                              className="w-full px-3 py-2 text-left text-sm hover:bg-muted/60"
+                            >
+                              <span className="block font-medium">{lead.name}</span>
+                              <span className="block text-xs text-muted-foreground">
+                                {lead.company}
+                                {lead.email ? ` · ${lead.email}` : ""}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="px-3 py-2 text-xs text-muted-foreground">
+                          Nenhum lead encontrado para essa busca.
+                        </p>
+                      )}
+                      <div className="border-t border-border/70 p-2">
+                        <button
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={openCreateLeadDialog}
+                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium hover:bg-muted/60"
+                        >
+                          <UserPlus className="size-4 text-indigo-500" aria-hidden />
+                          Adicionar novo lead
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -377,6 +673,192 @@ export default function NewRotaPage() {
                   className="min-h-[90px]"
                 />
               </div>
+
+              <details className="group rounded-xl border border-border bg-muted/20">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted/40 [&::-webkit-details-marker]:hidden">
+                  <span>
+                    Direcionamento da IA nesta rota
+                    <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                      Começa igual às configurações salvas; altere só para este cliente.
+                    </span>
+                  </span>
+                  <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+                </summary>
+                <div className="space-y-4 border-t border-border px-3 pb-3 pt-3">
+                  {aiSettingsLoading ? (
+                    <div className="flex items-center gap-2 py-2 text-xs text-muted-foreground">
+                      <Loader2 className="size-3.5 animate-spin" />
+                      Carregando opções de IA…
+                    </div>
+                  ) : (
+                    <>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Exigência nas notas</Label>
+                        <div className="flex flex-wrap gap-1.5">
+                          {SCORING_OPTIONS.map((opt) => {
+                            const sel = aiScoringStrictness === opt.id;
+                            return (
+                              <button
+                                key={opt.id}
+                                type="button"
+                                onClick={() => setAiScoringStrictness(opt.id)}
+                                className={cn(
+                                  "rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
+                                  scoringCompactClass(opt.id, sel),
+                                )}
+                              >
+                                {opt.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Diretrizes da IA</Label>
+                        <Textarea
+                          value={aiBasePromptGuidelines}
+                          onChange={(e) =>
+                            setAiBasePromptGuidelines(e.target.value.slice(0, MAX_AI_GUIDELINES_ROUTE))
+                          }
+                          placeholder="Instruções extras só para esta geração…"
+                          className="min-h-[64px] resize-y text-sm"
+                        />
+                        <p className="text-[11px] text-muted-foreground">
+                          {aiBasePromptGuidelines.length}/{MAX_AI_GUIDELINES_ROUTE} caracteres
+                        </p>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Canais digitais recomendados</Label>
+                        <div className="flex flex-wrap gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setAiChannelPolicy("open")}
+                            className={cn(
+                              "rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
+                              aiChannelPolicy === "open"
+                                ? "border-primary/50 bg-primary/10 text-foreground"
+                                : "border-border bg-background text-muted-foreground hover:bg-muted/50",
+                            )}
+                          >
+                            Livre
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setAiChannelPolicy("restricted")}
+                            className={cn(
+                              "rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
+                              aiChannelPolicy === "restricted"
+                                ? "border-indigo-500/50 bg-indigo-500/10 text-foreground"
+                                : "border-border bg-background text-muted-foreground hover:bg-muted/50",
+                            )}
+                          >
+                            Só selecionados
+                          </button>
+                        </div>
+                        <div className="max-h-28 overflow-y-auto rounded-md border border-border/80 bg-background/50 px-2 py-1.5">
+                          <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+                            {AI_RECOMMENDED_CHANNEL_OPTIONS.map((opt) => (
+                              <label
+                                key={opt.id}
+                                className={cn(
+                                  "flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 text-xs",
+                                  aiChannelPolicy !== "restricted" && "pointer-events-none opacity-45",
+                                )}
+                              >
+                                <input
+                                  type="checkbox"
+                                  className="size-3.5 rounded border-border"
+                                  checked={aiChannelIds.includes(opt.id)}
+                                  disabled={aiChannelPolicy !== "restricted"}
+                                  onChange={() => toggleAiChannel(opt.id)}
+                                />
+                                <span>{opt.label}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Serviços da agência (foco)</Label>
+                        <div className="flex flex-wrap gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setAiServicesPolicy("open")}
+                            className={cn(
+                              "rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
+                              aiServicesPolicy === "open"
+                                ? "border-primary/50 bg-primary/10 text-foreground"
+                                : "border-border bg-background text-muted-foreground hover:bg-muted/50",
+                            )}
+                          >
+                            Livre
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setAiServicesPolicy("restricted")}
+                            className={cn(
+                              "rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
+                              aiServicesPolicy === "restricted"
+                                ? "border-emerald-600/40 bg-emerald-500/10 text-foreground"
+                                : "border-border bg-background text-muted-foreground hover:bg-muted/50",
+                            )}
+                          >
+                            Só selecionados
+                          </button>
+                        </div>
+                        <div className="max-h-28 overflow-y-auto rounded-md border border-border/80 bg-background/50 px-2 py-1.5">
+                          <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+                            {AI_AGENCY_SERVICE_OPTIONS.map((opt) => (
+                              <label
+                                key={opt.id}
+                                className={cn(
+                                  "flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 text-xs",
+                                  aiServicesPolicy !== "restricted" && "pointer-events-none opacity-45",
+                                )}
+                              >
+                                <input
+                                  type="checkbox"
+                                  className="size-3.5 rounded border-border"
+                                  checked={aiServiceIds.includes(opt.id)}
+                                  disabled={aiServicesPolicy !== "restricted"}
+                                  onChange={() => toggleAiService(opt.id)}
+                                />
+                                <span>{opt.label}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                        <label
+                          className={cn(
+                            "flex cursor-pointer items-center gap-2 text-xs",
+                            aiServicesPolicy !== "restricted" && "pointer-events-none opacity-45",
+                          )}
+                        >
+                          <input
+                            type="checkbox"
+                            className="size-3.5 rounded border-border"
+                            checked={aiCustomServicesOpen}
+                            disabled={aiServicesPolicy !== "restricted"}
+                            onChange={(e) => setAiCustomServicesOpen(e.target.checked)}
+                          />
+                          Outros serviços (texto livre, um por linha)
+                        </label>
+                        {aiServicesPolicy === "restricted" && aiCustomServicesOpen ? (
+                          <Textarea
+                            value={aiCustomServicesText}
+                            onChange={(e) => setAiCustomServicesText(e.target.value)}
+                            placeholder={`Ex.: motion, agente de IA (máx. ${MAX_CUSTOM_SERVICE_LABELS} itens)`}
+                            className="min-h-[52px] text-xs"
+                          />
+                        ) : null}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </details>
             </>
           )}
 
@@ -391,7 +873,7 @@ export default function NewRotaPage() {
               type="button"
               variant="cta"
               onClick={handleGenerate}
-              disabled={saving || loadingLeads || !leadId}
+              disabled={saving || loadingLeads || !leadId || aiSettingsLoading}
               className="gap-2"
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
@@ -403,6 +885,96 @@ export default function NewRotaPage() {
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={isLeadDialogOpen} onOpenChange={setIsLeadDialogOpen}>
+        <DialogContent className="max-h-[min(92vh,820px)] w-full max-w-[calc(100%-1.5rem)] overflow-y-auto overflow-x-hidden rounded-2xl border border-white/10 bg-zinc-950 p-0 text-zinc-100 shadow-2xl sm:max-w-xl md:max-w-[36rem]">
+          <div className="border-b border-white/5 px-6 pb-6 pt-7 pr-14 sm:px-8 sm:pb-7 sm:pt-8 sm:pr-16">
+            <DialogHeader className="text-left">
+              <DialogTitle className="text-xl font-bold tracking-tight text-white sm:text-2xl">
+                Novo lead
+              </DialogTitle>
+              <DialogDescription className="text-sm leading-relaxed text-zinc-500">
+                Crie um lead sem sair desta tela.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+          <div className="space-y-4 px-6 py-6 sm:px-8">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Nome completo *</Label>
+                <Input value={newLeadName} onChange={(e) => setNewLeadName(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Empresa *</Label>
+                <Input value={newLeadCompany} onChange={(e) => setNewLeadCompany(e.target.value)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>E-mail</Label>
+                <Input
+                  type="email"
+                  value={newLeadEmail}
+                  onChange={(e) => setNewLeadEmail(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Telefone / WhatsApp</Label>
+                <Input
+                  type="tel"
+                  value={newLeadPhone}
+                  onChange={(e) => setNewLeadPhone(formatPhoneBr(e.target.value))}
+                  placeholder="(11) 99999-9999"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Status</Label>
+              <Select
+                value={newLeadStatus}
+                onValueChange={(value) => {
+                  if (value) setNewLeadStatus(value as (typeof LEAD_STATUS_OPTIONS)[number]);
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {LEAD_STATUS_OPTIONS.map((statusOpt) => (
+                    <SelectItem key={statusOpt} value={statusOpt}>
+                      {statusOpt}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {newLeadError ? (
+              <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+                {newLeadError}
+              </div>
+            ) : null}
+          </div>
+          <div className="flex flex-col-reverse gap-3 border-t border-white/5 bg-white/[0.02] px-6 py-5 sm:flex-row sm:justify-end sm:px-8">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setIsLeadDialogOpen(false)}
+              disabled={newLeadSaving}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void handleCreateLead()}
+              disabled={newLeadSaving}
+              className="gap-2"
+            >
+              {newLeadSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {newLeadSaving ? "Salvando..." : "Adicionar lead"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

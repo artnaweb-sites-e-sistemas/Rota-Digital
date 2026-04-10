@@ -1,24 +1,63 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { LayoutDashboard, Users, Settings, LogOut, Sparkles } from "lucide-react";
+import {
+  Bot,
+  ChevronLeft,
+  ChevronRight,
+  LayoutDashboard,
+  Users,
+  Settings,
+  LogOut,
+  Sparkles,
+  SlidersHorizontal,
+} from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useRouter, usePathname } from "next/navigation";
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { cn } from "@/lib/utils";
+
+const SIDEBAR_COLLAPSED_KEY = "rota-digital-sidebar-collapsed";
 
 const navItems = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Leads", href: "/dashboard/leads", icon: Users },
   { name: "Rotas Digitais", href: "/dashboard/rotas", icon: Sparkles },
-  { name: "Configurações", href: "/dashboard/settings", icon: Settings },
-];
+] as const;
+
+const settingsSubItems = [
+  { name: "Dados básicos", href: "/dashboard/settings/dados-basicos", icon: SlidersHorizontal },
+  { name: "Inteligência Artificial", href: "/dashboard/settings/inteligencia-artificial", icon: Bot },
+] as const;
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const settingsSection = pathname.startsWith("/dashboard/settings");
+  const [mainCollapsed, setMainCollapsed] = useState(false);
+
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1") setMainCollapsed(true);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const toggleMainSidebar = () => {
+    setMainCollapsed((c) => {
+      const next = !c;
+      try {
+        localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (!loading && !user) {
@@ -27,7 +66,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   }, [user, loading, router]);
 
   if (loading || !user) {
-    return null; // or a loading spinner
+    return null;
   }
 
   const handleLogout = async () => {
@@ -39,68 +78,195 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     router.push("/login");
   };
 
+  const navLinkClass = (active: boolean, iconOnly: boolean) =>
+    cn(
+      "group flex items-center rounded-xl transition-all duration-200",
+      iconOnly ? "justify-center px-2 py-2.5" : "gap-3 px-3.5 py-2.5",
+      active
+        ? "bg-indigo-500/12 text-foreground shadow-sm ring-1 ring-indigo-500/25 dark:bg-white/10 dark:text-white dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)] dark:ring-white/10"
+        : "text-muted-foreground hover:bg-muted hover:text-foreground dark:text-zinc-400 dark:hover:bg-white/5 dark:hover:text-zinc-100",
+    );
+
   return (
     <div className="fixed inset-0 flex min-h-0 overflow-hidden bg-background text-foreground font-sans">
-      {/* Sidebar — Design refinado com Glassmorphism sutil */}
-      <aside className="w-64 flex-shrink-0 bg-zinc-950/50 backdrop-blur-xl text-sidebar-foreground border-r border-white/5 flex flex-col justify-between shadow-[1px_0_0_0_rgba(255,255,255,0.05)]">
-        <div>
-          <div className="h-20 flex items-center px-6 border-b border-white/5">
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-600 shadow-lg shadow-indigo-500/20">
-                <Sparkles size={20} className="text-white" />
+      {/* Sidebar principal — expandida ou só ícones */}
+      <aside
+        className={cn(
+          "flex shrink-0 flex-col justify-between border-r border-sidebar-border bg-sidebar/95 text-sidebar-foreground shadow-sm backdrop-blur-xl transition-[width] duration-200 ease-out dark:shadow-[1px_0_0_0_rgba(255,255,255,0.05)] dark:bg-zinc-950/50",
+          mainCollapsed ? "w-[4.5rem]" : "w-64",
+        )}
+      >
+        <div className="min-h-0 min-w-0">
+          <div
+            className={cn(
+              "flex border-b border-sidebar-border dark:border-white/5",
+              mainCollapsed ? "flex-col items-center gap-2 py-3 px-2" : "h-20 items-center justify-between px-4",
+            )}
+          >
+            <div
+              className={cn(
+                "flex min-w-0 items-center gap-2.5",
+                mainCollapsed ? "flex-col gap-2" : "flex-1",
+              )}
+            >
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-600 shadow-lg shadow-indigo-500/20">
+                <Sparkles size={20} className="text-white" aria-hidden />
               </div>
-              <span className="text-lg font-bold tracking-tight text-white">
-                Rota Digital
-              </span>
+              {!mainCollapsed ? (
+                <span className="truncate text-lg font-bold tracking-tight text-foreground dark:text-white">
+                  Rota Digital
+                </span>
+              ) : null}
             </div>
+            <button
+              type="button"
+              onClick={toggleMainSidebar}
+              aria-expanded={!mainCollapsed}
+              aria-label={mainCollapsed ? "Expandir menu lateral" : "Recolher menu lateral (só ícones)"}
+              title={mainCollapsed ? "Expandir menu" : "Recolher para ícones"}
+              className={cn(
+                "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground dark:text-zinc-500 dark:hover:bg-white/10 dark:hover:text-zinc-200",
+                mainCollapsed && "order-first",
+              )}
+            >
+              {mainCollapsed ? (
+                <ChevronRight className="size-5" aria-hidden />
+              ) : (
+                <ChevronLeft className="size-5" aria-hidden />
+              )}
+            </button>
           </div>
-          <nav className="mt-8 px-4 space-y-1.5">
+
+          <nav className={cn("mt-6 space-y-1.5", mainCollapsed ? "px-2" : "px-4")}>
             {navItems.map((item) => {
-              const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
+              const isActive =
+                pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
               return (
                 <Link
                   key={item.name}
                   href={item.href}
-                  className={`group flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200 ${
-                    isActive
-                      ? "bg-white/10 text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)] ring-1 ring-white/10"
-                      : "text-zinc-400 hover:text-zinc-100 hover:bg-white/5"
-                  }`}
+                  title={mainCollapsed ? item.name : undefined}
+                  aria-label={mainCollapsed ? item.name : undefined}
+                  className={navLinkClass(isActive, mainCollapsed)}
                 >
-                  <item.icon className={`w-5 h-5 shrink-0 transition-colors ${isActive ? "text-indigo-400" : "group-hover:text-zinc-300"}`} />
-                  <span className="font-medium text-[14px]">{item.name}</span>
-                  {isActive && (
-                    <div className="ml-auto h-1.5 w-1.5 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.6)]" />
-                  )}
+                  <item.icon
+                    className={cn(
+                      "size-5 shrink-0 transition-colors",
+                      isActive
+                        ? "text-indigo-600 dark:text-indigo-400"
+                        : "group-hover:text-foreground dark:group-hover:text-zinc-300",
+                    )}
+                  />
+                  {!mainCollapsed ? (
+                    <>
+                      <span className="font-medium text-[14px]">{item.name}</span>
+                      {isActive ? (
+                        <div className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.35)] dark:shadow-[0_0_8px_rgba(99,102,241,0.6)]" />
+                      ) : null}
+                    </>
+                  ) : null}
                 </Link>
               );
             })}
+
+            <Link
+              href="/dashboard/settings"
+              title={mainCollapsed ? "Configurações" : undefined}
+              aria-label={mainCollapsed ? "Configurações" : undefined}
+              className={navLinkClass(settingsSection, mainCollapsed)}
+            >
+              <Settings
+                className={cn(
+                  "size-5 shrink-0 transition-colors",
+                  settingsSection
+                    ? "text-indigo-600 dark:text-indigo-400"
+                    : "group-hover:text-foreground dark:group-hover:text-zinc-300",
+                )}
+                aria-hidden
+              />
+              {!mainCollapsed ? (
+                <>
+                  <span className="font-medium text-[14px]">Configurações</span>
+                  {settingsSection ? (
+                    <div className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.35)] dark:shadow-[0_0_8px_rgba(99,102,241,0.6)]" />
+                  ) : null}
+                </>
+              ) : null}
+            </Link>
           </nav>
         </div>
 
-        <div className="p-4 border-t border-white/5 bg-white/[0.02]">
-          <div className="flex items-center gap-3 px-3 py-3 mb-3 rounded-xl bg-white/5 ring-1 ring-white/5 text-sm">
-            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-zinc-700 to-zinc-800 flex items-center justify-center text-white font-bold shrink-0 shadow-inner">
+        <div
+          className={cn(
+            "border-t border-sidebar-border bg-muted/30 p-4 dark:border-white/5 dark:bg-white/[0.02]",
+            mainCollapsed && "px-2",
+          )}
+        >
+          <div
+            className={cn(
+              "mb-3 rounded-xl bg-muted py-3 text-sm ring-1 ring-border dark:bg-white/5 dark:ring-white/5",
+              mainCollapsed ? "flex justify-center px-0" : "flex items-center gap-3 px-3",
+            )}
+            title={mainCollapsed ? (user.email ?? undefined) : undefined}
+            aria-label={mainCollapsed ? `Conta: ${user.email ?? "utilizador"}` : undefined}
+          >
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-zinc-600 to-zinc-700 text-sm font-bold text-white shadow-inner dark:from-zinc-700 dark:to-zinc-800">
               {user.email?.charAt(0).toUpperCase() || "U"}
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="truncate font-semibold text-zinc-200 text-xs">{user.email}</p>
-              <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Plano Pro</p>
-            </div>
+            {!mainCollapsed ? (
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-semibold text-foreground dark:text-zinc-200">{user.email}</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Plano Pro</p>
+              </div>
+            ) : null}
           </div>
           <button
             type="button"
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3.5 py-2.5 text-zinc-400 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all duration-200 group"
+            title={mainCollapsed ? "Sair" : undefined}
+            aria-label={mainCollapsed ? "Sair" : undefined}
+            className={cn(
+              "group flex w-full items-center rounded-xl text-muted-foreground transition-all duration-200 hover:bg-red-500/10 hover:text-red-600 dark:text-zinc-400 dark:hover:text-red-400",
+              mainCollapsed ? "justify-center px-2 py-2.5" : "gap-3 px-3.5 py-2.5",
+            )}
           >
-            <LogOut className="w-5 h-5 shrink-0 transition-transform group-hover:-translate-x-0.5" />
-            <span className="font-medium text-[14px]">Sair</span>
+            <LogOut className="size-5 shrink-0 transition-transform group-hover:-translate-x-0.5" aria-hidden />
+            {!mainCollapsed ? <span className="font-medium text-[14px]">Sair</span> : null}
           </button>
         </div>
       </aside>
 
-      {/* Main content */}
-      <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-clip bg-zinc-950">
+      {/* Segunda sidebar — só na área Configurações */}
+      {settingsSection ? (
+        <aside className="flex w-[13.5rem] shrink-0 flex-col border-r border-sidebar-border bg-sidebar/90 text-sidebar-foreground backdrop-blur-xl dark:border-white/5 dark:bg-zinc-950/70">
+          <div className="border-b border-sidebar-border px-4 py-5 dark:border-white/5">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Configurações</p>
+            <p className="mt-1 text-sm font-semibold text-foreground dark:text-zinc-200">Sua conta</p>
+          </div>
+          <nav className="flex-1 space-y-1 p-3">
+            {settingsSubItems.map((sub) => {
+              const subActive = pathname === sub.href;
+              return (
+                <Link
+                  key={sub.href}
+                  href={sub.href}
+                  className={cn(
+                    "flex items-center gap-2 rounded-lg px-3 py-2.5 text-[13px] font-medium transition-colors",
+                    subActive
+                      ? "bg-indigo-500/15 text-foreground ring-1 ring-indigo-500/25 dark:text-white"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground dark:text-zinc-500 dark:hover:bg-white/5 dark:hover:text-zinc-200",
+                  )}
+                >
+                  <sub.icon className="size-4 shrink-0" aria-hidden />
+                  {sub.name}
+                </Link>
+              );
+            })}
+          </nav>
+        </aside>
+      ) : null}
+
+      <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-clip bg-background dark:bg-zinc-950">
         <div className="mx-auto w-full min-h-0 min-w-0 max-w-[1760px] px-6 py-10 sm:px-10 md:px-12">
           {children}
         </div>

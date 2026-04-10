@@ -26,6 +26,15 @@ function formatInt(n: number) {
   return n.toLocaleString("pt-BR");
 }
 
+function formatCurrencyBRL(n: number) {
+  return n.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
 function leadsCreatedInMonth(leads: Lead[], year: number, monthIndex: number): number {
   const start = new Date(year, monthIndex, 1).getTime();
   const end = new Date(year, monthIndex + 1, 1).getTime();
@@ -203,6 +212,11 @@ export default function DashboardPage() {
     const emNegociacao = leads.filter((l) => l.status !== "Convertido" && l.status !== "Perdido").length;
     const taxa =
       total > 0 ? Math.round((convertidos / total) * 100) : 0;
+    const totalAiCostBrl = reports.reduce(
+      (sum, r) => sum + Number(r.aiUsage?.totalEstimatedCostBrl || 0),
+      0
+    );
+    const avgAiCostPerReport = reportCount > 0 ? totalAiCostBrl / reportCount : 0;
 
     return [
       {
@@ -234,45 +248,56 @@ export default function DashboardPage() {
         href: "/dashboard/leads",
       },
       {
-        title: "Em negociação",
-        value: formatInt(emNegociacao),
-        description: "Leads em aberto (exceto convertidos e perdidos)",
+        title: "Custo médio por rota",
+        value: formatCurrencyBRL(avgAiCostPerReport),
+        description:
+          reportCount > 0
+            ? `${formatCurrencyBRL(totalAiCostBrl)} em ${formatInt(reportCount)} rota(s) (estimado)`
+            : "Sem rotas para calcular custo médio",
         icon: Clock,
         color: "text-amber-500",
-        href: "/dashboard/leads",
+        href: "/dashboard/rotas",
       },
     ] as const;
-  }, [leads, reportCount]);
+  }, [leads, reportCount, reports]);
 
   return (
     <div className="space-y-8">
       <div className="flex flex-col gap-1">
-        <h1 className="text-4xl font-extrabold tracking-tight text-white">Visão geral</h1>
-        <p className="text-zinc-400 text-lg">Bem-vindo à sua central de inteligência digital.</p>
+        <h1 className="text-4xl font-extrabold tracking-tight text-foreground">Visão geral</h1>
+        <p className="text-lg text-muted-foreground">Bem-vindo à sua central de inteligência digital.</p>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat, i) => (
-          <Link key={i} href={stat.href} className="block group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950">
-            <Card className="h-full transition-all duration-300 hover:bg-white/[0.04] border-white/5 bg-white/[0.02] shadow-lg overflow-visible">
-              <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                <CardTitle className="text-xs font-bold uppercase tracking-widest text-zinc-500 group-hover:text-zinc-400 transition-colors">{stat.title}</CardTitle>
-                <div className={cn(
-                  "flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 ring-1 ring-white/10 transition-all duration-300 group-hover:scale-110 group-hover:ring-white/20",
-                  stat.color.replace("text-", "text-")
-                )}>
-                  <stat.icon className="w-4 h-4 shrink-0" aria-hidden />
+          <Link
+            key={i}
+            href={stat.href}
+            className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:focus-visible:ring-offset-zinc-950"
+          >
+            <Card className="h-full overflow-visible border border-border bg-card shadow-lg transition-all duration-300 hover:bg-muted/40 dark:border-white/5 dark:bg-white/[0.02] dark:hover:bg-white/[0.04]">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-xs font-bold uppercase tracking-widest text-muted-foreground transition-colors group-hover:text-foreground/80">
+                  {stat.title}
+                </CardTitle>
+                <div
+                  className={cn(
+                    "flex h-8 w-8 items-center justify-center rounded-lg bg-muted ring-1 ring-border transition-all duration-300 group-hover:scale-110 group-hover:ring-border/80 dark:bg-white/5 dark:ring-white/10 dark:group-hover:ring-white/20",
+                    stat.color,
+                  )}
+                >
+                  <stat.icon className="h-4 w-4 shrink-0" aria-hidden />
                 </div>
               </CardHeader>
               <CardContent className="pt-2">
                 {loading ? (
-                  <div className="flex items-center gap-2 text-zinc-500">
-                    <Loader2 className="size-5 animate-spin shrink-0" aria-hidden />
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Loader2 className="size-5 shrink-0 animate-spin" aria-hidden />
                   </div>
                 ) : (
                   <>
-                    <div className="text-3xl font-bold text-white tracking-tight">{stat.value}</div>
-                    <p className="text-xs text-zinc-500 mt-2 leading-relaxed font-medium">{stat.description}</p>
+                    <div className="text-3xl font-bold tracking-tight text-foreground">{stat.value}</div>
+                    <p className="mt-2 text-xs font-medium leading-relaxed text-muted-foreground">{stat.description}</p>
                   </>
                 )}
               </CardContent>
@@ -282,47 +307,47 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-7">
-        <Card className="md:col-span-4 border-white/5 bg-white/[0.02] shadow-xl overflow-hidden">
+        <Card className="overflow-hidden border border-border bg-card shadow-xl dark:border-white/5 dark:bg-white/[0.02] md:col-span-4">
           <CardHeader className="pb-6">
             <div className="flex items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-500/10 ring-1 ring-indigo-500/20">
-                <TrendingUp className="size-5 text-indigo-400" />
+                <TrendingUp className="size-5 text-indigo-600 dark:text-indigo-400" />
               </div>
               <div>
-                <CardTitle className="text-lg font-bold text-white">Desempenho semanal</CardTitle>
-                <CardDescription className="text-zinc-500">Acompanhamento de novos leads nos últimos 7 dias</CardDescription>
+                <CardTitle className="text-lg font-bold text-foreground">Desempenho semanal</CardTitle>
+                <CardDescription>Acompanhamento de novos leads nos últimos 7 dias</CardDescription>
               </div>
             </div>
           </CardHeader>
           <CardContent className="p-0">
             <div className="px-6 pb-6">
-              <div className="rounded-2xl border border-white/5 bg-zinc-900/40 p-2 shadow-inner">
+              <div className="rounded-2xl border border-border bg-muted/50 p-2 shadow-inner dark:border-white/5 dark:bg-zinc-900/40">
                 <WeeklyLeadsChart data={weekBuckets} loading={loading} />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="md:col-span-3 border-white/5 bg-white/[0.02] shadow-xl overflow-hidden">
+        <Card className="overflow-hidden border border-border bg-card shadow-xl dark:border-white/5 dark:bg-white/[0.02] md:col-span-3">
           <CardHeader className="pb-4">
             <div className="flex items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-500/10 ring-1 ring-violet-500/20">
-                <Sparkles className="size-5 text-violet-400" />
+                <Sparkles className="size-5 text-violet-600 dark:text-violet-400" />
               </div>
               <div>
-                <CardTitle className="text-lg font-bold text-white">Últimas rotas</CardTitle>
-                <CardDescription className="text-zinc-500">Relatórios gerados recentemente</CardDescription>
+                <CardTitle className="text-lg font-bold text-foreground">Últimas rotas</CardTitle>
+                <CardDescription>Relatórios gerados recentemente</CardDescription>
               </div>
             </div>
           </CardHeader>
           <CardContent className="space-y-4 pt-2">
             {loading ? (
               <div className="flex justify-center py-12">
-                <Loader2 className="size-8 animate-spin text-zinc-700" aria-hidden />
+                <Loader2 className="size-8 animate-spin text-muted-foreground" aria-hidden />
               </div>
             ) : latestReports.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] px-4 py-10 text-center">
-                <p className="text-sm text-zinc-500 font-medium">Nenhuma rota gerada ainda.</p>
+              <div className="rounded-2xl border border-dashed border-border bg-muted/30 px-4 py-10 text-center dark:border-white/10 dark:bg-white/[0.02]">
+                <p className="text-sm font-medium text-muted-foreground">Nenhuma rota gerada ainda.</p>
                 <Link
                   href="/dashboard/rotas/new"
                   className="mt-4 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white transition-all hover:bg-indigo-500 hover:scale-105 active:scale-95 shadow-lg shadow-indigo-500/20"
@@ -338,15 +363,15 @@ export default function DashboardPage() {
                     <li key={r.id}>
                       <Link
                         href={`/dashboard/rotas/${r.id}`}
-                        className="flex items-center gap-4 rounded-xl border border-transparent px-3 py-3 transition-all hover:bg-white/5 hover:border-white/5 group"
+                        className="group flex items-center gap-4 rounded-xl border border-transparent px-3 py-3 transition-all hover:border-border hover:bg-muted/60 dark:hover:border-white/5 dark:hover:bg-white/5"
                       >
                         <div className="relative">
-                          <div className="absolute -inset-1 rounded-full bg-indigo-500/20 blur-sm opacity-0 group-hover:opacity-100 transition-opacity" />
-                          <ReportSiteAvatar report={r} className="relative ring-1 ring-white/10 group-hover:ring-indigo-500/30 transition-all" />
+                          <div className="absolute -inset-1 rounded-full bg-indigo-500/20 opacity-0 blur-sm transition-opacity group-hover:opacity-100" />
+                          <ReportSiteAvatar report={r} className="relative ring-1 ring-border transition-all group-hover:ring-indigo-500/30 dark:ring-white/10" />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="truncate font-bold text-zinc-100 group-hover:text-white transition-colors">{r.leadCompany}</p>
-                          <p className="truncate text-[11px] font-semibold uppercase tracking-wider text-zinc-500 mt-0.5">
+                          <p className="truncate font-bold text-foreground transition-colors group-hover:text-primary">{r.leadCompany}</p>
+                          <p className="mt-0.5 truncate text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                             {new Date(r.createdAt).toLocaleDateString("pt-BR", {
                               day: "2-digit",
                               month: "short",
@@ -355,7 +380,7 @@ export default function DashboardPage() {
                             })}
                           </p>
                         </div>
-                        <ChevronRight className="size-4 shrink-0 text-zinc-700 group-hover:text-zinc-400 group-hover:translate-x-0.5 transition-all" aria-hidden />
+                        <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-all group-hover:translate-x-0.5 group-hover:text-foreground dark:group-hover:text-zinc-400" aria-hidden />
                       </Link>
                     </li>
                   ))}
@@ -363,7 +388,7 @@ export default function DashboardPage() {
                 <div className="pt-2">
                   <Link
                     href="/dashboard/rotas"
-                    className="flex items-center justify-center gap-2 rounded-xl border border-white/5 bg-white/5 py-2.5 text-xs font-bold text-zinc-400 transition-all hover:bg-white/10 hover:text-zinc-200"
+                    className="flex items-center justify-center gap-2 rounded-xl border border-border bg-muted/40 py-2.5 text-xs font-bold text-muted-foreground transition-all hover:bg-muted hover:text-foreground dark:border-white/5 dark:bg-white/5 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-zinc-200"
                   >
                     <List className="size-3.5 shrink-0" aria-hidden />
                     Ver todas as rotas

@@ -4,7 +4,26 @@ import {
   DynamicRetrievalMode,
 } from "@google/generative-ai";
 import { randomBytes } from "crypto";
-import type { DiagnosticScore, RotaDigitalReport } from "@/types/report";
+import type { DiagnosticScore, DigitalChannel, RotaDigitalReport } from "@/types/report";
+import type {
+  AiRecommendedChannelsPolicy,
+  AiScoringStrictness,
+  AiServicesFocusPolicy,
+} from "@/types/user-settings";
+import { buildRecommendedChannelsPolicyPromptSection } from "@/lib/ai-recommended-channels-prompt";
+import { buildServicesFocusPromptSection } from "@/lib/ai-services-focus-prompt";
+import {
+  labelsForChannelIds,
+  sanitizeAiRecommendedChannelIds,
+} from "@/lib/ai-recommended-channel-options";
+import {
+  sanitizeAiCustomServiceLabels,
+  sanitizeAiServiceOfferingIds,
+} from "@/lib/ai-agency-services";
+import {
+  buildScoringStrictnessPromptSection,
+  sanitizeAiScoringStrictness,
+} from "@/lib/ai-scoring-strictness-prompt";
 import {
   buildInstagramRequestHeaders,
   fetchInstagramPublicPage,
@@ -15,7 +34,33 @@ import {
 } from "@/lib/instagram-public-profile";
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+/** Vercel Pro: até 300s; 180s dá folga para evidências + Gemini + eventual reparo de JSON. */
+export const maxDuration = 180;
+
+/**
+ * Uma chamada `generateContent` com prompt grande e imagens costuma levar bem mais que 20s.
+ * Valor baixo provoca erro enganoso (“nenhum modelo disponível”) quando só houve timeout.
+ * Manter folga em relação a `maxDuration` (coleta de evidências também consome tempo).
+ */
+const GEMINI_GENERATE_TIMEOUT_MS = 75_000;
+const GEMINI_JSON_REPAIR_TIMEOUT_MS = 45_000;
+
+async function withGeminiCallTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`Tempo limite (${timeoutMs}ms) na chamada do Gemini.`)),
+          timeoutMs
+        );
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
 
 function newPublicSlug(): string {
   return randomBytes(12)
@@ -40,6 +85,87 @@ function normalizeUrl(input?: string): string | undefined {
     return value.startsWith("http") ? value : `https://${value}`;
   }
   return `https://${value}`;
+}
+
+function normalizeChannelName(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function sanitizeChannelEntry(input: unknown, forcedName?: string): DigitalChannel | null {
+  if (!input || typeof input !== "object") return null;
+  const row = input as Record<string, unknown>;
+  const rawName = typeof row.name === "string" ? row.name.trim() : "";
+  const name = (forcedName || rawName).trim();
+  if (!name) return null;
+  const priority: DigitalChannel["priority"] =
+    row.priority === "Alta" || row.priority === "Baixa" ? row.priority : "Média";
+  const description =
+    typeof row.description === "string" && row.description.trim().length > 0
+      ? row.description.trim()
+      : `Canal recomendado para acelerar resultados em ${name}.`;
+  const actions = Array.isArray(row.actions)
+    ? row.actions.filter((x): x is string => typeof x === "string" && x.trim().length > 0).slice(0, 5)
+    : [];
+  return {
+    name,
+    priority,
+    description,
+    actions: actions.length > 0 ? actions : [`Iniciar plano de execução para ${name}.`],
+  };
+}
+
+function normalizeRecommendedChannels(
+  input: unknown,
+  policy: AiRecommendedChannelsPolicy,
+  restrictedChannelIds: string[]
+): DigitalChannel[] {
+  const source = Array.isArray(input) ? input : [];
+  const deduped: DigitalChannel[] = [];
+  const used = new Set<string>();
+
+  const pushIfUnique = (row: DigitalChannel | null) => {
+    if (!row) return;
+    const key = normalizeChannelName(row.name);
+    if (!key || used.has(key)) return;
+    used.add(key);
+    deduped.push(row);
+  };
+
+  if (policy === "restricted" && restrictedChannelIds.length > 0) {
+    const allowedLabels = labelsForChannelIds(restrictedChannelIds);
+    const allowedByNorm = new Map<string, string>();
+    for (const label of allowedLabels) {
+      allowedByNorm.set(normalizeChannelName(label), label);
+    }
+    for (const row of source) {
+      const rawName = typeof (row as Record<string, unknown>)?.name === "string"
+        ? String((row as Record<string, unknown>).name)
+        : "";
+      const canonical = allowedByNorm.get(normalizeChannelName(rawName));
+      if (!canonical) continue;
+      pushIfUnique(sanitizeChannelEntry(row, canonical));
+    }
+    // Fallback: garante saída consistente com os canais permitidos, mesmo se a IA falhar no formato.
+    for (const label of allowedLabels) {
+      pushIfUnique({
+        name: label,
+        priority: "Média",
+        description: `Canal autorizado na configuração da agência para este diagnóstico.`,
+        actions: [`Definir plano de execução para ${label}.`],
+      });
+    }
+    return deduped.slice(0, allowedLabels.length);
+  }
+
+  for (const row of source) {
+    pushIfUnique(sanitizeChannelEntry(row));
+  }
+  return deduped;
 }
 
 const RESERVED_INSTAGRAM_PATHS = new Set([
@@ -169,6 +295,45 @@ type GeminiInlineImagePart = {
     data: string;
   };
 };
+
+type GeminiUsageMetadata = {
+  promptTokenCount?: number;
+  candidatesTokenCount?: number;
+  totalTokenCount?: number;
+};
+
+type ModelCostPer1M = {
+  inputUsd: number;
+  outputUsd: number;
+};
+
+/**
+ * Tabela simplificada para estimativa de custo.
+ * Os valores podem mudar no provedor; por isso salvamos como "estimado".
+ */
+const MODEL_COST_PER_1M_USD: Record<string, ModelCostPer1M> = {
+  "gemini-2.5-flash": { inputUsd: 0.15, outputUsd: 0.6 },
+  "gemini-2.0-flash": { inputUsd: 0.1, outputUsd: 0.4 },
+  "gemini-2.0-flash-lite": { inputUsd: 0.075, outputUsd: 0.3 },
+  "gemini-1.5-flash": { inputUsd: 0.15, outputUsd: 0.6 },
+  "gemini-1.5-flash-latest": { inputUsd: 0.15, outputUsd: 0.6 },
+  "gemini-2.5-pro": { inputUsd: 1.25, outputUsd: 5 },
+  "gemini-1.5-pro": { inputUsd: 1.25, outputUsd: 5 },
+};
+
+const USD_TO_BRL_ESTIMATE = 5.2;
+
+function estimateCostUsdFromUsage(modelName: string, usage?: GeminiUsageMetadata): number | undefined {
+  if (!usage) return undefined;
+  const pricing = MODEL_COST_PER_1M_USD[modelName];
+  if (!pricing) return undefined;
+  const promptTokens = Number(usage.promptTokenCount || 0);
+  const outputTokens = Number(usage.candidatesTokenCount || 0);
+  const estimated =
+    (promptTokens / 1_000_000) * pricing.inputUsd +
+    (outputTokens / 1_000_000) * pricing.outputUsd;
+  return Number.isFinite(estimated) ? Number(estimated.toFixed(8)) : undefined;
+}
 
 async function fetchText(url: string): Promise<{ status: number; text: string }> {
   const ctrl = new AbortController();
@@ -1130,7 +1295,10 @@ async function repairModelJsonWithGemini(
         },
         { apiVersion: "v1" }
       );
-      const repaired = await repairModel.generateContent(repairPrompt);
+      const repaired = await withGeminiCallTimeout(
+        repairModel.generateContent(repairPrompt),
+        GEMINI_JSON_REPAIR_TIMEOUT_MS
+      );
       return parseModelJson(repaired.response.text());
     } catch (error) {
       lastError = error;
@@ -1189,25 +1357,41 @@ async function prepareEvidencePayload(params: {
         fullPage: true,
       }),
     ]);
+  const externalWebsiteSnapshotProxyUrl = buildImageProxyUrl(externalWebsiteSnapshotUrl);
+  const externalInstagramBioLinkSnapshotProxyUrl = buildImageProxyUrl(
+    externalInstagramBioLinkSnapshotUrl
+  );
 
   let siteHeroSnapshotUrl = hasBrowserless
-    ? internalWebsiteSnapshotUrl || externalWebsiteSnapshotUrl
-    : externalWebsiteSnapshotUrl || internalWebsiteSnapshotUrl;
+    ? internalWebsiteSnapshotUrl || externalWebsiteSnapshotProxyUrl || externalWebsiteSnapshotUrl
+    : externalWebsiteSnapshotProxyUrl || externalWebsiteSnapshotUrl || internalWebsiteSnapshotUrl;
   const instagramSnapshotCandidates = [internalInstagramSnapshotUrl];
   const instagramSnapshotUrl = instagramSnapshotCandidates.find(Boolean);
   if (siteHeroSnapshotUrl && siteHeroSnapshotUrl === instagramSnapshotUrl) {
     siteHeroSnapshotUrl = undefined;
   }
   const instagramBioLinkSnapshotUrl = hasBrowserless
-    ? internalInstagramBioLinkSnapshotUrl || externalInstagramBioLinkSnapshotUrl
-    : externalInstagramBioLinkSnapshotUrl || internalInstagramBioLinkSnapshotUrl;
+    ? internalInstagramBioLinkSnapshotUrl ||
+      externalInstagramBioLinkSnapshotProxyUrl ||
+      externalInstagramBioLinkSnapshotUrl
+    : externalInstagramBioLinkSnapshotProxyUrl ||
+      externalInstagramBioLinkSnapshotUrl ||
+      internalInstagramBioLinkSnapshotUrl;
 
   const websiteCandidateUrls = hasBrowserless
-    ? [internalWebsiteSnapshotUrl, externalWebsiteSnapshotUrl]
-    : [externalWebsiteSnapshotUrl, internalWebsiteSnapshotUrl];
+    ? [internalWebsiteSnapshotUrl, externalWebsiteSnapshotProxyUrl, externalWebsiteSnapshotUrl]
+    : [externalWebsiteSnapshotProxyUrl, externalWebsiteSnapshotUrl, internalWebsiteSnapshotUrl];
   const bioLinkCandidateUrls = hasBrowserless
-    ? [internalInstagramBioLinkSnapshotUrl, externalInstagramBioLinkSnapshotUrl]
-    : [externalInstagramBioLinkSnapshotUrl, internalInstagramBioLinkSnapshotUrl];
+    ? [
+        internalInstagramBioLinkSnapshotUrl,
+        externalInstagramBioLinkSnapshotProxyUrl,
+        externalInstagramBioLinkSnapshotUrl,
+      ]
+    : [
+        externalInstagramBioLinkSnapshotProxyUrl,
+        externalInstagramBioLinkSnapshotUrl,
+        internalInstagramBioLinkSnapshotUrl,
+      ];
 
   return {
     normalizedWebsiteUrl,
@@ -1381,6 +1565,13 @@ function buildPrompt(body: {
   instagramUrl?: string;
   servicesOffered?: string;
   objective?: string;
+  aiBasePromptGuidelines?: string;
+  aiRecommendedChannelsPolicy?: AiRecommendedChannelsPolicy;
+  aiRecommendedChannelIds?: string[];
+  aiServicesFocusPolicy?: AiServicesFocusPolicy;
+  aiServiceOfferingIds?: string[];
+  aiCustomServiceLabels?: string[];
+  aiScoringStrictness?: AiScoringStrictness;
   websiteEvidence?: WebsiteEvidence;
   instagramEvidence?: InstagramEvidence;
   hasWebsiteScreenshot?: boolean;
@@ -1397,9 +1588,32 @@ function buildPrompt(body: {
   const objectiveLine = objectiveText
     ? objectiveText
     : "Não informado pelo usuário — INFERIR objetivos plausíveis e gargalos a partir da análise. No relatório, deixe claro quando for hipótese sugerida pela IA.";
+  const aiGuidelines = (body.aiBasePromptGuidelines || "").trim();
+  const aiGuidelinesBlock = aiGuidelines
+    ? `\n**Diretrizes personalizadas da conta (aplicar sempre)**\n${aiGuidelines}\n`
+    : "";
+  let channelPolicy: AiRecommendedChannelsPolicy =
+    body.aiRecommendedChannelsPolicy === "restricted" ? "restricted" : "open";
+  const channelIds = sanitizeAiRecommendedChannelIds(body.aiRecommendedChannelIds);
+  if (channelPolicy === "restricted" && channelIds.length === 0) {
+    channelPolicy = "open";
+  }
+  const channelsPolicyBlock = `\n${buildRecommendedChannelsPolicyPromptSection(channelPolicy, channelIds)}\n`;
+
+  let servicesPolicy: AiServicesFocusPolicy =
+    body.aiServicesFocusPolicy === "restricted" ? "restricted" : "open";
+  const serviceOfferingIds = sanitizeAiServiceOfferingIds(body.aiServiceOfferingIds);
+  const customServiceLabels = sanitizeAiCustomServiceLabels(body.aiCustomServiceLabels);
+  if (servicesPolicy === "restricted" && serviceOfferingIds.length === 0 && customServiceLabels.length === 0) {
+    servicesPolicy = "open";
+  }
+  const servicesFocusBlock = `\n${buildServicesFocusPromptSection(servicesPolicy, serviceOfferingIds, customServiceLabels)}\n`;
+  const scoringStrictness = sanitizeAiScoringStrictness(body.aiScoringStrictness);
+  const scoringStrictnessBlock = `\n${buildScoringStrictnessPromptSection(scoringStrictness)}\n`;
+
   return `Você é um estrategista de marketing digital senior. Faça análise profunda com foco comercial.
 Use pesquisa na web quando necessário para enriquecer a análise (site da empresa, instagram e contexto competitivo).
-
+${aiGuidelinesBlock}${channelsPolicyBlock}${servicesFocusBlock}${scoringStrictnessBlock}
 **Dados do lead**
 - Nome: ${body.name}
 - Empresa: ${body.company}
@@ -1545,7 +1759,6 @@ Responda **somente** com um único objeto JSON válido (sem markdown fora do JSO
   "proposalPageHtml": "string — HTML completo do documento"
 }
 
-Mínimo 3 canais recomendados. 
 No executiveSummary, explique claramente o motivo da nota de maturidade digital em 1 parágrafo único.
 Seja específico para "${body.company}".`;
 }
@@ -1568,10 +1781,29 @@ export async function POST(req: NextRequest) {
       instagramUrl,
       servicesOffered: rawServices,
       objective: rawObjective,
+      aiBasePromptGuidelines: rawAiBasePromptGuidelines,
+      aiRecommendedChannelsPolicy: rawAiRecommendedChannelsPolicy,
+      aiRecommendedChannelIds: rawAiRecommendedChannelIds,
+      aiServicesFocusPolicy: rawAiServicesFocusPolicy,
+      aiServiceOfferingIds: rawAiServiceOfferingIds,
+      aiCustomServiceLabels: rawAiCustomServiceLabels,
+      aiScoringStrictness: rawAiScoringStrictness,
     } = body;
     const servicesOffered =
       typeof rawServices === "string" ? rawServices.trim() : "";
     const objective = typeof rawObjective === "string" ? rawObjective.trim() : "";
+    const aiBasePromptGuidelines =
+      typeof rawAiBasePromptGuidelines === "string"
+        ? rawAiBasePromptGuidelines.trim().slice(0, 3000)
+        : "";
+    const aiRecommendedChannelsPolicy: AiRecommendedChannelsPolicy =
+      rawAiRecommendedChannelsPolicy === "restricted" ? "restricted" : "open";
+    const aiRecommendedChannelIds = sanitizeAiRecommendedChannelIds(rawAiRecommendedChannelIds);
+    const aiServicesFocusPolicy: AiServicesFocusPolicy =
+      rawAiServicesFocusPolicy === "restricted" ? "restricted" : "open";
+    const aiServiceOfferingIds = sanitizeAiServiceOfferingIds(rawAiServiceOfferingIds);
+    const aiCustomServiceLabels = sanitizeAiCustomServiceLabels(rawAiCustomServiceLabels);
+    const aiScoringStrictness = sanitizeAiScoringStrictness(rawAiScoringStrictness);
 
     if (!leadId || !userId || !name || !company) {
       return NextResponse.json(
@@ -1677,6 +1909,13 @@ export async function POST(req: NextRequest) {
       instagramUrl: prepared.normalizedInstagramUrl,
       servicesOffered,
       objective,
+      aiBasePromptGuidelines,
+      aiRecommendedChannelsPolicy,
+      aiRecommendedChannelIds,
+      aiServicesFocusPolicy,
+      aiServiceOfferingIds,
+      aiCustomServiceLabels,
+      aiScoringStrictness,
       websiteEvidence,
       instagramEvidence,
       hasWebsiteScreenshot: Boolean(websiteImagePart),
@@ -1693,20 +1932,9 @@ export async function POST(req: NextRequest) {
     const candidateModels = discoveredModels.length ? discoveredModels : ["gemini-2.5-flash"];
 
     let responseText = "";
+    let selectedModelName = "";
+    let selectedUsage: GeminiUsageMetadata | undefined;
     let lastError: unknown = null;
-    const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
-      let timer: ReturnType<typeof setTimeout> | undefined;
-      try {
-        return await Promise.race([
-          promise,
-          new Promise<T>((_, reject) => {
-            timer = setTimeout(() => reject(new Error(`Tempo limite (${timeoutMs}ms) na chamada do Gemini.`)), timeoutMs);
-          }),
-        ]);
-      } finally {
-        if (timer) clearTimeout(timer);
-      }
-    };
     const elapsedMs = Date.now() - requestStartedAt;
     const lowTimeBudget = elapsedMs > 35_000;
 
@@ -1730,8 +1958,13 @@ export async function POST(req: NextRequest) {
             },
             { apiVersion: "v1" }
           );
-          const result = await withTimeout(model.generateContent(generateContentInput), 20_000);
+          const result = await withGeminiCallTimeout(
+            model.generateContent(generateContentInput),
+            GEMINI_GENERATE_TIMEOUT_MS
+          );
           responseText = result.response.text();
+          selectedModelName = modelName;
+          selectedUsage = result.response.usageMetadata as GeminiUsageMetadata | undefined;
           break;
         } catch (err) {
           lastError = err;
@@ -1749,8 +1982,13 @@ export async function POST(req: NextRequest) {
             },
             { apiVersion: "v1" }
           );
-          const result = await withTimeout(model.generateContent(generateContentInput), 20_000);
+          const result = await withGeminiCallTimeout(
+            model.generateContent(generateContentInput),
+            GEMINI_GENERATE_TIMEOUT_MS
+          );
           responseText = result.response.text();
+          selectedModelName = modelName;
+          selectedUsage = result.response.usageMetadata as GeminiUsageMetadata | undefined;
           break;
         } catch (err) {
           lastError = err;
@@ -1936,6 +2174,13 @@ export async function POST(req: NextRequest) {
       `${websiteNote}\n\n${instagramNote}`
     );
 
+    const generationEstimatedCostUsd = estimateCostUsdFromUsage(selectedModelName, selectedUsage);
+    const generationEstimatedCostBrl =
+      typeof generationEstimatedCostUsd === "number"
+        ? Number((generationEstimatedCostUsd * USD_TO_BRL_ESTIMATE).toFixed(6))
+        : undefined;
+    const generationTotalTokens = Number(selectedUsage?.totalTokenCount || 0) || undefined;
+
     const report: Omit<RotaDigitalReport, "id"> = {
       leadId,
       userId,
@@ -1956,9 +2201,11 @@ export async function POST(req: NextRequest) {
       strengths: (aiData.strengths as string[]) || [],
       weaknesses: (aiData.weaknesses as string[]) || [],
       opportunities: (aiData.opportunities as string[]) || [],
-      recommendedChannels:
-        (aiData.recommendedChannels as RotaDigitalReport["recommendedChannels"]) ||
-        [],
+      recommendedChannels: normalizeRecommendedChannels(
+        aiData.recommendedChannels,
+        aiRecommendedChannelsPolicy,
+        aiRecommendedChannelIds
+      ),
       quickWins: (aiData.quickWins as string[]) || [],
       longTermActions: (aiData.longTermActions as string[]) || [],
       estimatedTimelineMonths: Number(aiData.estimatedTimelineMonths) || 6,
@@ -1983,6 +2230,21 @@ export async function POST(req: NextRequest) {
         instagramBioLinkUrl: instagramEvidence.bioLinkUrl,
         instagramBioLinkResolvedUrl: instagramEvidence.bioLinkResolvedUrl,
         researchNotes,
+      },
+      aiUsage: {
+        generation: {
+          model: selectedModelName || undefined,
+          promptTokens: Number(selectedUsage?.promptTokenCount || 0) || undefined,
+          candidateTokens: Number(selectedUsage?.candidatesTokenCount || 0) || undefined,
+          totalTokens: generationTotalTokens,
+          estimatedCostUsd: generationEstimatedCostUsd,
+          estimatedCostBrl: generationEstimatedCostBrl,
+          createdAt: Date.now(),
+        },
+        reanalysis: [],
+        totalTokens: generationTotalTokens,
+        totalEstimatedCostUsd: generationEstimatedCostUsd,
+        totalEstimatedCostBrl: generationEstimatedCostBrl,
       },
     };
 
@@ -2011,6 +2273,14 @@ export async function POST(req: NextRequest) {
         websiteScreenshotSentToAi: Boolean(websiteImagePart),
         instagramScreenshotSentToAi: Boolean(instagramImagePart),
         instagramBioLinkScreenshotSentToAi: Boolean(instagramBioLinkImagePart),
+      },
+      usage: {
+        model: selectedModelName || null,
+        promptTokens: selectedUsage?.promptTokenCount ?? null,
+        candidateTokens: selectedUsage?.candidatesTokenCount ?? null,
+        totalTokens: selectedUsage?.totalTokenCount ?? null,
+        estimatedCostUsd: generationEstimatedCostUsd ?? null,
+        estimatedCostBrl: generationEstimatedCostBrl ?? null,
       },
     };
     return NextResponse.json({ report, debug });

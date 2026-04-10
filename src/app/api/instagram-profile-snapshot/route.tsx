@@ -8,6 +8,7 @@ import {
   isInstagramLoginWallHtml,
   sanitizeInstagramAssetUrl,
 } from "@/lib/instagram-public-profile";
+import { convertImageBufferToWebp } from "@/lib/image-webp";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -454,12 +455,16 @@ export async function GET(req: NextRequest) {
         height: 1780,
       }
     );
-    const payload = Buffer.from(await image.arrayBuffer());
-    setCachedSnapshotResponse(cacheKey, "image/png", payload);
-    return new Response(bufferToBody(payload), {
+    const pngPayload = Buffer.from(await image.arrayBuffer());
+    const converted = await convertImageBufferToWebp(pngPayload, {
+      quality: 76,
+      fallbackMimeType: "image/png",
+    });
+    setCachedSnapshotResponse(cacheKey, converted.mimeType, converted.buffer);
+    return new Response(bufferToBody(converted.buffer), {
       status: 200,
       headers: {
-        "Content-Type": "image/png",
+        "Content-Type": converted.mimeType,
         "Cache-Control": "public, max-age=900, s-maxage=900",
       },
     });
@@ -594,12 +599,16 @@ export async function GET(req: NextRequest) {
       height: 1780,
     }
   );
-  const payload = Buffer.from(await image.arrayBuffer());
-  setCachedSnapshotResponse(cacheKey, "image/png", payload);
-  return new Response(bufferToBody(payload), {
+  const pngPayload = Buffer.from(await image.arrayBuffer());
+  const converted = await convertImageBufferToWebp(pngPayload, {
+    quality: 76,
+    fallbackMimeType: "image/png",
+  });
+  setCachedSnapshotResponse(cacheKey, converted.mimeType, converted.buffer);
+  return new Response(bufferToBody(converted.buffer), {
     status: 200,
     headers: {
-      "Content-Type": "image/png",
+      "Content-Type": converted.mimeType,
       "Cache-Control": "public, max-age=900, s-maxage=900",
     },
   });

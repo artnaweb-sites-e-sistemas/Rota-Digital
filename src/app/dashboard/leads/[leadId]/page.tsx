@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { getLead } from "@/lib/leads";
 import { getReportByLead } from "@/lib/reports";
-import { Lead } from "@/types/lead";
+import { Lead, type LeadStatus } from "@/types/lead";
 import { RotaDigitalReport } from "@/types/report";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -64,7 +64,7 @@ export default function LeadDetailPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="animate-spin text-zinc-400" size={32} />
+        <Loader2 className="animate-spin text-muted-foreground" size={32} />
       </div>
     );
   }
@@ -72,7 +72,7 @@ export default function LeadDetailPage() {
   if (!lead) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-4">
-        <p className="text-zinc-400">Lead não encontrado.</p>
+        <p className="text-muted-foreground">Lead não encontrado.</p>
         <Button variant="outline" onClick={() => router.back()}>
           Voltar
         </Button>
@@ -88,58 +88,56 @@ export default function LeadDetailPage() {
           variant="ghost"
           size="icon"
           onClick={() => router.push("/dashboard/leads")}
-          className="text-zinc-400 hover:text-white"
+          className="text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft size={20} />
         </Button>
         <div>
-          <h1 className="text-3xl font-bold text-white">{lead.name}</h1>
-          <p className="text-zinc-400 mt-1">{lead.company}</p>
+          <h1 className="text-3xl font-bold text-foreground">{lead.name}</h1>
+          <p className="mt-1 text-muted-foreground">{lead.company}</p>
         </div>
-        <Badge
-          className={`ml-auto ${STATUS_COLORS[lead.status] || "bg-zinc-600"} text-white border-none`}
-        >
+        <Badge className={cn("ml-auto border-none", STATUS_BADGE_SURFACE[lead.status])}>
           {lead.status}
         </Badge>
       </div>
 
       {/* Lead Info Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="bg-zinc-900 border-zinc-800">
+        <Card className="border-border bg-card dark:border-zinc-800 dark:bg-zinc-900">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-zinc-400">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
               Informações de Contato
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="flex items-center gap-3 text-zinc-300">
-              <User size={16} className="text-zinc-500 shrink-0" />
+            <div className="flex items-center gap-3 text-foreground">
+              <User size={16} className="shrink-0 text-muted-foreground" />
               <span>{lead.name}</span>
             </div>
-            <div className="flex items-center gap-3 text-zinc-300">
-              <Building2 size={16} className="text-zinc-500 shrink-0" />
+            <div className="flex items-center gap-3 text-foreground">
+              <Building2 size={16} className="shrink-0 text-muted-foreground" />
               <span>{lead.company}</span>
             </div>
-            <div className="flex items-center gap-3 text-zinc-300">
-              <Mail size={16} className="text-zinc-500 shrink-0" />
+            <div className="flex items-center gap-3 text-foreground">
+              <Mail size={16} className="shrink-0 text-muted-foreground" />
               <span>{lead.email || "—"}</span>
             </div>
-            <div className="flex items-center gap-3 text-zinc-300">
-              <Phone size={16} className="text-zinc-500 shrink-0" />
+            <div className="flex items-center gap-3 text-foreground">
+              <Phone size={16} className="shrink-0 text-muted-foreground" />
               <span>{lead.phone || "—"}</span>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-zinc-900 border-zinc-800">
+        <Card className="border-border bg-card dark:border-zinc-800 dark:bg-zinc-900">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-zinc-400">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
               Outros Detalhes
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="flex items-center gap-3 text-zinc-300">
-              <Calendar size={16} className="text-zinc-500 shrink-0" />
+            <div className="flex items-center gap-3 text-foreground">
+              <Calendar size={16} className="shrink-0 text-muted-foreground" />
               <span>
                 Criado em{" "}
                 {new Date(lead.createdAt).toLocaleDateString("pt-BR", {
@@ -151,8 +149,8 @@ export default function LeadDetailPage() {
             </div>
             {lead.notes && (
               <div className="mt-2">
-                <p className="text-xs text-zinc-500 mb-1">Observações</p>
-                <p className="text-zinc-300 text-sm whitespace-pre-wrap">{lead.notes}</p>
+                <p className="mb-1 text-xs text-muted-foreground">Observações</p>
+                <p className="whitespace-pre-wrap text-sm text-foreground/90">{lead.notes}</p>
               </div>
             )}
           </CardContent>
@@ -160,19 +158,19 @@ export default function LeadDetailPage() {
       </div>
 
       {/* AI Route Generation */}
-      <Card className="bg-gradient-to-br from-indigo-950/60 to-zinc-900 border-indigo-800/40">
+      <Card className="border border-indigo-500/25 bg-gradient-to-br from-indigo-500/8 to-card dark:from-indigo-950/60 dark:to-zinc-900 dark:border-indigo-800/40">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-white">
-            <Sparkles size={20} className="text-indigo-400" />
+          <CardTitle className="flex items-center gap-2 text-foreground">
+            <Sparkles size={20} className="text-indigo-600 dark:text-indigo-400" />
             Rota Digital com IA
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {existingReport ? (
             <div className="space-y-3">
-              <p className="text-zinc-300 text-sm">
+              <p className="text-sm text-foreground/90">
                 Já existe uma Rota Digital gerada para este lead em{" "}
-                <span className="text-indigo-400 font-medium">
+                <span className="font-medium text-indigo-700 dark:text-indigo-400">
                   {new Date(existingReport.createdAt).toLocaleDateString("pt-BR")}
                 </span>
                 .
@@ -186,20 +184,20 @@ export default function LeadDetailPage() {
                 <LinkButton
                   href={`/dashboard/rotas/new?leadId=${lead.id}`}
                   variant="outline"
-                  className="gap-2 border-zinc-700 bg-zinc-900 text-zinc-100 hover:bg-zinc-800"
+                  className="gap-2 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
                 >
                   <Sparkles size={16} />
                   Atualizar rota
                 </LinkButton>
                 </div>
                 {existingReport.publicSlug ? (
-                  <p className="text-xs text-zinc-500">
+                  <p className="text-xs text-muted-foreground">
                     Link para o lead:{" "}
                     <Link
                       href={`/r/${existingReport.publicSlug}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-indigo-400 hover:underline"
+                      className="text-indigo-700 underline-offset-2 hover:underline dark:text-indigo-400"
                     >
                       abrir página pública
                     </Link>
@@ -209,7 +207,7 @@ export default function LeadDetailPage() {
             </div>
           ) : (
             <div className="space-y-3">
-              <p className="text-zinc-400 text-sm">
+              <p className="text-sm text-muted-foreground">
                 Para gerar, abra o formulário de rota, selecione este lead e
                 preencha site, instagram, serviços e objetivo.
               </p>

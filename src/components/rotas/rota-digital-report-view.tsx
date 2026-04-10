@@ -64,11 +64,14 @@ import { CardSpotlight } from "@/components/ui/card-spotlight";
 import { cn } from "@/lib/utils";
 import { WhatsAppIcon } from "@/components/icons/whatsapp-icon";
 import type { UserReportCtaSettings } from "@/types/user-settings";
+import { PublicThemeToggle } from "@/components/public-theme-toggle";
 
 const PRIORITY_COLORS: Record<string, string> = {
-  Alta: "bg-red-500/25 text-red-200 border border-red-400/45",
-  Média: "bg-amber-500/20 text-amber-200 border border-amber-400/40",
-  Baixa: "bg-emerald-500/20 text-emerald-200 border border-emerald-400/40",
+  Alta: "border border-red-500/35 bg-red-500/15 text-red-900 dark:bg-red-500/25 dark:text-red-200 dark:border-red-400/45",
+  Média:
+    "border border-amber-500/35 bg-amber-500/12 text-amber-900 dark:bg-amber-500/20 dark:text-amber-200 dark:border-amber-400/40",
+  Baixa:
+    "border border-emerald-500/35 bg-emerald-500/12 text-emerald-900 dark:bg-emerald-500/20 dark:text-emerald-200 dark:border-emerald-400/40",
 };
 
 /** Borda do BorderGlow em repouso (antes do hover), alinhada à prioridade. */
@@ -80,7 +83,7 @@ const PRIORITY_FRAME_BORDER: Record<string, string> = {
 
 /** Mesmo visual da pill “WEBSITE” / “Instagram” nas evidências — rótulo em caixa alta (sutil). */
 const TOPIC_PILL_CLASS =
-  "inline-flex max-w-full items-center gap-1.5 rounded-full border border-zinc-700 bg-zinc-900/70 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide leading-none text-zinc-300";
+  "inline-flex max-w-full items-center gap-1.5 rounded-full border border-border bg-muted px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide leading-none text-foreground/82 dark:text-muted-foreground";
 
 /** Rótulo ao lado de ícone na pill — desce o texto para alinhar ao centro óptico do glifo. */
 const TOPIC_PILL_LABEL_NEXT_TO_ICON = "translate-y-0.5";
@@ -97,10 +100,10 @@ function SectionHeaderIcon({
     <div
       className={cn(
         "flex h-6 w-6 shrink-0 items-center justify-center rounded-md border",
-        tone === "indigo" && "border-indigo-500/30 bg-indigo-500/10 text-indigo-400",
-        tone === "yellow" && "border-yellow-500/35 bg-yellow-500/10 text-yellow-400",
-        tone === "purple" && "border-purple-500/35 bg-purple-500/10 text-purple-400",
-        tone === "neutral" && "border-zinc-700 bg-zinc-800 text-zinc-400",
+        tone === "indigo" && "border-indigo-500/30 bg-indigo-500/10 text-indigo-700 dark:text-indigo-400",
+        tone === "yellow" && "border-yellow-500/35 bg-yellow-500/10 text-yellow-800 dark:text-yellow-400",
+        tone === "purple" && "border-purple-500/35 bg-purple-500/10 text-purple-800 dark:text-purple-400",
+        tone === "neutral" && "border-border bg-muted text-muted-foreground",
       )}
     >
       <Icon size={14} />
@@ -128,7 +131,7 @@ const ROTA_REPORT_CARD_BOX = "py-6 sm:py-7";
 
 /** Linha de apoio sob o título do card (tom e escala iguais no relatório). */
 const ROTA_CARD_SUBTITLE =
-  "max-w-prose text-sm font-normal leading-relaxed text-zinc-400";
+  "max-w-prose text-sm font-normal leading-relaxed text-muted-foreground";
 
 type RotaHeaderIconTone = "indigo" | "yellow" | "purple" | "green" | "red" | "blue";
 
@@ -155,9 +158,9 @@ function RotaHeaderIcon({ tone, children }: { tone: RotaHeaderIconTone; children
 }
 
 const MATURITY_CONFIG = {
-  Iniciante: { color: "text-orange-400", bar: "bg-orange-500", range: "0.0-3.9" },
-  Intermediário: { color: "text-yellow-400", bar: "bg-yellow-500", range: "4.0-6.9" },
-  Avançado: { color: "text-green-400", bar: "bg-green-500", range: "7.0-10.0" },
+  Iniciante: { color: "text-orange-800 dark:text-orange-400", bar: "bg-orange-500", range: "0.0-3.9" },
+  Intermediário: { color: "text-amber-900 dark:text-yellow-400", bar: "bg-yellow-500", range: "4.0-6.9" },
+  Avançado: { color: "text-emerald-800 dark:text-green-400", bar: "bg-green-500", range: "7.0-10.0" },
 };
 
 function formatReadableParagraphs(text?: string): string {
@@ -190,6 +193,13 @@ function formatReadableParagraphs(text?: string): string {
   }
 
   return normalized;
+}
+
+function splitReadableParagraphs(text?: string): string[] {
+  return formatReadableParagraphs(text)
+    .split(/\n{2,}/)
+    .map((p) => p.trim())
+    .filter(Boolean);
 }
 
 function withSnapshotParams(src?: string, params?: Record<string, string | number | undefined>): string | undefined {
@@ -282,9 +292,9 @@ function MaturityGauge({ score, level }: { score: number; level: string }) {
         <span className={`text-4xl font-bold tabular-nums ${config.color}`}>
           {normalized.toFixed(1)}
         </span>
-        <span className="pb-1 text-sm text-zinc-500">/10</span>
+        <span className="pb-1 text-sm text-muted-foreground">/10</span>
       </div>
-      <div className="h-2.5 w-full overflow-hidden rounded-full bg-zinc-800">
+      <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
         <div
           className={`h-full rounded-full transition-all duration-1000 ${config.bar}`}
           style={{ width: `${normalized * 10}%` }}
@@ -300,9 +310,13 @@ function MaturityGauge({ score, level }: { score: number; level: string }) {
 }
 
 function getScoreBadgeClass(score: number): string {
-  if (score < 4) return "bg-red-500/20 text-red-300 border-red-400/40";
-  if (score < 7) return "bg-yellow-500/20 text-yellow-300 border-yellow-400/40";
-  return "bg-green-500/20 text-green-300 border-green-400/40";
+  if (score < 4) {
+    return "border-red-600/40 bg-red-500/12 text-red-950 dark:bg-red-500/20 dark:text-red-200 dark:border-red-400/45";
+  }
+  if (score < 7) {
+    return "border-amber-600/40 bg-amber-500/12 text-amber-950 dark:bg-yellow-500/20 dark:text-yellow-200 dark:border-yellow-400/45";
+  }
+  return "border-emerald-600/40 bg-emerald-500/12 text-emerald-950 dark:bg-green-500/20 dark:text-green-200 dark:border-green-400/45";
 }
 
 /** BorderGlow do tópico: mesmas faixas do badge (< 4 vermelho, < 7 amarelo, senão verde). */
@@ -548,7 +562,7 @@ function EvidenceImage({
 
   if (!resolvedSrc || failed) {
     return (
-      <div className="flex h-full w-full items-center justify-center rounded-md border border-dashed border-zinc-700 bg-zinc-950/40 px-3 text-center text-xs text-zinc-500">
+      <div className="flex h-full w-full items-center justify-center rounded-md border border-dashed border-border bg-muted/45 px-3 text-center text-xs text-muted-foreground">
         Sem imagem disponível
       </div>
     );
@@ -586,8 +600,8 @@ function EvidenceImage({
             />
             {scrollOffset > 0 ? (
               <>
-                <div className="pointer-events-none absolute inset-x-0 top-0 h-8 bg-gradient-to-b from-zinc-950/65 to-transparent opacity-70 transition-opacity duration-300 group-hover:opacity-30" />
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-zinc-950/80 to-transparent opacity-80 transition-opacity duration-300 group-hover:opacity-20" />
+                <div className="pointer-events-none absolute inset-x-0 top-0 h-8 bg-gradient-to-b from-background/75 dark:from-zinc-950/65 to-transparent opacity-70 transition-opacity duration-300 group-hover:opacity-30" />
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-background/85 dark:from-zinc-950/80 to-transparent opacity-80 transition-opacity duration-300 group-hover:opacity-20" />
               </>
             ) : null}
           </div>
@@ -678,8 +692,8 @@ function EvidenceImage({
       />
       {scrollOffset > 0 ? (
         <>
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-8 bg-gradient-to-b from-zinc-950/65 to-transparent opacity-70 transition-opacity duration-300 group-hover:opacity-30" />
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-zinc-950/80 to-transparent opacity-80 transition-opacity duration-300 group-hover:opacity-20" />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-8 bg-gradient-to-b from-background/75 dark:from-zinc-950/65 to-transparent opacity-70 transition-opacity duration-300 group-hover:opacity-30" />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-background/85 dark:from-zinc-950/80 to-transparent opacity-80 transition-opacity duration-300 group-hover:opacity-20" />
         </>
       ) : null}
     </div>
@@ -717,42 +731,51 @@ function getDiagnosticTopicPillVisual(topic: string): {
   const k = normalizeTopicKey(topic);
 
   if (k.includes("posicionamento")) {
-    return { Icon: Compass, iconClass: "text-violet-400" };
+    return { Icon: Compass, iconClass: "text-violet-700 dark:text-violet-400" };
   }
   if (k.includes("identidade") && k.includes("visual")) {
-    return { Icon: Palette, iconClass: "text-pink-400" };
+    return { Icon: Palette, iconClass: "text-pink-700 dark:text-pink-400" };
   }
   if (isFunilOrCtaDiagnosticTopic(k)) {
-    return { Icon: Filter, iconClass: "text-orange-400" };
+    return { Icon: Filter, iconClass: "text-orange-700 dark:text-orange-400" };
   }
   if (k.includes("presenca") && k.includes("digital")) {
-    return { Icon: Globe, iconClass: "text-sky-400" };
+    return { Icon: Globe, iconClass: "text-sky-800 dark:text-sky-400" };
   }
   if (k.includes("clareza") && k.includes("proposta")) {
-    return { Icon: Lightbulb, iconClass: "text-amber-400" };
+    return { Icon: Lightbulb, iconClass: "text-amber-800 dark:text-amber-400" };
   }
   if (k.includes("consistencia") && k.includes("comunicacao")) {
-    return { Icon: MessageSquare, iconClass: "text-emerald-400" };
+    return { Icon: MessageSquare, iconClass: "text-emerald-800 dark:text-emerald-400" };
   }
 
   if (k.includes("identidade")) {
-    return { Icon: Palette, iconClass: "text-pink-400" };
+    return { Icon: Palette, iconClass: "text-pink-700 dark:text-pink-400" };
   }
   if (k.includes("clareza")) {
-    return { Icon: Lightbulb, iconClass: "text-amber-400" };
+    return { Icon: Lightbulb, iconClass: "text-amber-800 dark:text-amber-400" };
   }
   if (k.includes("consistencia")) {
-    return { Icon: MessageSquare, iconClass: "text-emerald-400" };
+    return { Icon: MessageSquare, iconClass: "text-emerald-800 dark:text-emerald-400" };
   }
   if (k.includes("presenca")) {
-    return { Icon: Globe, iconClass: "text-sky-400" };
+    return { Icon: Globe, iconClass: "text-sky-800 dark:text-sky-400" };
   }
 
-  return { Icon: Tag, iconClass: "text-zinc-400" };
+  return { Icon: Tag, iconClass: "text-muted-foreground" };
 }
 
 /** Texto da pill no UI: remove sufixo redundante " geral" (ex.: "Presença digital geral"). */
 function formatDiagnosticTopicPillLabel(topic: string): string {
+  const normalized = topic
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+  if (normalized.includes("consistencia da comunicacao")) {
+    return "Comunicação";
+  }
+
   return topic.replace(/\s+geral\s*$/i, "").trim();
 }
 
@@ -792,7 +815,7 @@ function TopicEvidence({
           fitContainMode="cover"
           hoverScroll
           initialOffsetRatio={0}
-          frameClassName="h-56 w-full rounded-md border border-zinc-800 bg-zinc-950/60"
+          frameClassName="h-56 w-full rounded-md border border-border bg-muted/55"
           className="h-auto"
         />
         <EvidenceImage
@@ -804,7 +827,7 @@ function TopicEvidence({
           fitContain
           fitContainMode="cover"
           hoverScroll
-          frameClassName="h-56 w-full rounded-md border border-zinc-800 bg-zinc-950/60"
+          frameClassName="h-56 w-full rounded-md border border-border bg-muted/55"
           className="h-auto"
         />
       </div>
@@ -833,7 +856,7 @@ function TopicEvidence({
     Boolean(siteHeroUrl && evidenceSrc === siteHeroUrl);
 
   if (!evidenceSrc) {
-    return <div className="h-56 w-full rounded-md border border-dashed border-zinc-700 bg-zinc-950/40" />;
+    return <div className="h-56 w-full rounded-md border border-dashed border-border bg-muted/45" />;
   }
 
   const evidenceScrollInitialRatio = (() => {
@@ -854,7 +877,7 @@ function TopicEvidence({
       fitContainMode={useFitContain ? "cover" : "width"}
       hoverScroll
       initialOffsetRatio={evidenceScrollInitialRatio}
-      frameClassName="h-56 w-full rounded-md border border-zinc-800 bg-zinc-950/60"
+      frameClassName="h-56 w-full rounded-md border border-border bg-muted/55"
       className="h-auto"
     />
   );
@@ -882,7 +905,7 @@ function ChannelCard({ channel }: { channel: DigitalChannel }) {
     <BorderGlow
       edgeSensitivity={30}
       glowColor={glow.glowColor}
-      backgroundColor="#18181b"
+      backgroundColor="var(--card)"
       borderRadius={10}
       glowRadius={28}
       glowIntensity={0.8}
@@ -893,7 +916,7 @@ function ChannelCard({ channel }: { channel: DigitalChannel }) {
       contentInset={0}
       className={`overflow-hidden rounded-lg ${idleBorder}`}
     >
-      <div className="rounded-lg bg-zinc-900/40 space-y-3 px-5 py-5 sm:px-7 sm:py-5">
+      <div className="rounded-lg bg-card space-y-3 px-5 py-5 sm:px-7 sm:py-5 dark:bg-muted/50">
         <div className="flex items-start justify-between gap-2">
           <h4 className="m-0 min-w-0 flex-1 font-normal leading-none" title={channel.name}>
             <span className={TOPIC_PILL_CLASS}>
@@ -904,14 +927,14 @@ function ChannelCard({ channel }: { channel: DigitalChannel }) {
             {channel.priority}
           </Badge>
         </div>
-        <p className="text-[13.5px] leading-relaxed text-zinc-100 whitespace-pre-line">
+        <p className="text-[13.5px] leading-relaxed text-foreground whitespace-pre-line">
           {formatReadableParagraphs(channel.description)}
         </p>
         {channel.actions.length > 0 && (
           <ul className="space-y-2">
             {channel.actions.map((action, i) => (
-              <li key={i} className="flex items-start gap-2 text-[13px] leading-relaxed text-zinc-300">
-                <ArrowRight size={14} className="mt-1 shrink-0 text-white" />
+              <li key={i} className="flex items-start gap-2 text-[13px] leading-relaxed text-foreground/90">
+                <ArrowRight size={14} className="mt-1 shrink-0 text-primary" />
                 {action}
               </li>
             ))}
@@ -1126,8 +1149,8 @@ export function RotaDigitalReportView({
       {/* Header */}
       <div
         className={cn(
-          "no-print flex justify-between gap-6",
-          isDashboard ? "items-start" : "items-center",
+          "no-print flex flex-col justify-between gap-4 sm:flex-row sm:gap-6",
+          isDashboard ? "items-start sm:items-start" : "items-stretch sm:items-center",
         )}
       >
         <div className="flex items-center gap-3">
@@ -1136,19 +1159,19 @@ export function RotaDigitalReportView({
               variant="ghost"
               size="icon"
               onClick={() => router.push(`/dashboard/leads/${report.leadId}`)}
-              className="text-zinc-400 hover:text-white"
+              className="text-muted-foreground hover:text-foreground"
             >
               <ArrowLeft size={20} />
             </Button>
           ) : null}
           <div>
-            <h1 className="text-2xl font-bold text-white">Rota Digital</h1>
+            <h1 className="text-2xl font-bold text-foreground">Rota Digital</h1>
             {isDashboard ? (
-              <p className="text-sm text-zinc-400">
+              <p className="text-sm text-muted-foreground">
                 Gerado para{" "}
                 <Link
                   href={`/dashboard/leads/${report.leadId}`}
-                  className="text-indigo-400 hover:underline"
+                  className="text-indigo-600 hover:underline dark:text-indigo-400"
                 >
                   {report.leadCompany}
                 </Link>
@@ -1175,7 +1198,7 @@ export function RotaDigitalReportView({
                   type="button"
                   variant="outline"
                   onClick={cancelEdit}
-                  className="gap-2 border-zinc-700 text-zinc-300 hover:text-white no-print"
+                  className="gap-2 no-print"
                 >
                   <X size={16} />
                   Cancelar
@@ -1196,7 +1219,7 @@ export function RotaDigitalReportView({
                 type="button"
                 variant="outline"
                 onClick={startEdit}
-                className="gap-2 border-zinc-700 text-zinc-300 hover:text-white no-print"
+                className="gap-2 no-print"
               >
                 <Pencil size={16} />
                 Editar
@@ -1204,10 +1227,13 @@ export function RotaDigitalReportView({
             )}
           </div>
         ) : (
-          <p className="max-w-[min(100%,28rem)] text-right text-sm leading-snug text-zinc-400">
-            Gerado para{" "}
-            <span className="font-medium text-zinc-200">{report.leadCompany}</span>
-          </p>
+          <div className="flex flex-wrap items-center justify-end gap-3 sm:gap-4">
+            <PublicThemeToggle className="no-print" />
+            <p className="max-w-[min(100%,28rem)] text-right text-sm leading-snug text-muted-foreground">
+              Gerado para{" "}
+              <span className="font-medium text-foreground">{report.leadCompany}</span>
+            </p>
+          </div>
         )}
       </div>
 
@@ -1247,9 +1273,9 @@ export function RotaDigitalReportView({
       ) : null}
 
       {isDashboard && report.publicSlug && origin ? (
-        <Card className={cn("no-print border-indigo-800/50 bg-indigo-950/30", ROTA_REPORT_CARD_BOX)}>
+        <Card className={cn("no-print border-indigo-500/25 bg-indigo-500/[0.08] dark:border-indigo-800/50 dark:bg-indigo-950/30", ROTA_REPORT_CARD_BOX)}>
           <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-3 text-base text-white">
+            <CardTitle className="flex items-center gap-3 text-base text-foreground">
               <RotaHeaderIcon tone="indigo">
                 <Link2 size={18} className="text-indigo-400" />
               </RotaHeaderIcon>
@@ -1260,7 +1286,7 @@ export function RotaDigitalReportView({
             </p>
           </CardHeader>
           <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center">
-            <code className="min-w-0 flex-1 truncate rounded-md bg-zinc-950 px-3 py-2 text-left text-sm text-zinc-300">
+            <code className="min-w-0 flex-1 truncate rounded-md bg-muted px-3 py-2 text-left text-sm text-foreground/90">
               {`${origin}/r/${report.publicSlug}`}
             </code>
             <div className="flex shrink-0 flex-wrap gap-2">
@@ -1284,7 +1310,7 @@ export function RotaDigitalReportView({
                 target="_blank"
                 rel="noopener noreferrer"
                 variant="outline"
-                className="gap-2 border-zinc-600 bg-zinc-900/80 text-zinc-100 hover:bg-zinc-800"
+                className="gap-2"
               >
                 <ExternalLink size={16} />
                 Abrir
@@ -1367,14 +1393,14 @@ export function RotaDigitalReportView({
           <CardHeader className="pb-4">
             <div className="flex items-center gap-2.5">
               <SectionHeaderIcon Icon={Sparkles} tone="indigo" />
-              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-foreground/78 dark:text-muted-foreground">
                 Resumo Executivo
               </CardTitle>
             </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <p className="text-[15px] leading-relaxed text-zinc-100 antialiased whitespace-pre-line">
+              <p className="text-[15px] leading-relaxed text-foreground antialiased whitespace-pre-line">
                 {formatReadableParagraphs(report.executiveSummary || "")}
               </p>
             </div>
@@ -1383,7 +1409,7 @@ export function RotaDigitalReportView({
 
         <Card
           className={cn(
-            "flex min-w-0 flex-col items-center justify-center overflow-visible border-zinc-800 bg-zinc-900/40 md:col-span-4",
+            "flex min-w-0 flex-col items-center justify-center overflow-visible border-border bg-muted/50 md:col-span-4",
             ROTA_REPORT_CARD_BOX,
           )}
         >
@@ -1402,18 +1428,18 @@ export function RotaDigitalReportView({
                   className={
                     isWebsiteLogo
                       ? "h-28 w-28 rounded-xl bg-white p-3 object-contain shadow-lg"
-                      : "h-28 w-28 rounded-full border-2 border-zinc-700 object-cover shadow-lg"
+                      : "h-28 w-28 rounded-full border-2 border-border object-cover shadow-lg"
                   }
                 />
               </div>
             ) : (
-              <div className="flex h-28 w-28 items-center justify-center rounded-full border-2 border-dashed border-zinc-800 bg-zinc-900/50">
-                <Globe className="size-10 text-zinc-700" />
+              <div className="flex h-28 w-28 items-center justify-center rounded-full border-2 border-dashed border-border bg-card/95">
+                <Globe className="size-10 text-muted-foreground" />
               </div>
             )}
             <div className="space-y-1">
-              <h3 className="text-lg font-bold text-white">{report.leadCompany}</h3>
-              <p className="text-xs font-medium uppercase tracking-widest text-zinc-500">
+              <h3 className="text-lg font-bold text-foreground">{report.leadCompany}</h3>
+              <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
                 Análise de Presença
               </p>
             </div>
@@ -1433,22 +1459,22 @@ export function RotaDigitalReportView({
           <CardHeader className="pb-4">
             <div className="flex items-center gap-2.5">
               <div className="flex h-6 w-6 items-center justify-center rounded-md border border-indigo-500/30 bg-indigo-500/10">
-                <Target size={14} className="text-indigo-400" />
+                <Target size={14} className="text-indigo-700 dark:text-indigo-400" />
               </div>
-              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-foreground/78 dark:text-muted-foreground">
                 Maturidade Digital
               </CardTitle>
             </div>
           </CardHeader>
           <CardContent className="flex flex-1 flex-col gap-6">
             <div className="flex items-baseline gap-2">
-              <span className="text-5xl font-bold tracking-tight tabular-nums text-white">
+              <span className="text-5xl font-bold tracking-tight tabular-nums text-foreground">
                 {report.digitalMaturityScore.toFixed(1)}
               </span>
-              <span className="text-lg font-medium text-zinc-600">/10</span>
+              <span className="text-lg font-medium text-muted-foreground">/10</span>
             </div>
             <div className="space-y-2">
-              <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-800/50">
+              <div className="h-2 w-full overflow-hidden rounded-full bg-muted/60">
                 <div
                   className={cn(
                     "h-full rounded-full transition-all duration-1000",
@@ -1461,12 +1487,12 @@ export function RotaDigitalReportView({
                 <Badge
                   className={cn(
                     "border-none px-0 text-sm font-semibold bg-transparent",
-                    MATURITY_CONFIG[report.digitalMaturityLevel]?.color || "text-indigo-400",
+                    MATURITY_CONFIG[report.digitalMaturityLevel]?.color || "text-indigo-800 dark:text-indigo-400",
                   )}
                 >
                   Nível {report.digitalMaturityLevel}
                 </Badge>
-                <span className="text-[10px] font-medium uppercase tracking-widest text-zinc-600">
+                <span className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
                   Score consolidado
                 </span>
               </div>
@@ -1492,9 +1518,9 @@ export function RotaDigitalReportView({
           <CardHeader className="relative pb-4">
             <div className="flex items-center gap-2.5">
               <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-blue-500/30 bg-blue-500/10">
-                <Calendar size={14} className="text-blue-400" aria-hidden />
+                <Calendar size={14} className="text-blue-700 dark:text-blue-400" aria-hidden />
               </div>
-              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-zinc-400 print:text-zinc-700">
+              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-foreground/78 dark:text-muted-foreground print:text-foreground">
                 Prazo estimado
               </CardTitle>
             </div>
@@ -1502,19 +1528,19 @@ export function RotaDigitalReportView({
           <CardContent className="relative flex flex-1 flex-col justify-between gap-4">
             <div className="space-y-2.5">
               <div className="flex items-baseline gap-1.5">
-                <span className="text-5xl font-bold tracking-tight tabular-nums text-blue-400">
+                <span className="text-5xl font-bold tracking-tight tabular-nums text-blue-800 dark:text-blue-400">
                   {report.estimatedTimelineMonths}
                 </span>
-                <span className="text-lg font-medium text-zinc-500 print:text-zinc-600">meses</span>
+                <span className="text-lg font-medium text-muted-foreground print:text-muted-foreground">meses</span>
               </div>
-              <p className="border-l-2 border-blue-400/40 pl-2.5 text-[11px] leading-snug text-zinc-300 antialiased print:border-l-blue-900/40 print:text-zinc-800">
+              <p className="border-l-2 border-blue-500/45 pl-2.5 text-[11px] leading-snug text-foreground/90 antialiased print:border-l-blue-900/40 print:text-zinc-800 dark:border-blue-400/40">
                 Tempo previsto para{" "}
-                <span className="font-semibold text-blue-100 print:text-blue-900">
+                <span className="font-semibold text-blue-900 dark:text-blue-100 print:text-blue-900">
                   colocar este plano em prática
                 </span>
                 {" "}no seu negócio, em{" "}
-                <span className="font-semibold text-blue-100 print:text-blue-900">meses corridos</span>.
-                <span className="text-zinc-400 print:text-zinc-600">
+                <span className="font-semibold text-blue-900 dark:text-blue-100 print:text-blue-900">meses corridos</span>.
+                <span className="text-muted-foreground print:text-muted-foreground">
                   {" "}Serve para você entender o caminho, planejar o investimento e avançar com mais segurança.
                 </span>
               </p>
@@ -1550,46 +1576,46 @@ export function RotaDigitalReportView({
         {/* Canais Recomendados - Lista Compacta */}
         <Card
           className={cn(
-            "flex flex-col border-zinc-800 bg-zinc-900/50 md:col-span-4",
+            "flex flex-col border-border bg-card/95 md:col-span-4",
             ROTA_REPORT_CARD_BOX,
           )}
         >
           <CardHeader className="pb-4">
             <div className="flex items-center gap-2.5">
-              <div className="flex h-6 w-6 items-center justify-center rounded-md border border-zinc-700 bg-zinc-800">
-                <Sparkles size={14} className="text-indigo-400" />
+              <div className="flex h-6 w-6 items-center justify-center rounded-md border border-border bg-muted">
+                <Sparkles size={14} className="text-indigo-700 dark:text-indigo-400" />
               </div>
-              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-foreground/78 dark:text-muted-foreground">
                 Canais Recomendados
               </CardTitle>
             </div>
           </CardHeader>
           <CardContent className="flex flex-1 flex-col gap-4">
             <div className="flex items-baseline gap-1.5">
-              <span className="text-4xl font-bold tracking-tight tabular-nums text-white">
+              <span className="text-4xl font-bold tracking-tight tabular-nums text-foreground">
                 {report.recommendedChannels.length}
               </span>
-              <span className="text-sm font-medium text-zinc-400">canais</span>
+              <span className="text-sm font-medium text-muted-foreground">canais</span>
             </div>
             <div className="space-y-2">
               {sortedChannels.slice(0, 3).map((ch, i) => (
                 <div
                   key={ch.name}
-                  className="flex items-center justify-between gap-3 rounded-lg border border-zinc-600/50 bg-zinc-900/90 p-2.5 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]"
+                  className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-card p-2.5 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]"
                 >
                   <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
                     <div className="flex min-w-0 items-center gap-2">
                       {i === 0 ? (
                         <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-400 shadow-[0_0_10px_rgba(129,140,248,0.75)]" />
                       ) : (
-                        <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-500" />
+                        <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground" />
                       )}
-                      <span className="truncate text-[12px] font-semibold text-zinc-100">
+                      <span className="truncate text-[12px] font-semibold text-foreground">
                         {ch.name}
                       </span>
                     </div>
                     {i === 0 ? (
-                      <span className="inline-flex shrink-0 items-center rounded-full border border-indigo-400/45 bg-indigo-500/20 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-indigo-200 print:border-indigo-900/40 print:bg-indigo-100 print:text-indigo-950">
+                      <span className="inline-flex shrink-0 items-center rounded-full border border-indigo-600/40 bg-indigo-500/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-indigo-950 dark:border-indigo-400/45 dark:bg-indigo-500/20 dark:text-indigo-200 print:border-indigo-900/40 print:bg-indigo-100 print:text-indigo-950">
                         Prioridade
                       </span>
                     ) : null}
@@ -1605,7 +1631,7 @@ export function RotaDigitalReportView({
                 </div>
               ))}
               {sortedChannels.length > 3 && (
-                <p className="text-center text-[10px] font-medium text-zinc-600">
+                <p className="text-center text-[10px] font-medium text-muted-foreground">
                   + {sortedChannels.length - 3} outros canais detalhados abaixo
                 </p>
               )}
@@ -1615,29 +1641,29 @@ export function RotaDigitalReportView({
       </div>
 
       {(report.brief?.servicesOffered || report.brief?.objective) ? (
-        <Card className={cn("bg-zinc-900 border-zinc-800 print-white", ROTA_REPORT_CARD_BOX)}>
+        <Card className={cn("bg-card border-border print-white", ROTA_REPORT_CARD_BOX)}>
           <CardHeader>
-            <CardTitle className="text-white">Briefing informado</CardTitle>
+            <CardTitle className="text-foreground">Briefing informado</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-5 md:grid-cols-2">
             <div className="space-y-2">
-              <p className="text-xs text-zinc-500 mb-1">Serviços oferecidos</p>
-              <p className="text-sm leading-7 text-zinc-300 whitespace-pre-line">{report.brief?.servicesOffered || "—"}</p>
+              <p className="text-xs text-muted-foreground mb-1">Serviços oferecidos</p>
+              <p className="text-sm leading-7 text-foreground/90 whitespace-pre-line">{report.brief?.servicesOffered || "—"}</p>
             </div>
             <div className="space-y-2">
-              <p className="text-xs text-zinc-500 mb-1">Objetivo</p>
-              <p className="text-sm leading-7 text-zinc-300 whitespace-pre-line">{report.brief?.objective || "—"}</p>
+              <p className="text-xs text-muted-foreground mb-1">Objetivo</p>
+              <p className="text-sm leading-7 text-foreground/90 whitespace-pre-line">{report.brief?.objective || "—"}</p>
             </div>
           </CardContent>
         </Card>
       ) : null}
 
       {sortedDiagnosticScores.length > 0 ? (
-        <Card className={cn("border-zinc-800 bg-zinc-900/50 print-white", ROTA_REPORT_CARD_BOX)}>
+        <Card className={cn("border-border bg-card/95 print-white", ROTA_REPORT_CARD_BOX)}>
           <CardHeader className="space-y-3 pb-4">
             <div className="flex items-center gap-2.5">
               <SectionHeaderIcon Icon={ClipboardList} tone="indigo" />
-              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-foreground/78 dark:text-muted-foreground">
                 Diagnóstico por tópico
               </CardTitle>
             </div>
@@ -1653,7 +1679,7 @@ export function RotaDigitalReportView({
                 key={`${item.topic}-${idx}`}
                 edgeSensitivity={30}
                 glowColor={topicGlow.glowColor}
-                backgroundColor="#18181b"
+                backgroundColor="var(--card)"
                 borderRadius={12}
                 glowRadius={28}
                 glowIntensity={0.8}
@@ -1667,7 +1693,7 @@ export function RotaDigitalReportView({
                   topicGlow.frameClass,
                 )}
               >
-                <div className="rounded-[10px] bg-zinc-900 p-6 sm:p-7">
+                <div className="rounded-[10px] bg-card p-6 sm:p-7">
                   <div className="grid gap-5 md:grid-cols-[360px_minmax(0,1fr)] md:items-start md:gap-6">
                     <TopicEvidence item={item} report={report} />
                     <div className="space-y-4">
@@ -1679,9 +1705,31 @@ export function RotaDigitalReportView({
                           {item.score}/10
                         </Badge>
                       </div>
-                      <p className="text-[14.5px] leading-relaxed text-zinc-100 whitespace-pre-line">
-                        {formatReadableParagraphs(item.comment)}
-                      </p>
+                      {(() => {
+                        const paragraphs = splitReadableParagraphs(item.comment);
+                        const firstParagraph = paragraphs[0] || "";
+                        const secondParagraph = paragraphs[1] || "";
+                        const remaining = paragraphs.slice(2).join("\n\n");
+                        return (
+                          <div className="space-y-3">
+                            {firstParagraph ? (
+                              <p className="text-[14.5px] leading-relaxed text-foreground whitespace-pre-line">
+                                {firstParagraph}
+                              </p>
+                            ) : null}
+                            {secondParagraph ? (
+                              <p className="text-[14px] leading-relaxed text-foreground/90 whitespace-pre-line">
+                                {secondParagraph}
+                              </p>
+                            ) : null}
+                            {remaining ? (
+                              <p className="text-[14px] leading-relaxed text-foreground/90 whitespace-pre-line">
+                                {remaining}
+                              </p>
+                            ) : null}
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
                 </div>
@@ -1693,11 +1741,11 @@ export function RotaDigitalReportView({
       ) : null}
 
       {report.evidences ? (
-        <Card className={cn("border-zinc-800 bg-zinc-900/50 print-white", ROTA_REPORT_CARD_BOX)}>
+        <Card className={cn("border-border bg-card/95 print-white", ROTA_REPORT_CARD_BOX)}>
           <CardHeader className="space-y-3 pb-4">
             <div className="flex items-center gap-2.5">
               <SectionHeaderIcon Icon={Images} tone="indigo" />
-              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-foreground/78 dark:text-muted-foreground">
                 Evidências coletadas
               </CardTitle>
             </div>
@@ -1711,15 +1759,15 @@ export function RotaDigitalReportView({
             }`}
           >
             <div className="flex h-full min-h-0 flex-col gap-3">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Bio do Instagram</p>
-              <div className="shrink-0 rounded-xl border border-zinc-700 bg-zinc-900 p-5">
-                <p className="text-[14px] leading-relaxed text-zinc-100 whitespace-pre-line">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Bio do Instagram</p>
+              <div className="shrink-0 rounded-xl border border-border bg-card p-5">
+                <p className="text-[14px] leading-relaxed text-foreground whitespace-pre-line">
                   {report.evidences.instagramBioExcerpt ||
                     "Bio não disponível na coleta automática."}
                 </p>
               </div>
               {briefWebsiteHref || briefInstagramHref ? (
-                <div className="mt-auto flex flex-col gap-2.5 border-t border-zinc-800 pt-4">
+                <div className="mt-auto flex flex-col gap-2.5 border-t border-border pt-4">
                   <div className="flex flex-col gap-2">
                     {briefWebsiteHref ? (
                       <a
@@ -1727,7 +1775,7 @@ export function RotaDigitalReportView({
                         target="_blank"
                         rel="noopener noreferrer"
                         title={briefWebsiteHref}
-                        className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2.5 text-sm font-medium text-sky-400 transition-colors hover:border-zinc-600 hover:bg-zinc-700 hover:text-sky-300"
+                        className="inline-flex items-center gap-2 rounded-lg border border-border bg-muted px-3 py-2.5 text-sm font-medium text-sky-400 transition-colors hover:border-border hover:bg-muted/90 hover:text-sky-600 dark:hover:text-sky-300"
                       >
                         <ExternalLink size={14} className="shrink-0 opacity-90" />
                         <span className="min-w-0 truncate">Website</span>
@@ -1739,10 +1787,10 @@ export function RotaDigitalReportView({
                         target="_blank"
                         rel="noopener noreferrer"
                         title={briefInstagramHref}
-                        className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2.5 text-sm font-medium text-pink-400 transition-colors hover:border-zinc-600 hover:bg-zinc-700 hover:text-pink-300"
+                        className="inline-flex items-center gap-2 rounded-lg border border-border bg-muted px-3 py-2.5 text-sm font-medium text-pink-400 transition-colors hover:border-border hover:bg-muted/90 hover:text-pink-600 dark:hover:text-pink-300"
                       >
                         <InstagramBrandGlyph className="size-3.5 shrink-0 opacity-90" />
-                        <span className="min-w-0 truncate text-zinc-100">Instagram</span>
+                        <span className="min-w-0 truncate text-foreground">Instagram</span>
                       </a>
                     ) : null}
                   </div>
@@ -1751,7 +1799,7 @@ export function RotaDigitalReportView({
             </div>
 
             <div className="space-y-3">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Imagem do Instagram</p>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Imagem do Instagram</p>
               <EvidenceImage
                 src={withSnapshotParams(instagramEvidenceSrc, {
                   variant: "profile",
@@ -1759,13 +1807,13 @@ export function RotaDigitalReportView({
                 })}
                 alt="Imagem do Instagram"
                 hoverScroll
-                frameClassName="h-64 w-full rounded-md border border-zinc-700 bg-zinc-950"
+                frameClassName="h-64 w-full rounded-md border border-border bg-muted"
                 className="h-auto"
               />
             </div>
 
             <div className="space-y-3">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Página completa do site</p>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Página completa do site</p>
               <EvidenceImage
                 src={report.evidences.siteHeroSnapshotUrl}
                 alt="Página completa do site"
@@ -1773,14 +1821,14 @@ export function RotaDigitalReportView({
                 fitContainMode="cover"
                 hoverScroll
                 initialOffsetRatio={0}
-                frameClassName="h-64 w-full rounded-md border border-zinc-700 bg-zinc-950"
+                frameClassName="h-64 w-full rounded-md border border-border bg-muted"
                 className="h-auto"
               />
             </div>
 
             {report.evidences.instagramBioLinkSnapshotUrl ? (
               <div className="space-y-3">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Destino do link da bio</p>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Destino do link da bio</p>
                 <EvidenceImage
                   src={report.evidences.instagramBioLinkSnapshotUrl}
                   alt="Destino do link da bio"
@@ -1788,7 +1836,7 @@ export function RotaDigitalReportView({
                   fitContainMode="cover"
                   hoverScroll
                   initialOffsetRatio={0}
-                  frameClassName="h-64 w-full rounded-md border border-zinc-700 bg-zinc-950"
+                  frameClassName="h-64 w-full rounded-md border border-border bg-muted"
                   className="h-auto"
                 />
               </div>
@@ -1800,7 +1848,7 @@ export function RotaDigitalReportView({
                   <BorderGlow
                     edgeSensitivity={30}
                     glowColor="210 78 58"
-                    backgroundColor="#18181b"
+                    backgroundColor="var(--card)"
                     borderRadius={10}
                     glowRadius={26}
                     glowIntensity={0.8}
@@ -1811,12 +1859,12 @@ export function RotaDigitalReportView({
                     contentInset={2}
                     className={cn("overflow-hidden rounded-lg border-0 print-white")}
                   >
-                    <div className="rounded-[8px] bg-zinc-900 p-5 sm:p-6">
+                    <div className="rounded-[8px] bg-card p-5 sm:p-6">
                       <div className={cn("mb-3", TOPIC_PILL_CLASS)}>
                         <Globe className="size-3.5 shrink-0 stroke-[1.75] text-sky-400" aria-hidden />
                         <span className={TOPIC_PILL_LABEL_NEXT_TO_ICON}>Website</span>
                       </div>
-                      <p className="text-[14px] leading-relaxed text-zinc-100 break-words whitespace-pre-line">
+                      <p className="text-[14px] leading-relaxed text-foreground break-words whitespace-pre-line">
                         {formatReadableParagraphs(
                           notes.website ||
                             "Website: não foi possível validar conteúdo relevante; tratar como presença fraca ou inexistente até revisão manual."
@@ -1827,7 +1875,7 @@ export function RotaDigitalReportView({
                   <BorderGlow
                     edgeSensitivity={30}
                     glowColor="318 72 58"
-                    backgroundColor="#18181b"
+                    backgroundColor="var(--card)"
                     borderRadius={10}
                     glowRadius={26}
                     glowIntensity={0.8}
@@ -1838,12 +1886,12 @@ export function RotaDigitalReportView({
                     contentInset={2}
                     className={cn("overflow-hidden rounded-lg border-0 print-white")}
                   >
-                    <div className="rounded-[8px] bg-zinc-900 p-5 sm:p-6">
+                    <div className="rounded-[8px] bg-card p-5 sm:p-6">
                       <div className={cn("mb-3", TOPIC_PILL_CLASS)}>
                         <InstagramBrandGlyph className="size-3.5 text-[#f472b6]" aria-hidden />
                         <span className={TOPIC_PILL_LABEL_NEXT_TO_ICON}>Instagram</span>
                       </div>
-                      <p className="text-[14px] leading-relaxed text-zinc-100 break-words whitespace-pre-line">
+                      <p className="text-[14px] leading-relaxed text-foreground break-words whitespace-pre-line">
                         {formatReadableParagraphs(normalizedInstagramNote)}
                       </p>
                     </div>
@@ -1851,7 +1899,7 @@ export function RotaDigitalReportView({
                   {notes.general.length > 0 ? (
                     <div className="space-y-3">
                       {notes.general.map((paragraph, i) => (
-                        <p key={i} className="text-sm text-zinc-300 leading-relaxed break-words whitespace-pre-line">
+                        <p key={i} className="text-sm text-foreground/90 leading-relaxed break-words whitespace-pre-line">
                           {formatReadableParagraphs(paragraph)}
                         </p>
                       ))}
@@ -1883,7 +1931,7 @@ export function RotaDigitalReportView({
           <CardContent>
             <ul className="space-y-4">
               {report.strengths.map((s, i) => (
-                <li key={i} className="flex items-start gap-3 text-sm leading-relaxed text-zinc-300">
+                <li key={i} className="flex items-start gap-3 text-sm leading-relaxed text-foreground/90">
                   <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-green-500/60" />
                   <span>{s}</span>
                 </li>
@@ -1909,7 +1957,7 @@ export function RotaDigitalReportView({
           <CardContent>
             <ul className="space-y-4">
               {report.weaknesses.map((w, i) => (
-                <li key={i} className="flex items-start gap-3 text-sm leading-relaxed text-zinc-300">
+                <li key={i} className="flex items-start gap-3 text-sm leading-relaxed text-foreground/90">
                   <AlertCircle size={16} className="mt-0.5 shrink-0 text-red-500/60" />
                   <span>{w}</span>
                 </li>
@@ -1935,7 +1983,7 @@ export function RotaDigitalReportView({
           <CardContent>
             <ul className="space-y-4">
               {report.opportunities.map((o, i) => (
-                <li key={i} className="flex items-start gap-3 text-sm leading-relaxed text-zinc-300">
+                <li key={i} className="flex items-start gap-3 text-sm leading-relaxed text-foreground/90">
                   <Star size={16} className="mt-0.5 shrink-0 text-blue-500/60" />
                   <span>{o}</span>
                 </li>
@@ -1946,11 +1994,11 @@ export function RotaDigitalReportView({
       </div>
 
       {/* Recommended Channels */}
-      <Card className={cn("border-zinc-800 bg-zinc-900/50 print-white", ROTA_REPORT_CARD_BOX)}>
+      <Card className={cn("border-border bg-card/95 print-white", ROTA_REPORT_CARD_BOX)}>
         <CardHeader className="pb-4">
           <div className="flex items-center gap-2.5">
             <SectionHeaderIcon Icon={Sparkles} tone="indigo" />
-            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-foreground/78 dark:text-muted-foreground">
               Canais Digitais Recomendados
             </CardTitle>
           </div>
@@ -1968,16 +2016,16 @@ export function RotaDigitalReportView({
       <div className="grid min-w-0 grid-cols-1 gap-5 md:grid-cols-2">
         <Card
           className={cn(
-            "min-w-0 overflow-visible border-yellow-500/10 bg-zinc-900/40 print-white",
+            "min-w-0 overflow-visible border-yellow-500/10 bg-muted/50 print-white",
             ROTA_REPORT_CARD_BOX,
           )}
         >
           <CardHeader className="space-y-3 pb-4">
             <div className="flex items-center gap-3">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-yellow-500/10 ring-1 ring-yellow-500/20">
-                <Zap size={18} className="text-yellow-400" />
+                <Zap size={18} className="text-yellow-800 dark:text-yellow-400" />
               </div>
-              <CardTitle className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+              <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground/78 dark:text-muted-foreground">
                 Quick Wins
               </CardTitle>
             </div>
@@ -1988,8 +2036,8 @@ export function RotaDigitalReportView({
           <CardContent>
             <ul className="space-y-4">
               {report.quickWins.map((win, i) => (
-                <li key={i} className="flex items-start gap-4 text-sm leading-relaxed text-zinc-300">
-                  <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-yellow-500/10 text-[11px] font-bold text-yellow-500/90 ring-1 ring-yellow-500/20">
+                <li key={i} className="flex items-start gap-4 text-sm leading-relaxed text-foreground/90">
+                  <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-yellow-500/10 text-[11px] font-bold text-yellow-900 ring-1 ring-yellow-600/25 dark:text-yellow-500/90 dark:ring-yellow-500/20">
                     {i + 1}
                   </div>
                   <span>{win}</span>
@@ -2001,16 +2049,16 @@ export function RotaDigitalReportView({
 
         <Card
           className={cn(
-            "min-w-0 overflow-visible border-purple-500/10 bg-zinc-900/40 print-white",
+            "min-w-0 overflow-visible border-purple-500/10 bg-muted/50 print-white",
             ROTA_REPORT_CARD_BOX,
           )}
         >
           <CardHeader className="space-y-3 pb-4">
             <div className="flex items-center gap-3">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-500/10 ring-1 ring-purple-500/20">
-                <Target size={18} className="text-purple-400" />
+                <Target size={18} className="text-purple-800 dark:text-purple-400" />
               </div>
-              <CardTitle className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+              <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground/78 dark:text-muted-foreground">
                 Ações de Longo Prazo
               </CardTitle>
             </div>
@@ -2021,8 +2069,8 @@ export function RotaDigitalReportView({
           <CardContent>
             <ul className="space-y-4">
               {report.longTermActions.map((action, i) => (
-                <li key={i} className="flex items-start gap-4 text-sm leading-relaxed text-zinc-300">
-                  <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-purple-500/10 text-[11px] font-bold text-purple-500/90 ring-1 ring-purple-500/20">
+                <li key={i} className="flex items-start gap-4 text-sm leading-relaxed text-foreground/90">
+                  <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-purple-500/10 text-[11px] font-bold text-purple-900 ring-1 ring-purple-600/25 dark:text-purple-500/90 dark:ring-purple-500/20">
                     {i + 1}
                   </div>
                   <span>{action}</span>
@@ -2045,7 +2093,7 @@ export function RotaDigitalReportView({
           <CardHeader className="space-y-3 px-4 pb-4 pt-0 sm:px-7 sm:pt-0">
             <div className="flex items-center gap-2.5">
               <SectionHeaderIcon Icon={ArrowRight} tone="indigo" />
-              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-foreground/78 dark:text-muted-foreground">
                 Próximos Passos
               </CardTitle>
             </div>
@@ -2058,12 +2106,12 @@ export function RotaDigitalReportView({
               {report.nextSteps.map((step, i) => (
                 <div
                   key={i}
-                  className="flex items-start gap-4 rounded-xl border border-zinc-700/90 bg-zinc-900/75 p-4 transition-colors hover:border-indigo-500/40"
+                  className="flex items-start gap-4 rounded-xl border border-border/90 bg-card/75 p-4 transition-colors hover:border-indigo-500/40"
                 >
                   <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-indigo-500/40 bg-indigo-500/10">
-                    <span className="text-[11px] font-bold text-indigo-300">{i + 1}</span>
+                    <span className="text-[11px] font-bold text-indigo-800 dark:text-indigo-300">{i + 1}</span>
                   </div>
-                  <p className="text-[14.5px] leading-relaxed text-zinc-100">{step}</p>
+                  <p className="text-[14.5px] leading-relaxed text-foreground">{step}</p>
                 </div>
               ))}
             </div>
@@ -2101,7 +2149,7 @@ export function RotaDigitalReportView({
       </CardSpotlight>
 
       {/* Footer */}
-      <div className="text-center text-zinc-600 text-xs py-4 no-print">
+      <div className="text-center text-muted-foreground text-xs py-4 no-print">
         Rota Digital gerada com IA em{" "}
         {new Date(report.createdAt).toLocaleDateString("pt-BR", {
           day: "2-digit",

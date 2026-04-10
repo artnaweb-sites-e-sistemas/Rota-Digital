@@ -10,6 +10,7 @@ import {
   isInstagramLoginWallBio,
   sanitizeInstagramAssetUrl,
 } from "@/lib/instagram-public-profile";
+import { convertImageBufferToWebp } from "@/lib/image-webp";
 
 export type PlaywrightInstagramProfile = {
   fullName?: string;
@@ -440,6 +441,10 @@ async function captureWithPersistentChrome(handle: string): Promise<PlaywrightIn
     const profile = buildProfileFromHtml(html);
     const screenshot = await page.screenshot({ type: "jpeg", quality: 82, fullPage: true });
     const buf = Buffer.from(screenshot);
+    const webp = await convertImageBufferToWebp(buf, {
+      quality: 74,
+      fallbackMimeType: "image/jpeg",
+    });
 
     if (isScreenshotMostlyBlank(buf)) {
       console.warn("[IG_DEBUG][instagram-playwright] Screenshot parece estar em branco/preto. Tentando novamente...", { handle });
@@ -457,10 +462,18 @@ async function captureWithPersistentChrome(handle: string): Promise<PlaywrightIn
       if (isScreenshotMostlyBlank(retryBuf)) {
         return null;
       }
-      return { screenshot: retryBuf, mimeType: "image/jpeg", profile: mergeProfiles(profile, retryProfile) };
+      const retryWebp = await convertImageBufferToWebp(retryBuf, {
+        quality: 70,
+        fallbackMimeType: "image/jpeg",
+      });
+      return {
+        screenshot: retryWebp.buffer,
+        mimeType: retryWebp.mimeType,
+        profile: mergeProfiles(profile, retryProfile),
+      };
     }
 
-    return { screenshot: buf, mimeType: "image/jpeg", profile };
+    return { screenshot: webp.buffer, mimeType: webp.mimeType, profile };
   } catch (error) {
     console.warn("[IG_DEBUG][instagram-playwright] Falha na captura via perfil do Chrome.", {
       handle,
@@ -569,6 +582,10 @@ async function captureWithCookieContext(handle: string): Promise<PlaywrightInsta
     const profile = buildProfileFromHtml(html);
     const screenshot = await page.screenshot({ type: "jpeg", quality: 82, fullPage: true });
     const buf = Buffer.from(screenshot);
+    const webp = await convertImageBufferToWebp(buf, {
+      quality: 74,
+      fallbackMimeType: "image/jpeg",
+    });
 
     if (isScreenshotMostlyBlank(buf)) {
       console.warn("[IG_DEBUG][instagram-playwright] Cookie context: screenshot em branco. Tentando novamente...", { handle });
@@ -586,10 +603,18 @@ async function captureWithCookieContext(handle: string): Promise<PlaywrightInsta
       if (isScreenshotMostlyBlank(retryBuf)) {
         return null;
       }
-      return { screenshot: retryBuf, mimeType: "image/jpeg", profile: mergeProfiles(profile, retryProfile) };
+      const retryWebp = await convertImageBufferToWebp(retryBuf, {
+        quality: 70,
+        fallbackMimeType: "image/jpeg",
+      });
+      return {
+        screenshot: retryWebp.buffer,
+        mimeType: retryWebp.mimeType,
+        profile: mergeProfiles(profile, retryProfile),
+      };
     }
 
-    return { screenshot: buf, mimeType: "image/jpeg", profile };
+    return { screenshot: webp.buffer, mimeType: webp.mimeType, profile };
   } catch (error) {
     console.warn("[IG_DEBUG][instagram-playwright] Falha na captura via contexto com cookies.", {
       handle,

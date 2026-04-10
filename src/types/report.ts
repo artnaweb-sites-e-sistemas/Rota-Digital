@@ -34,6 +34,31 @@ export interface ReportBrief {
   objective?: string;
 }
 
+export interface ReportAiUsageEntry {
+  /** Modelo Gemini utilizado na chamada. */
+  model?: string;
+  /** Tokens de entrada (prompt). */
+  promptTokens?: number;
+  /** Tokens de saída (resposta). */
+  candidateTokens?: number;
+  /** Tokens totais da chamada. */
+  totalTokens?: number;
+  /** Custo estimado em USD (aproximado por tabela de preço). */
+  estimatedCostUsd?: number;
+  /** Custo estimado em BRL (USD convertido por taxa fixa). */
+  estimatedCostBrl?: number;
+  /** Momento da coleta dessa métrica. */
+  createdAt?: number;
+}
+
+export interface ReportAiUsageSummary {
+  generation?: ReportAiUsageEntry;
+  reanalysis?: ReportAiUsageEntry[];
+  totalTokens?: number;
+  totalEstimatedCostUsd?: number;
+  totalEstimatedCostBrl?: number;
+}
+
 export interface RotaDigitalReport {
   id: string;
   leadId: string;
@@ -73,4 +98,6 @@ export interface RotaDigitalReport {
   diagnosticScores?: DiagnosticScore[];
   /** Evidências visuais/textuais usadas no relatório */
   evidences?: ReportEvidence;
+  /** Telemetria de custo/tokens de IA (estimada). */
+  aiUsage?: ReportAiUsageSummary;
 }
