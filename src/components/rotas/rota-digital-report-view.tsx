@@ -28,7 +28,6 @@ import {
 } from "@/components/ui/dialog";
 import {
   ArrowLeft,
-  Download,
   Loader2,
   Sparkles,
   TrendingUp,
@@ -978,10 +977,6 @@ export function RotaDigitalReportView({
     };
   }, [report?.userId]);
 
-  const handlePrint = () => {
-    window.print();
-  };
-
   const startEdit = () => {
     if (!report) return;
     setIsEditing(true);
@@ -1107,7 +1102,7 @@ export function RotaDigitalReportView({
   return (
     <div
       className={cn(
-        "w-full max-w-full space-y-7 overflow-x-hidden print:max-w-none lg:space-y-8",
+        "w-full min-w-0 max-w-full space-y-7 print:max-w-none lg:space-y-8",
         /* Alinha respiro horizontal ao py-6/sm:py-7 do casco do card (default do Card é px-4). */
         "[&_[data-slot=card-header]]:!px-5 [&_[data-slot=card-header]]:sm:!px-7",
         "[&_[data-slot=card-content]]:!px-5 [&_[data-slot=card-content]]:sm:!px-7",
@@ -1124,7 +1119,12 @@ export function RotaDigitalReportView({
       `}</style>
 
       {/* Header */}
-      <div className="no-print flex items-start justify-between gap-6">
+      <div
+        className={cn(
+          "no-print flex justify-between gap-6",
+          isDashboard ? "items-start" : "items-center",
+        )}
+      >
         <div className="flex items-center gap-3">
           {isDashboard ? (
             <Button
@@ -1138,79 +1138,72 @@ export function RotaDigitalReportView({
           ) : null}
           <div>
             <h1 className="text-2xl font-bold text-white">Rota Digital</h1>
-            <p className="text-zinc-400 text-sm">
-              Gerado para{" "}
-              {isDashboard ? (
+            {isDashboard ? (
+              <p className="text-sm text-zinc-400">
+                Gerado para{" "}
                 <Link
                   href={`/dashboard/leads/${report.leadId}`}
                   className="text-indigo-400 hover:underline"
                 >
                   {report.leadCompany}
                 </Link>
-              ) : (
-                <span className="text-zinc-300">{report.leadCompany}</span>
-              )}
-            </p>
+              </p>
+            ) : null}
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2.5">
-          {isDashboard ? (
-            <>
-              <Button
-                type="button"
-                onClick={() => {
-                  setReanalyzeOpen(true);
-                  setReanalyzeError(null);
-                }}
-                className="relative overflow-hidden gap-2 border-none bg-gradient-to-r from-violet-600 via-indigo-500 to-cyan-500 bg-[length:200%_100%] animate-[gradient-move_3s_ease_infinite] text-white shadow-lg transition hover:brightness-110 no-print"
-              >
-                <Bot size={16} />
-                Reanalise
-              </Button>
-              {isEditing ? (
-                <>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={cancelEdit}
-                    className="gap-2 border-zinc-700 text-zinc-300 hover:text-white no-print"
-                  >
-                    <X size={16} />
-                    Cancelar
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="cta"
-                    onClick={saveEdit}
-                    disabled={isSavingEdit}
-                    className="gap-2 no-print"
-                  >
-                    {isSavingEdit ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                    Salvar alterações
-                  </Button>
-                </>
-              ) : (
+        {isDashboard ? (
+          <div className="flex flex-wrap items-center gap-2.5">
+            <Button
+              type="button"
+              onClick={() => {
+                setReanalyzeOpen(true);
+                setReanalyzeError(null);
+              }}
+              className="relative overflow-hidden gap-2 border-none bg-gradient-to-r from-violet-600 via-indigo-500 to-cyan-500 bg-[length:200%_100%] animate-[gradient-move_3s_ease_infinite] text-white shadow-lg transition hover:brightness-110 no-print"
+            >
+              <Bot size={16} />
+              Reanalise
+            </Button>
+            {isEditing ? (
+              <>
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={startEdit}
+                  onClick={cancelEdit}
                   className="gap-2 border-zinc-700 text-zinc-300 hover:text-white no-print"
                 >
-                  <Pencil size={16} />
-                  Editar
+                  <X size={16} />
+                  Cancelar
                 </Button>
-              )}
-            </>
-          ) : null}
-          <Button
-            onClick={handlePrint}
-            variant="outline"
-            className="gap-2 border-zinc-700 text-zinc-300 hover:text-white no-print"
-          >
-            <Download size={16} />
-            Exportar / Imprimir
-          </Button>
-        </div>
+                <Button
+                  type="button"
+                  variant="cta"
+                  onClick={saveEdit}
+                  disabled={isSavingEdit}
+                  className="gap-2 no-print"
+                >
+                  {isSavingEdit ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                  Salvar alterações
+                </Button>
+              </>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={startEdit}
+                className="gap-2 border-zinc-700 text-zinc-300 hover:text-white no-print"
+              >
+                <Pencil size={16} />
+                Editar
+              </Button>
+            )}
+          </div>
+        ) : (
+          <p className="max-w-[min(100%,28rem)] text-right text-sm leading-snug text-zinc-400">
+            Gerado para{" "}
+            <span className="font-medium text-zinc-200">{report.leadCompany}</span>
+          </p>
+        )}
       </div>
 
       {isDashboard ? (
@@ -1359,50 +1352,72 @@ export function RotaDigitalReportView({
       </div>
 
       {/* Executive Summary */}
-      <Card
-        className={cn(
-          "border-indigo-500/20 bg-gradient-to-b from-indigo-500/[0.03] to-transparent print-white",
-          ROTA_REPORT_CARD_BOX,
-        )}
-      >
-        <CardHeader className="pb-4">
-          <div className="flex items-center gap-2.5">
-            <SectionHeaderIcon Icon={Sparkles} tone="indigo" />
-            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-              Resumo Executivo
-            </CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div
-            className={`grid gap-6 ${hasBrandImage ? "md:grid-cols-[140px_minmax(0,1fr)] md:items-start" : ""}`}
-          >
+      <div className="grid min-w-0 grid-cols-1 gap-5 md:grid-cols-12">
+        <Card
+          className={cn(
+            "min-w-0 overflow-visible border-indigo-500/20 bg-gradient-to-b from-indigo-500/[0.03] to-transparent print-white md:col-span-8",
+            ROTA_REPORT_CARD_BOX,
+          )}
+        >
+          <CardHeader className="pb-4">
+            <div className="flex items-center gap-2.5">
+              <SectionHeaderIcon Icon={Sparkles} tone="indigo" />
+              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                Resumo Executivo
+              </CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <p className="text-[15px] leading-relaxed text-zinc-100 antialiased whitespace-pre-line">
+                {formatReadableParagraphs(report.executiveSummary || "")}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card
+          className={cn(
+            "flex min-w-0 flex-col items-center justify-center overflow-visible border-zinc-800 bg-zinc-900/40 md:col-span-4",
+            ROTA_REPORT_CARD_BOX,
+          )}
+        >
+          <CardContent className="flex flex-col items-center gap-4 text-center">
             {hasBrandImage ? (
-              <div className="flex min-h-[120px] items-center justify-center rounded-xl border border-zinc-700 bg-zinc-900/60 p-4 shadow-inner">
+              <div
+                className={
+                  isWebsiteLogo
+                    ? "rounded-2xl bg-gradient-to-tr from-indigo-500/25 to-purple-500/25 p-1.5 ring-1 ring-white/10"
+                    : "rounded-full bg-gradient-to-tr from-indigo-500/25 to-purple-500/25 p-1.5 ring-1 ring-white/10"
+                }
+              >
                 <EvidenceImage
                   src={brandImageSrc}
                   alt={isWebsiteLogo ? "Logo" : "Foto de perfil do Instagram"}
                   className={
                     isWebsiteLogo
-                      ? "h-24 w-24 rounded-md bg-white p-2.5 object-contain"
-                      : "h-24 w-24 rounded-full border border-zinc-600 object-cover shadow-lg"
+                      ? "h-28 w-28 rounded-xl bg-white p-3 object-contain shadow-lg"
+                      : "h-28 w-28 rounded-full border-2 border-zinc-700 object-cover shadow-lg"
                   }
                 />
               </div>
-            ) : null}
-            <div className="space-y-4">
-              <p className="text-[15px] leading-relaxed text-zinc-100 antialiased whitespace-pre-line">
-                {formatReadableParagraphs(
-                  [report.executiveSummary, report.companyProfile].filter(Boolean).join("\n\n"),
-                )}
+            ) : (
+              <div className="flex h-28 w-28 items-center justify-center rounded-full border-2 border-dashed border-zinc-800 bg-zinc-900/50">
+                <Globe className="size-10 text-zinc-700" />
+              </div>
+            )}
+            <div className="space-y-1">
+              <h3 className="text-lg font-bold text-white">{report.leadCompany}</h3>
+              <p className="text-xs font-medium uppercase tracking-widest text-zinc-500">
+                Análise de Presença
               </p>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* KPIs: Layout Bento com hierarquia e profundidade */}
-      <div className="grid grid-cols-1 gap-5 md:grid-cols-12">
+      <div className="grid min-w-0 grid-cols-1 gap-5 md:grid-cols-12">
         {/* Maturidade Digital - Destaque */}
         <Card
           className={cn(
@@ -1845,99 +1860,84 @@ export function RotaDigitalReportView({
       ) : null}
 
       {/* SWOT */}
-      <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
-        <BorderGlow
-          edgeSensitivity={30}
-          glowColor="142 55 52"
-          backgroundColor="#18181b"
-          borderRadius={12}
-          glowRadius={32}
-          glowIntensity={0.9}
-          coneSpread={25}
-          animated={false}
-          colors={["#4ade80", "#34d399", "#86efac"]}
-          fillOpacity={0.45}
-          className="rounded-xl print-white"
+      <div className="grid min-w-0 grid-cols-1 gap-5 md:grid-cols-3">
+        <Card
+          className={cn(
+            "min-w-0 overflow-visible border-green-500/20 bg-green-500/[0.02] print-white",
+            ROTA_REPORT_CARD_BOX,
+          )}
         >
-          <Card className={cn("border-0 bg-transparent shadow-none ring-0 print-white", ROTA_REPORT_CARD_BOX)}>
-            <CardHeader className="flex flex-row items-center gap-2 pb-3">
-              <TrendingUp size={16} className="text-green-400" />
-              <CardTitle className="text-sm font-medium text-green-400">Forças</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-1">
-              <ul className="divide-y divide-zinc-500/50">
-                {report.strengths.map((s, i) => (
-                  <li key={i} className="flex items-start gap-2.5 py-3 text-sm leading-6 text-zinc-300 first:pt-0 last:pb-0">
-                    <CheckCircle2 size={14} className="text-green-400 mt-0.5 shrink-0" />
-                    {s}
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
-        </BorderGlow>
+          <CardHeader className="flex flex-row items-center gap-3 pb-4">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-500/10 ring-1 ring-green-500/20">
+              <TrendingUp size={18} className="text-green-400" />
+            </div>
+            <CardTitle className="text-sm font-bold uppercase tracking-wider text-green-400">
+              Forças
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-4">
+              {report.strengths.map((s, i) => (
+                <li key={i} className="flex items-start gap-3 text-sm leading-relaxed text-zinc-300">
+                  <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-green-500/60" />
+                  <span>{s}</span>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
 
-        <BorderGlow
-          edgeSensitivity={30}
-          glowColor="0 72 58"
-          backgroundColor="#18181b"
-          borderRadius={12}
-          glowRadius={32}
-          glowIntensity={0.9}
-          coneSpread={25}
-          animated={false}
-          colors={["#f87171", "#fb7185", "#fca5a5"]}
-          fillOpacity={0.45}
-          className="rounded-xl print-white"
+        <Card
+          className={cn(
+            "min-w-0 overflow-visible border-red-500/20 bg-red-500/[0.02] print-white",
+            ROTA_REPORT_CARD_BOX,
+          )}
         >
-          <Card className={cn("border-0 bg-transparent shadow-none ring-0 print-white", ROTA_REPORT_CARD_BOX)}>
-            <CardHeader className="flex flex-row items-center gap-2 pb-3">
-              <TrendingDown size={16} className="text-red-400" />
-              <CardTitle className="text-sm font-medium text-red-400">Fraquezas</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-1">
-              <ul className="divide-y divide-zinc-500/50">
-                {report.weaknesses.map((w, i) => (
-                  <li key={i} className="flex items-start gap-2.5 py-3 text-sm leading-6 text-zinc-300 first:pt-0 last:pb-0">
-                    <AlertCircle size={14} className="text-red-400 mt-0.5 shrink-0" />
-                    {w}
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
-        </BorderGlow>
+          <CardHeader className="flex flex-row items-center gap-3 pb-4">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-500/10 ring-1 ring-red-500/20">
+              <TrendingDown size={18} className="text-red-400" />
+            </div>
+            <CardTitle className="text-sm font-bold uppercase tracking-wider text-red-400">
+              Fraquezas
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-4">
+              {report.weaknesses.map((w, i) => (
+                <li key={i} className="flex items-start gap-3 text-sm leading-relaxed text-zinc-300">
+                  <AlertCircle size={16} className="mt-0.5 shrink-0 text-red-500/60" />
+                  <span>{w}</span>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
 
-        <BorderGlow
-          edgeSensitivity={30}
-          glowColor="217 90 62"
-          backgroundColor="#18181b"
-          borderRadius={12}
-          glowRadius={32}
-          glowIntensity={0.9}
-          coneSpread={25}
-          animated={false}
-          colors={["#c084fc", "#f472b6", "#38bdf8"]}
-          fillOpacity={0.45}
-          className="rounded-xl print-white"
+        <Card
+          className={cn(
+            "min-w-0 overflow-visible border-blue-500/20 bg-blue-500/[0.02] print-white",
+            ROTA_REPORT_CARD_BOX,
+          )}
         >
-          <Card className={cn("border-0 bg-transparent shadow-none ring-0 print-white", ROTA_REPORT_CARD_BOX)}>
-            <CardHeader className="flex flex-row items-center gap-2 pb-3">
-              <Target size={16} className="text-blue-400" />
-              <CardTitle className="text-sm font-medium text-blue-400">Oportunidades</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-1">
-              <ul className="divide-y divide-zinc-500/50">
-                {report.opportunities.map((o, i) => (
-                  <li key={i} className="flex items-start gap-2.5 py-3 text-sm leading-6 text-zinc-300 first:pt-0 last:pb-0">
-                    <Star size={14} className="text-blue-400 mt-0.5 shrink-0" />
-                    {o}
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
-        </BorderGlow>
+          <CardHeader className="flex flex-row items-center gap-3 pb-4">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10 ring-1 ring-blue-500/20">
+              <Target size={18} className="text-blue-400" />
+            </div>
+            <CardTitle className="text-sm font-bold uppercase tracking-wider text-blue-400">
+              Oportunidades
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-4">
+              {report.opportunities.map((o, i) => (
+                <li key={i} className="flex items-start gap-3 text-sm leading-relaxed text-zinc-300">
+                  <Star size={16} className="mt-0.5 shrink-0 text-blue-500/60" />
+                  <span>{o}</span>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Recommended Channels */}
@@ -1960,86 +1960,72 @@ export function RotaDigitalReportView({
       </Card>
 
       {/* Quick Wins & Long Term */}
-      <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-        <BorderGlow
-          edgeSensitivity={30}
-          glowColor="48 92 60"
-          backgroundColor="#18181b"
-          borderRadius={12}
-          glowRadius={30}
-          glowIntensity={0.85}
-          coneSpread={25}
-          animated={false}
-          colors={["#facc15", "#f59e0b", "#fde68a"]}
-          fillOpacity={0.35}
-          className="rounded-xl print-white"
+      <div className="grid min-w-0 grid-cols-1 gap-5 md:grid-cols-2">
+        <Card
+          className={cn(
+            "min-w-0 overflow-visible border-yellow-500/10 bg-zinc-900/40 print-white",
+            ROTA_REPORT_CARD_BOX,
+          )}
         >
-          <Card className={cn("border-0 bg-transparent shadow-none ring-0 print-white", ROTA_REPORT_CARD_BOX)}>
-            <CardHeader className="space-y-3 pb-4">
-              <div className="flex items-center gap-2.5">
-                <SectionHeaderIcon Icon={Zap} tone="yellow" />
-                <CardTitle className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                  Quick Wins
-                </CardTitle>
+          <CardHeader className="space-y-3 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-yellow-500/10 ring-1 ring-yellow-500/20">
+                <Zap size={18} className="text-yellow-400" />
               </div>
-              <p className={ROTA_CARD_SUBTITLE}>
-                Ações de alto impacto a implementar imediatamente.
-              </p>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-3.5">
-                {report.quickWins.map((win, i) => (
-                  <li key={i} className="flex items-start gap-3 text-sm leading-6 text-zinc-300">
-                    <span className="w-5 h-5 rounded-full bg-yellow-500/20 text-yellow-400 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
-                      {i + 1}
-                    </span>
-                    {win}
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
-        </BorderGlow>
+              <CardTitle className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+                Quick Wins
+              </CardTitle>
+            </div>
+            <p className={ROTA_CARD_SUBTITLE}>
+              Ações de alto impacto a implementar imediatamente.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-4">
+              {report.quickWins.map((win, i) => (
+                <li key={i} className="flex items-start gap-4 text-sm leading-relaxed text-zinc-300">
+                  <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-yellow-500/10 text-[11px] font-bold text-yellow-500/90 ring-1 ring-yellow-500/20">
+                    {i + 1}
+                  </div>
+                  <span>{win}</span>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
 
-        <BorderGlow
-          edgeSensitivity={30}
-          glowColor="270 70 68"
-          backgroundColor="#18181b"
-          borderRadius={12}
-          glowRadius={30}
-          glowIntensity={0.85}
-          coneSpread={25}
-          animated={false}
-          colors={["#c084fc", "#f472b6", "#38bdf8"]}
-          fillOpacity={0.35}
-          className="rounded-xl print-white"
+        <Card
+          className={cn(
+            "min-w-0 overflow-visible border-purple-500/10 bg-zinc-900/40 print-white",
+            ROTA_REPORT_CARD_BOX,
+          )}
         >
-          <Card className={cn("border-0 bg-transparent shadow-none ring-0 print-white", ROTA_REPORT_CARD_BOX)}>
-            <CardHeader className="space-y-3 pb-4">
-              <div className="flex items-center gap-2.5">
-                <SectionHeaderIcon Icon={Target} tone="purple" />
-                <CardTitle className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                  Ações de Longo Prazo
-                </CardTitle>
+          <CardHeader className="space-y-3 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-500/10 ring-1 ring-purple-500/20">
+                <Target size={18} className="text-purple-400" />
               </div>
-              <p className={ROTA_CARD_SUBTITLE}>
-                Estratégias para construção de presença digital sustentável.
-              </p>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-3.5">
-                {report.longTermActions.map((action, i) => (
-                  <li key={i} className="flex items-start gap-3 text-sm leading-6 text-zinc-300">
-                    <span className="w-5 h-5 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
-                      {i + 1}
-                    </span>
-                    {action}
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
-        </BorderGlow>
+              <CardTitle className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+                Ações de Longo Prazo
+              </CardTitle>
+            </div>
+            <p className={ROTA_CARD_SUBTITLE}>
+              Estratégias para construção de presença digital sustentável.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-4">
+              {report.longTermActions.map((action, i) => (
+                <li key={i} className="flex items-start gap-4 text-sm leading-relaxed text-zinc-300">
+                  <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-purple-500/10 text-[11px] font-bold text-purple-500/90 ring-1 ring-purple-500/20">
+                    {i + 1}
+                  </div>
+                  <span>{action}</span>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Próximos passos — spotlight ao hover */}

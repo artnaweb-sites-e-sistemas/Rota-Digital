@@ -90,9 +90,9 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      {/* Main content */}
-      <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden bg-background">
-        <div className="mx-auto w-full min-h-0 max-w-[1760px] px-6 py-8 sm:px-8 md:px-10">
+      {/* Main content — min-w-0 evita que o flex corte bordas/ring na largura útil */}
+      <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-clip bg-background">
+        <div className="mx-auto w-full min-h-0 min-w-0 max-w-[1760px] px-6 py-8 sm:px-8 md:px-10">
           {children}
         </div>
       </main>
