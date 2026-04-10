@@ -1384,6 +1384,7 @@ Seja específico para "${body.company}".`;
 
 export async function POST(req: NextRequest) {
   try {
+    const requestStartedAt = Date.now();
     const body = await req.json();
     const {
       leadId,
@@ -1540,43 +1541,58 @@ export async function POST(req: NextRequest) {
     });
 
     const candidateModels = [
-      "gemini-2.5-flash",
-      "gemini-2.0-flash",
       "gemini-2.0-flash-lite",
-      "gemini-1.5-flash-latest",
+      "gemini-2.0-flash",
     ];
 
     let responseText = "";
     let lastError: unknown = null;
-
-    // 1) Tenta com grounding (pesquisa web) nos modelos disponíveis.
-    for (const modelName of candidateModels) {
+    const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
       try {
-        const model = genAI.getGenerativeModel(
-          {
-            model: modelName,
-            tools: [
-              {
-                googleSearchRetrieval: {
-                  dynamicRetrievalConfig: {
-                    mode: DynamicRetrievalMode.MODE_DYNAMIC,
-                    dynamicThreshold: 0.25,
+        return await Promise.race([
+          promise,
+          new Promise<T>((_, reject) => {
+            timer = setTimeout(() => reject(new Error(`Tempo limite (${timeoutMs}ms) na chamada do Gemini.`)), timeoutMs);
+          }),
+        ]);
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
+    };
+    const elapsedMs = Date.now() - requestStartedAt;
+    const lowTimeBudget = elapsedMs > 35_000;
+
+    // 1) Se ainda há orçamento de tempo, tenta com grounding (pesquisa web).
+    if (!lowTimeBudget) {
+      for (const modelName of candidateModels) {
+        try {
+          const model = genAI.getGenerativeModel(
+            {
+              model: modelName,
+              tools: [
+                {
+                  googleSearchRetrieval: {
+                    dynamicRetrievalConfig: {
+                      mode: DynamicRetrievalMode.MODE_DYNAMIC,
+                      dynamicThreshold: 0.25,
+                    },
                   },
                 },
-              },
-            ],
-          },
-          { apiVersion: "v1" }
-        );
-        const result = await model.generateContent(generateContentInput);
-        responseText = result.response.text();
-        break;
-      } catch (err) {
-        lastError = err;
+              ],
+            },
+            { apiVersion: "v1" }
+          );
+          const result = await withTimeout(model.generateContent(generateContentInput), 20_000);
+          responseText = result.response.text();
+          break;
+        } catch (err) {
+          lastError = err;
+        }
       }
     }
 
-    // 2) Se grounding falhar, tenta sem grounding (mais compatível).
+    // 2) Se grounding falhar (ou foi pulado por orçamento), tenta sem grounding.
     if (!responseText) {
       for (const modelName of candidateModels) {
         try {
@@ -1586,7 +1602,7 @@ export async function POST(req: NextRequest) {
             },
             { apiVersion: "v1" }
           );
-          const result = await model.generateContent(generateContentInput);
+          const result = await withTimeout(model.generateContent(generateContentInput), 20_000);
           responseText = result.response.text();
           break;
         } catch (err) {

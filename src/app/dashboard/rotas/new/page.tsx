@@ -9,6 +9,7 @@ import { getLeads, updateLead } from "@/lib/leads";
 import { getReportByLead, saveReport, updateReport } from "@/lib/reports";
 import { persistEvidenceImagesToStorage } from "@/lib/evidence-storage";
 import { Lead } from "@/types/lead";
+import type { RotaDigitalReport } from "@/types/report";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -174,16 +175,29 @@ export default function NewRotaPage() {
         }),
       });
 
-      const data = await res.json();
+      const rawBody = await res.text();
+      let data: { error?: string; report?: Record<string, unknown>; debug?: unknown } = {};
+      try {
+        data = rawBody ? JSON.parse(rawBody) : {};
+      } catch {
+        data = {};
+      }
       if (!res.ok) {
-        throw new Error(data.error || "Erro ao gerar rota.");
+        const fallbackMessage =
+          res.status === 504
+            ? "Tempo esgotado ao gerar a rota em produção. Tente novamente em instantes."
+            : "Erro ao gerar rota.";
+        throw new Error(data.error || fallbackMessage);
+      }
+      if (!data.report) {
+        throw new Error("Resposta inválida da API ao gerar rota.");
       }
       console.info("[IG_DEBUG][client][generate-route-response]", data?.debug || null);
 
-      let reportWithStoredEvidence = data.report;
+      let reportWithStoredEvidence = data.report as Omit<RotaDigitalReport, "id">;
       try {
         reportWithStoredEvidence = await persistEvidenceImagesToStorage({
-          report: data.report,
+          report: data.report as Omit<RotaDigitalReport, "id">,
           userId: user.uid,
           leadId: selectedLead.id,
         });
