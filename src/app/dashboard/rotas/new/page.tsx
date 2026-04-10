@@ -157,34 +157,62 @@ export default function NewRotaPage() {
     }, 250);
 
     try {
-      const res = await fetch("/api/generate-route", {
+      const payload = {
+        leadId: selectedLead.id,
+        userId: user.uid,
+        name: selectedLead.name,
+        email: selectedLead.email,
+        phone: selectedLead.phone,
+        company: selectedLead.company,
+        status: selectedLead.status,
+        websiteUrl: websiteUrl.trim(),
+        instagramUrl: instagramUrl.trim(),
+        servicesOffered: servicesOffered.trim(),
+        objective: objective.trim(),
+      };
+      const parseApiResponse = async (res: Response) => {
+        const rawBody = await res.text();
+        let parsed: { error?: string; report?: Record<string, unknown>; debug?: unknown; preparedEvidence?: unknown } = {};
+        try {
+          parsed = rawBody ? JSON.parse(rawBody) : {};
+        } catch {
+          parsed = {};
+        }
+        return parsed;
+      };
+
+      // Etapa 1: coleta de evidências (prints, bio, URLs verificadas).
+      const collectRes = await fetch("/api/generate-route", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          leadId: selectedLead.id,
-          userId: user.uid,
-          name: selectedLead.name,
-          email: selectedLead.email,
-          phone: selectedLead.phone,
-          company: selectedLead.company,
-          status: selectedLead.status,
-          websiteUrl: websiteUrl.trim(),
-          instagramUrl: instagramUrl.trim(),
-          servicesOffered: servicesOffered.trim(),
-          objective: objective.trim(),
+          ...payload,
+          mode: "collectEvidence",
         }),
       });
-
-      const rawBody = await res.text();
-      let data: { error?: string; report?: Record<string, unknown>; debug?: unknown } = {};
-      try {
-        data = rawBody ? JSON.parse(rawBody) : {};
-      } catch {
-        data = {};
-      }
-      if (!res.ok) {
+      const collectData = await parseApiResponse(collectRes);
+      if (!collectRes.ok || !collectData.preparedEvidence) {
         const fallbackMessage =
-          res.status === 504
+          collectRes.status === 504
+            ? "Tempo esgotado na coleta de evidências em produção. Tente novamente em instantes."
+            : "Erro ao coletar evidências da rota.";
+        throw new Error(collectData.error || fallbackMessage);
+      }
+
+      // Etapa 2: geração do relatório com IA usando as evidências já coletadas.
+      const generateRes = await fetch("/api/generate-route", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...payload,
+          mode: "generateFromEvidence",
+          preparedEvidence: collectData.preparedEvidence,
+        }),
+      });
+      const data = await parseApiResponse(generateRes);
+      if (!generateRes.ok) {
+        const fallbackMessage =
+          generateRes.status === 504
             ? "Tempo esgotado ao gerar a rota em produção. Tente novamente em instantes."
             : "Erro ao gerar rota.";
         throw new Error(data.error || fallbackMessage);

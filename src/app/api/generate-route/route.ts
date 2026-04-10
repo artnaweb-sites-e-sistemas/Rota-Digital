@@ -147,6 +147,22 @@ type InstagramEvidence = {
   isAccessible?: boolean;
 };
 
+type PreparedEvidencePayload = {
+  normalizedWebsiteUrl?: string;
+  normalizedInstagramUrl?: string;
+  websiteEvidence: WebsiteEvidence;
+  instagramEvidence: InstagramEvidence;
+  hasBrowserless: boolean;
+  siteHeroSnapshotUrl?: string;
+  instagramSnapshotUrl?: string;
+  instagramBioLinkSnapshotUrl?: string;
+  instagramProfileImageUrl?: string;
+  logoImageUrl?: string;
+  websiteCandidateUrls: Array<string | undefined>;
+  instagramSnapshotCandidates: Array<string | undefined>;
+  bioLinkCandidateUrls: Array<string | undefined>;
+};
+
 type GeminiInlineImagePart = {
   inlineData: {
     mimeType: string;
@@ -1119,6 +1135,89 @@ async function repairModelJsonWithGemini(
   );
 }
 
+async function prepareEvidencePayload(params: {
+  normalizedWebsiteUrl?: string;
+  normalizedInstagramUrl?: string;
+}): Promise<PreparedEvidencePayload> {
+  const { normalizedWebsiteUrl, normalizedInstagramUrl } = params;
+  const [websiteEvidence, instagramEvidence] = await Promise.all([
+    collectWebsiteEvidence(normalizedWebsiteUrl),
+    collectInstagramEvidence(normalizedInstagramUrl),
+  ]);
+  console.info("[IG_DEBUG][generate-route] Evidências coletadas.", {
+    websiteAccessible: websiteEvidence.isAccessible !== false,
+    instagramAccessible: instagramEvidence.isAccessible !== false,
+    instagramHandle: instagramEvidence.handle || null,
+    instagramHasBio: Boolean(instagramEvidence.bio),
+    instagramFollowers: instagramEvidence.followers ?? null,
+    instagramPosts: instagramEvidence.posts ?? null,
+    instagramHasProfileImage: Boolean(instagramEvidence.profileImageUrl),
+    instagramHasRecentPost: Boolean(instagramEvidence.recentPostImageUrl),
+  });
+
+  const hasBrowserless = Boolean(process.env.BROWSERLESS_API_KEY?.trim());
+  const internalWebsiteSnapshotUrl = buildWebsiteFullPageSnapshotUrl(normalizedWebsiteUrl);
+  const internalInstagramSnapshotUrl = instagramEvidence.handle
+    ? buildInstagramProfileSnapshotUrl(instagramEvidence.handle)
+    : undefined;
+  const instagramBioLinkTargetUrl =
+    instagramEvidence.bioLinkResolvedUrl || instagramEvidence.bioLinkUrl;
+  const internalInstagramBioLinkSnapshotUrl = buildWebsiteFullPageSnapshotUrl(
+    instagramBioLinkTargetUrl
+  );
+  const proxiedInstagramProfileImageUrl = buildImageProxyUrl(instagramEvidence.profileImageUrl);
+  const logoImageUrl = normalizedWebsiteUrl
+    ? `https://www.google.com/s2/favicons?sz=256&domain_url=${encodeURIComponent(normalizedWebsiteUrl)}`
+    : undefined;
+
+  const [externalWebsiteSnapshotUrl, externalInstagramBioLinkSnapshotUrl] =
+    await Promise.all([
+      resolveScreenshotUrl(normalizedWebsiteUrl, 1400, true, {
+        denyInstagram: true,
+        fullPage: true,
+      }),
+      resolveScreenshotUrl(instagramBioLinkTargetUrl, 1400, true, {
+        denyInstagram: true,
+        fullPage: true,
+      }),
+    ]);
+
+  let siteHeroSnapshotUrl = hasBrowserless
+    ? internalWebsiteSnapshotUrl || externalWebsiteSnapshotUrl
+    : externalWebsiteSnapshotUrl || internalWebsiteSnapshotUrl;
+  const instagramSnapshotCandidates = [internalInstagramSnapshotUrl];
+  const instagramSnapshotUrl = instagramSnapshotCandidates.find(Boolean);
+  if (siteHeroSnapshotUrl && siteHeroSnapshotUrl === instagramSnapshotUrl) {
+    siteHeroSnapshotUrl = undefined;
+  }
+  const instagramBioLinkSnapshotUrl = hasBrowserless
+    ? internalInstagramBioLinkSnapshotUrl || externalInstagramBioLinkSnapshotUrl
+    : externalInstagramBioLinkSnapshotUrl || internalInstagramBioLinkSnapshotUrl;
+
+  const websiteCandidateUrls = hasBrowserless
+    ? [internalWebsiteSnapshotUrl, externalWebsiteSnapshotUrl]
+    : [externalWebsiteSnapshotUrl, internalWebsiteSnapshotUrl];
+  const bioLinkCandidateUrls = hasBrowserless
+    ? [internalInstagramBioLinkSnapshotUrl, externalInstagramBioLinkSnapshotUrl]
+    : [externalInstagramBioLinkSnapshotUrl, internalInstagramBioLinkSnapshotUrl];
+
+  return {
+    normalizedWebsiteUrl,
+    normalizedInstagramUrl,
+    websiteEvidence,
+    instagramEvidence,
+    hasBrowserless,
+    siteHeroSnapshotUrl: siteHeroSnapshotUrl || undefined,
+    instagramSnapshotUrl: instagramSnapshotUrl || undefined,
+    instagramBioLinkSnapshotUrl: instagramBioLinkSnapshotUrl || undefined,
+    instagramProfileImageUrl: proxiedInstagramProfileImageUrl || undefined,
+    logoImageUrl,
+    websiteCandidateUrls,
+    instagramSnapshotCandidates,
+    bioLinkCandidateUrls,
+  };
+}
+
 function buildWebsiteResearchNote(e: WebsiteEvidence): string {
   if (e.isAccessible === false) {
     return `não foi possível acessar a home durante a coleta automática.`;
@@ -1448,6 +1547,8 @@ export async function POST(req: NextRequest) {
     const requestStartedAt = Date.now();
     const body = await req.json();
     const {
+      mode,
+      preparedEvidence,
       leadId,
       userId,
       name,
@@ -1493,72 +1594,36 @@ export async function POST(req: NextRequest) {
         Boolean(normalizedWebsiteUrlRaw) && !normalizedWebsiteUrl && isInstagramDomainUrl(normalizedWebsiteUrlRaw),
       instagramUrl: normalizedInstagramUrl || null,
     });
-    const [websiteEvidence, instagramEvidence] = await Promise.all([
-      collectWebsiteEvidence(normalizedWebsiteUrl),
-      collectInstagramEvidence(normalizedInstagramUrl),
-    ]);
-    console.info("[IG_DEBUG][generate-route] Evidências coletadas.", {
-      websiteAccessible: websiteEvidence.isAccessible !== false,
-      instagramAccessible: instagramEvidence.isAccessible !== false,
-      instagramHandle: instagramEvidence.handle || null,
-      instagramHasBio: Boolean(instagramEvidence.bio),
-      instagramFollowers: instagramEvidence.followers ?? null,
-      instagramPosts: instagramEvidence.posts ?? null,
-      instagramHasProfileImage: Boolean(instagramEvidence.profileImageUrl),
-      instagramHasRecentPost: Boolean(instagramEvidence.recentPostImageUrl),
-    });
+    if (mode === "collectEvidence") {
+      const prepared = await prepareEvidencePayload({
+        normalizedWebsiteUrl,
+        normalizedInstagramUrl,
+      });
+      return NextResponse.json({ preparedEvidence: prepared });
+    }
+
+    const prepared: PreparedEvidencePayload =
+      mode === "generateFromEvidence" && preparedEvidence
+        ? (preparedEvidence as PreparedEvidencePayload)
+        : await prepareEvidencePayload({
+            normalizedWebsiteUrl,
+            normalizedInstagramUrl,
+          });
 
     const requestOrigin = req.nextUrl.origin;
-    const hasBrowserless = Boolean(process.env.BROWSERLESS_API_KEY?.trim());
-
-    const internalWebsiteSnapshotUrl = buildWebsiteFullPageSnapshotUrl(normalizedWebsiteUrl);
-    const internalInstagramSnapshotUrl = instagramEvidence.handle
-      ? buildInstagramProfileSnapshotUrl(instagramEvidence.handle)
-      : undefined;
-    const instagramBioLinkTargetUrl =
-      instagramEvidence.bioLinkResolvedUrl || instagramEvidence.bioLinkUrl;
-    const internalInstagramBioLinkSnapshotUrl = buildWebsiteFullPageSnapshotUrl(
-      instagramBioLinkTargetUrl
-    );
-    const proxiedInstagramProfileImageUrl = buildImageProxyUrl(instagramEvidence.profileImageUrl);
-    const proxiedInstagramRecentPostImageUrl = buildImageProxyUrl(instagramEvidence.recentPostImageUrl);
-    const logoImageUrl = normalizedWebsiteUrl
-      ? `https://www.google.com/s2/favicons?sz=256&domain_url=${encodeURIComponent(normalizedWebsiteUrl)}`
-      : undefined;
-
-    const [externalWebsiteSnapshotUrl, externalInstagramScreenshotUrl, externalInstagramBioLinkSnapshotUrl] =
-      await Promise.all([
-        resolveScreenshotUrl(normalizedWebsiteUrl, 1400, true, { denyInstagram: true, fullPage: true }),
-        normalizedInstagramUrl ? resolveScreenshotUrl(normalizedInstagramUrl, 1200, false) : Promise.resolve(undefined),
-        resolveScreenshotUrl(instagramBioLinkTargetUrl, 1400, true, { denyInstagram: true, fullPage: true }),
-      ]);
-
-    let siteHeroSnapshotUrl = hasBrowserless
-      ? (internalWebsiteSnapshotUrl || externalWebsiteSnapshotUrl)
-      : (externalWebsiteSnapshotUrl || internalWebsiteSnapshotUrl);
-    // A imagem principal do Instagram deve representar o PERFIL (bio + destaques + grade),
-    // nunca um post isolado ou thumbnail.
-    const instagramSnapshotCandidates = [internalInstagramSnapshotUrl];
-    let instagramSnapshotUrl = instagramSnapshotCandidates.find(Boolean);
-    if (siteHeroSnapshotUrl && siteHeroSnapshotUrl === instagramSnapshotUrl) {
-      siteHeroSnapshotUrl = undefined;
-    }
-    let instagramBioLinkSnapshotUrl = hasBrowserless
-      ? (internalInstagramBioLinkSnapshotUrl || externalInstagramBioLinkSnapshotUrl)
-      : (externalInstagramBioLinkSnapshotUrl || internalInstagramBioLinkSnapshotUrl);
-    const instagramProfileImageUrl = proxiedInstagramProfileImageUrl || undefined;
-
-    const websiteCandidateUrls = hasBrowserless
-      ? [internalWebsiteSnapshotUrl, externalWebsiteSnapshotUrl]
-      : [externalWebsiteSnapshotUrl, internalWebsiteSnapshotUrl];
-    const bioLinkCandidateUrls = hasBrowserless
-      ? [internalInstagramBioLinkSnapshotUrl, externalInstagramBioLinkSnapshotUrl]
-      : [externalInstagramBioLinkSnapshotUrl, internalInstagramBioLinkSnapshotUrl];
+    const hasBrowserless = prepared.hasBrowserless;
+    const websiteEvidence = prepared.websiteEvidence;
+    const instagramEvidence = prepared.instagramEvidence;
+    let siteHeroSnapshotUrl = prepared.siteHeroSnapshotUrl;
+    let instagramSnapshotUrl = prepared.instagramSnapshotUrl;
+    let instagramBioLinkSnapshotUrl = prepared.instagramBioLinkSnapshotUrl;
+    const instagramProfileImageUrl = prepared.instagramProfileImageUrl;
+    const logoImageUrl = prepared.logoImageUrl;
 
     const [websiteDownload, instagramDownload, bioLinkDownload] = await Promise.all([
-      downloadFirstAvailableImagePart(requestOrigin, websiteCandidateUrls),
-      downloadFirstAvailableImagePart(requestOrigin, instagramSnapshotCandidates),
-      downloadFirstAvailableImagePart(requestOrigin, bioLinkCandidateUrls),
+      downloadFirstAvailableImagePart(requestOrigin, prepared.websiteCandidateUrls),
+      downloadFirstAvailableImagePart(requestOrigin, prepared.instagramSnapshotCandidates),
+      downloadFirstAvailableImagePart(requestOrigin, prepared.bioLinkCandidateUrls),
     ]);
     const { part: websiteImagePart, selectedUrl: selectedWebsiteSnapshotUrl } = websiteDownload;
     const { part: instagramImagePart, selectedUrl: selectedInstagramSnapshotUrl } = instagramDownload;
@@ -1585,8 +1650,8 @@ export async function POST(req: NextRequest) {
       phone,
       company,
       status,
-      websiteUrl: normalizedWebsiteUrl,
-      instagramUrl: normalizedInstagramUrl,
+      websiteUrl: prepared.normalizedWebsiteUrl,
+      instagramUrl: prepared.normalizedInstagramUrl,
       servicesOffered,
       objective,
       websiteEvidence,
@@ -1865,8 +1930,8 @@ export async function POST(req: NextRequest) {
       publicSlug,
       proposalHtml,
       brief: {
-        websiteUrl: normalizedWebsiteUrl,
-        instagramUrl: normalizedInstagramUrl,
+        websiteUrl: prepared.normalizedWebsiteUrl,
+        instagramUrl: prepared.normalizedInstagramUrl,
         servicesOffered,
         objective,
       },
@@ -1887,7 +1952,7 @@ export async function POST(req: NextRequest) {
 
     const debug = {
       instagram: {
-        inputUrl: normalizedInstagramUrl || null,
+        inputUrl: prepared.normalizedInstagramUrl || null,
         handle: instagramEvidence.handle || null,
         dataSource: instagramEvidence.dataSource || null,
         authCookiesConfigured: hasInstagramAuthCookies(),
