@@ -1,19 +1,18 @@
 import { notFound } from "next/navigation";
 
-import { getReportByPublicSlug } from "@/lib/reports";
+import { getPublicProposalReportBySlug } from "@/lib/public-report-server";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 /**
- * Página pública da proposta HTML para o lead.
- * Ajuste as regras do Firestore para permitir leitura anônima na coleção `reports`
- * quando `publicSlug` for igual ao da URL, por exemplo:
+ * Página pública da proposta HTML para o lead (sem login).
  *
- * match /reports/{id} {
- *   allow read: if resource.data.publicSlug != null;
- * }
+ * Em produção, defina `FIREBASE_SERVICE_ACCOUNT_JSON` na Vercel (JSON da service account
+ * com acesso ao Firestore) para leitura via Admin SDK — assim as regras podem manter
+ * `reports` fechadas para clientes anônimos.
  *
- * (Refine conforme sua política de segurança.)
+ * Sem Admin: é necessário regra Firestore permitindo leitura da query por `publicSlug`.
  */
 export default async function PublicProposalPage({
   params,
@@ -23,7 +22,7 @@ export default async function PublicProposalPage({
   const { slug } = await params;
   if (!slug) notFound();
 
-  const report = await getReportByPublicSlug(slug);
+  const report = await getPublicProposalReportBySlug(slug);
   if (!report?.proposalHtml) notFound();
 
   return (

@@ -1778,7 +1778,10 @@ export default function ReportPage() {
                   src={report.evidences.instagramBioLinkSnapshotUrl}
                   alt="Destino do link da bio"
                   fitContain
-                  frameClassName="h-48 w-full rounded-md border border-zinc-700 bg-zinc-950"
+                  fitContainMode="cover"
+                  hoverScroll
+                  initialOffsetRatio={0}
+                  frameClassName="h-64 w-full rounded-md border border-zinc-700 bg-zinc-950"
                   className="h-auto"
                 />
               </div>

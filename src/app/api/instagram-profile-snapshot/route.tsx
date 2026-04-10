@@ -26,6 +26,9 @@ type SnapshotCacheEntry = {
 const SNAPSHOT_CACHE_TTL_MS = 15 * 60 * 1000;
 const snapshotResponseCache = new Map<string, SnapshotCacheEntry>();
 
+/** Miniaturas no fallback composto (API/OG), alinhado ao grid típico do perfil (3 colunas × 4 linhas). */
+const PROFILE_FALLBACK_GRID_POSTS = 12;
+
 function getSnapshotCacheKey(handle: string, variant: string, start: number): string {
   return `${handle}|${variant}|${start}`;
 }
@@ -333,23 +336,19 @@ export async function GET(req: NextRequest) {
       || fallback?.postImageUrls
       || [];
   const startIndex = Math.max(0, start - 1);
-  const postUrls = allPostUrls.slice(startIndex, startIndex + 3);
+  const postUrls = allPostUrls.slice(startIndex, startIndex + PROFILE_FALLBACK_GRID_POSTS);
 
-  const [profilePic, post1, post2, post3] = await Promise.all([
-    fetchAsDataUrl(profilePicUrl),
-    fetchAsDataUrl(postUrls[0]),
-    fetchAsDataUrl(postUrls[1]),
-    fetchAsDataUrl(postUrls[2]),
-  ]);
+  const profilePic = await fetchAsDataUrl(profilePicUrl);
+  const postDataUrls = await Promise.all(postUrls.map((u) => fetchAsDataUrl(u)));
   console.info("[IG_DEBUG][instagram-profile-snapshot] Assets resolvidos.", {
     hasProfilePic: Boolean(profilePic),
     postUrlsCount: postUrls.length,
-    renderedPostsCount: [post1, post2, post3].filter(Boolean).length,
+    renderedPostsCount: postDataUrls.filter(Boolean).length,
   });
 
   const hasAnyVisualData =
     Boolean(profilePic) ||
-    [post1, post2, post3].some(Boolean) ||
+    postDataUrls.some(Boolean) ||
     Boolean(bio) ||
     typeof followers === "number" ||
     typeof posts === "number" ||
@@ -363,7 +362,9 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  const postImages = [post1, post2, post3];
+  const postSlotCount = PROFILE_FALLBACK_GRID_POSTS;
+  const paddedPostImages: (string | undefined)[] = [...postDataUrls];
+  while (paddedPostImages.length < postSlotCount) paddedPostImages.push(undefined);
 
   if (variant === "feed") {
     const image = new ImageResponse(
@@ -372,7 +373,7 @@ export async function GET(req: NextRequest) {
           style={{
             display: "flex",
             width: "1200px",
-            height: "900px",
+            height: "1780px",
             background: "#0f1115",
             color: "#ffffff",
             padding: "36px",
@@ -404,34 +405,44 @@ export async function GET(req: NextRequest) {
             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
               <div style={{ fontSize: "28px", fontWeight: 700 }}>{handle}</div>
               <div style={{ fontSize: "18px", color: "#a7acb8" }}>
-                {`Feed a partir do ${start}º post`}
+                {`Feed a partir do ${start}º post (até ${postSlotCount} miniaturas)`}
               </div>
             </div>
           </div>
 
-          <div style={{ display: "flex", width: "100%", gap: "18px", flex: 1 }}>
-            {postImages.map((image, index) => (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "row",
+              flexWrap: "wrap",
+              width: "100%",
+              gap: "12px",
+              alignContent: "flex-start",
+            }}
+          >
+            {paddedPostImages.slice(0, postSlotCount).map((cell, index) => (
               <div
                 key={`feed-post-${index}`}
                 style={{
                   display: "flex",
-                  flex: 1,
+                  width: "372px",
+                  height: "372px",
                   background: "#171a20",
                   border: "1px solid rgba(255,255,255,0.08)",
-                  borderRadius: "18px",
+                  borderRadius: "14px",
                   overflow: "hidden",
                   alignItems: "center",
                   justifyContent: "center",
                 }}
               >
-                {image ? (
+                {cell ? (
                   <img
-                    src={image}
+                    src={cell}
                     alt={`Post ${start + index}`}
                     style={{ objectFit: "cover", width: "100%", height: "100%" }}
                   />
                 ) : (
-                  <div style={{ color: "#7f8694", fontSize: "24px" }}>Post indisponível</div>
+                  <div style={{ color: "#7f8694", fontSize: "18px" }}>—</div>
                 )}
               </div>
             ))}
@@ -440,7 +451,7 @@ export async function GET(req: NextRequest) {
       ),
       {
         width: 1200,
-        height: 900,
+        height: 1780,
       }
     );
     const payload = Buffer.from(await image.arrayBuffer());
@@ -460,7 +471,7 @@ export async function GET(req: NextRequest) {
         style={{
           display: "flex",
           width: "1200px",
-          height: "900px",
+          height: "1780px",
           background: "#0f1115",
           color: "#ffffff",
           padding: "42px",
@@ -541,34 +552,37 @@ export async function GET(req: NextRequest) {
         <div
           style={{
             display: "flex",
+            flexDirection: "row",
+            flexWrap: "wrap",
             width: "100%",
-            gap: "18px",
-            marginTop: "30px",
+            gap: "12px",
+            marginTop: "24px",
+            alignContent: "flex-start",
           }}
         >
-          {postImages.map((image, index) => (
+          {paddedPostImages.slice(0, postSlotCount).map((cell, index) => (
             <div
               key={`post-${index}`}
               style={{
                 display: "flex",
-                flex: 1,
-                height: "520px",
+                width: "352px",
+                height: "352px",
                 background: "#171a20",
                 border: "1px solid rgba(255,255,255,0.08)",
-                borderRadius: "18px",
+                borderRadius: "14px",
                 overflow: "hidden",
                 alignItems: "center",
                 justifyContent: "center",
               }}
             >
-              {image ? (
+              {cell ? (
                 <img
-                  src={image}
+                  src={cell}
                   alt={`Post ${index + 1}`}
                   style={{ objectFit: "cover", width: "100%", height: "100%" }}
                 />
               ) : (
-                <div style={{ color: "#7f8694", fontSize: "24px" }}>Post indisponível</div>
+                <div style={{ color: "#7f8694", fontSize: "18px" }}>—</div>
               )}
             </div>
           ))}
@@ -577,7 +591,7 @@ export async function GET(req: NextRequest) {
     ),
     {
       width: 1200,
-      height: 900,
+      height: 1780,
     }
   );
   const payload = Buffer.from(await image.arrayBuffer());

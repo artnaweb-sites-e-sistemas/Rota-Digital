@@ -353,6 +353,33 @@ async function waitForInstagramHighlights(page: Page): Promise<void> {
   ).catch(() => undefined);
 }
 
+/** Instagram carrega o grid com lazy-load; precisamos rolar para aparecer ~12 posts no print. */
+async function scrollInstagramProfileGrid(page: Page, minPostLinks = 12): Promise<void> {
+  const countPostLinks = () =>
+    page.evaluate(() => {
+      const main = document.querySelector("main");
+      const root = main || document.body;
+      return root.querySelectorAll('a[href*="/p/"], a[href*="/reel/"]').length;
+    });
+
+  let last = 0;
+  for (let step = 0; step < 14; step += 1) {
+    const n = await countPostLinks();
+    if (n >= minPostLinks) break;
+    if (n === last && step > 4) break;
+    last = n;
+    await page.mouse.wheel(0, 720);
+    await page.waitForTimeout(450);
+  }
+
+  await page.evaluate(() => {
+    const main = document.querySelector("main");
+    if (main) main.scrollTop = main.scrollHeight;
+    else window.scrollTo(0, document.documentElement.scrollHeight);
+  });
+  await page.waitForTimeout(800);
+}
+
 async function captureWithPersistentChrome(handle: string): Promise<PlaywrightInstagramCaptureResult | null> {
   const config = getChromeProfileConfig();
   if (!config) return null;
@@ -407,6 +434,7 @@ async function captureWithPersistentChrome(handle: string): Promise<PlaywrightIn
     await page.waitForTimeout(1000);
 
     await dismissInstagramOverlays(page);
+    await scrollInstagramProfileGrid(page, 12);
 
     const html = await page.content();
     const profile = buildProfileFromHtml(html);
@@ -420,6 +448,7 @@ async function captureWithPersistentChrome(handle: string): Promise<PlaywrightIn
       await waitForInstagramProfileToRender(page, handle);
       await waitForInstagramHighlights(page);
       await dismissInstagramOverlays(page);
+      await scrollInstagramProfileGrid(page, 12);
       await page.waitForTimeout(1000);
       const retryShot = await page.screenshot({ type: "jpeg", quality: 78, fullPage: true });
       const retryBuf = Buffer.from(retryShot);
@@ -534,6 +563,7 @@ async function captureWithCookieContext(handle: string): Promise<PlaywrightInsta
     await page.waitForTimeout(1000);
 
     await dismissInstagramOverlays(page);
+    await scrollInstagramProfileGrid(page, 12);
 
     const html = await page.content();
     const profile = buildProfileFromHtml(html);
@@ -547,6 +577,7 @@ async function captureWithCookieContext(handle: string): Promise<PlaywrightInsta
       await waitForInstagramProfileToRender(page, handle);
       await waitForInstagramHighlights(page);
       await dismissInstagramOverlays(page);
+      await scrollInstagramProfileGrid(page, 12);
       await page.waitForTimeout(1000);
       const retryShot = await page.screenshot({ type: "jpeg", quality: 78, fullPage: true });
       const retryBuf = Buffer.from(retryShot);

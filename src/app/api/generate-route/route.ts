@@ -348,7 +348,8 @@ async function downloadFirstAvailableImagePart(
 }
 
 async function downloadImageAsInlinePart(
-  imageUrl?: string
+  imageUrl?: string,
+  timeoutMsOverride?: number
 ): Promise<GeminiInlineImagePart | undefined> {
   if (!imageUrl) return undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -356,7 +357,14 @@ async function downloadImageAsInlinePart(
     const ctrl = new AbortController();
     const isInstagramSnapshot = imageUrl.includes("/api/instagram-profile-snapshot");
     const isInternalApi = imageUrl.includes("/api/");
-    const timeoutMs = isInstagramSnapshot ? 35000 : (isInternalApi ? 18000 : 10000);
+    const timeoutMs =
+      typeof timeoutMsOverride === "number"
+        ? timeoutMsOverride
+        : isInstagramSnapshot
+          ? 35000
+          : isInternalApi
+            ? 18000
+            : 10000;
     timer = setTimeout(() => ctrl.abort(), timeoutMs);
     const res = await fetch(imageUrl, {
       method: "GET",
@@ -1625,13 +1633,28 @@ export async function POST(req: NextRequest) {
       downloadFirstAvailableImagePart(requestOrigin, prepared.instagramSnapshotCandidates),
       downloadFirstAvailableImagePart(requestOrigin, prepared.bioLinkCandidateUrls),
     ]);
-    const { part: websiteImagePart, selectedUrl: selectedWebsiteSnapshotUrl } = websiteDownload;
-    const { part: instagramImagePart, selectedUrl: selectedInstagramSnapshotUrl } = instagramDownload;
+    let { part: websiteImagePart, selectedUrl: selectedWebsiteSnapshotUrl } = websiteDownload;
+    let { part: instagramImagePart, selectedUrl: selectedInstagramSnapshotUrl } = instagramDownload;
     const { part: instagramBioLinkImagePart, selectedUrl: selectedBioLinkSnapshotUrl } = bioLinkDownload;
 
     if (selectedWebsiteSnapshotUrl) siteHeroSnapshotUrl = selectedWebsiteSnapshotUrl;
     if (selectedInstagramSnapshotUrl) instagramSnapshotUrl = selectedInstagramSnapshotUrl;
     if (selectedBioLinkSnapshotUrl) instagramBioLinkSnapshotUrl = selectedBioLinkSnapshotUrl;
+
+    if (!instagramImagePart && selectedInstagramSnapshotUrl) {
+      const abs = toAbsoluteUrl(requestOrigin, selectedInstagramSnapshotUrl);
+      if (abs) {
+        const retry = await downloadImageAsInlinePart(abs, 60000);
+        if (retry) instagramImagePart = retry;
+      }
+    }
+    if (!websiteImagePart && selectedWebsiteSnapshotUrl) {
+      const abs = toAbsoluteUrl(requestOrigin, selectedWebsiteSnapshotUrl);
+      if (abs) {
+        const retry = await downloadImageAsInlinePart(abs, 45000);
+        if (retry) websiteImagePart = retry;
+      }
+    }
     console.info("[IG_DEBUG][generate-route] URLs de evidência selecionadas.", {
       hasBrowserless,
       siteHeroSnapshotUrl: siteHeroSnapshotUrl || null,
@@ -1815,14 +1838,27 @@ export async function POST(req: NextRequest) {
             : "Captura usada na análise de posicionamento e conversão do site."),
       };
     });
+    const hasInstagramCapture =
+      Boolean(instagramImagePart) || Boolean(selectedInstagramSnapshotUrl);
+    const hasWebsiteCapture =
+      Boolean(websiteImagePart) || Boolean(selectedWebsiteSnapshotUrl);
+
+    const topicKeyForGate = (raw: string) =>
+      raw
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+
     const gatedDiagnosticScores = enrichedDiagnosticScores.map((item) => {
       const topic = item.topic.toLowerCase();
-      const isInstagramTopic =
-        topic.includes("instagram") ||
-        topic.includes("rede") ||
-        topic.includes("consistência");
+      const topicAscii = topicKeyForGate(item.topic);
+      const isCrossChannelConsistency =
+        topicAscii.includes("consistencia") && topicAscii.includes("comunicacao");
+      const isInstagramOnlyTopic =
+        (topic.includes("instagram") || topic.includes("rede")) &&
+        !isCrossChannelConsistency;
       const isWebsiteTopic = topic.includes("site") || topic.includes("website");
-      if (isInstagramTopic && !instagramImagePart) {
+      if (isInstagramOnlyTopic && !hasInstagramCapture) {
         return {
           ...item,
           score: Math.min(item.score, 3),
@@ -1832,7 +1868,7 @@ export async function POST(req: NextRequest) {
           evidenceNote: "Sem captura visual real de Instagram nesta execução.",
         };
       }
-      if (isWebsiteTopic && !websiteImagePart) {
+      if (isWebsiteTopic && !hasWebsiteCapture) {
         return {
           ...item,
           score: Math.min(item.score, 3),
