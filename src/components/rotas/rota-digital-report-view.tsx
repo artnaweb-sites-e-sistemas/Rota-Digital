@@ -82,6 +82,24 @@ const PRIORITY_FRAME_BORDER: Record<string, string> = {
   Baixa: "border-green-500/35",
 };
 
+/** Rótulo do badge de prioridade nos cards de canal. */
+function channelPriorityBadgeLabel(priority: string): string {
+  if (priority === "Alta") return "Prioridade alta";
+  if (priority === "Média") return "Prioridade média";
+  if (priority === "Baixa") return "Prioridade baixa";
+  return `Prioridade ${priority}`;
+}
+
+/** Caixa do ícone nas ações do card de canal — harmoniza com a prioridade. */
+const CHANNEL_ACTION_ICON_SHELL: Record<string, string> = {
+  Alta:
+    "border-red-500/35 bg-red-500/10 text-red-700 ring-red-500/25 dark:text-red-400 dark:ring-red-500/20",
+  Média:
+    "border-amber-500/35 bg-amber-500/12 text-amber-950 ring-amber-500/25 dark:text-amber-400 dark:ring-amber-500/20",
+  Baixa:
+    "border-emerald-500/35 bg-emerald-500/10 text-emerald-900 ring-emerald-500/25 dark:text-emerald-400 dark:ring-emerald-500/20",
+};
+
 /** Mesmo visual da pill “WEBSITE” / “Instagram” nas evidências — rótulo em caixa alta (sutil). */
 const TOPIC_PILL_CLASS =
   "inline-flex max-w-full items-center gap-1.5 rounded-full border border-border bg-muted px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide leading-none text-foreground/82 dark:text-muted-foreground";
@@ -1120,19 +1138,26 @@ function ChannelCard({ channel }: { channel: DigitalChannel }) {
             </span>
           </h4>
           <Badge className={`text-xs shrink-0 ${PRIORITY_COLORS[channel.priority] || PRIORITY_COLORS.Média}`}>
-            {channel.priority}
+            {channelPriorityBadgeLabel(channel.priority)}
           </Badge>
         </div>
         <ReportProseBlocks text={channel.description} size="sm" sentencesPerBlock={1} />
         {channel.actions.length > 0 && (
-          <ul className="space-y-2">
+          <ul className="space-y-2.5">
             {channel.actions.map((action, i) => (
-              <li key={i} className="flex items-start gap-2 text-[13px] leading-relaxed text-foreground/90">
-                <ArrowRight
-                  size={14}
-                  className="mt-1 shrink-0 text-[color:var(--rota-brand-lilac)]"
-                />
-                {action}
+              <li key={i} className="flex items-start gap-3 text-[13px] leading-relaxed">
+                <div
+                  className={cn(
+                    "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border ring-1",
+                    CHANNEL_ACTION_ICON_SHELL[channel.priority] || CHANNEL_ACTION_ICON_SHELL.Média,
+                  )}
+                  aria-hidden
+                >
+                  <ArrowRight size={13} className="shrink-0 opacity-95" strokeWidth={2.25} />
+                </div>
+                <span className="min-w-0 flex-1 text-muted-foreground dark:text-zinc-300">
+                  {action}
+                </span>
               </li>
             ))}
           </ul>
@@ -1843,7 +1868,7 @@ export function RotaDigitalReportView({
                       PRIORITY_COLORS[ch.priority] || PRIORITY_COLORS.Média,
                     )}
                   >
-                    {ch.priority}
+                    {channelPriorityBadgeLabel(ch.priority)}
                   </Badge>
                 </div>
               ))}
