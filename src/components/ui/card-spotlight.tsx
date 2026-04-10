@@ -2,6 +2,7 @@
 
 import {
   useCallback,
+  useEffect,
   useRef,
   useState,
   type ComponentProps,
@@ -13,20 +14,37 @@ type CardSpotlightProps = ComponentProps<"div">;
 
 export function CardSpotlight({ className, children, ...props }: CardSpotlightProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const moveRafRef = useRef<number | null>(null);
+  const pendingRef = useRef({ x: 0, y: 0 });
   const [spotlight, setSpotlight] = useState({ x: 0, y: 0, active: false });
+
+  useEffect(() => {
+    return () => {
+      if (moveRafRef.current != null) cancelAnimationFrame(moveRafRef.current);
+    };
+  }, []);
 
   const handleMove = useCallback((e: MouseEvent<HTMLDivElement>) => {
     const el = ref.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
-    setSpotlight({
+    pendingRef.current = {
       x: e.clientX - r.left,
       y: e.clientY - r.top,
-      active: true,
+    };
+    if (moveRafRef.current != null) return;
+    moveRafRef.current = requestAnimationFrame(() => {
+      moveRafRef.current = null;
+      const p = pendingRef.current;
+      setSpotlight({ x: p.x, y: p.y, active: true });
     });
   }, []);
 
   const handleLeave = useCallback(() => {
+    if (moveRafRef.current != null) {
+      cancelAnimationFrame(moveRafRef.current);
+      moveRafRef.current = null;
+    }
     setSpotlight((s) => ({ ...s, active: false }));
   }, []);
 

@@ -266,7 +266,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         </aside>
       ) : null}
 
-      <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-clip bg-background dark:bg-zinc-950">
+      <main className="min-h-0 min-w-0 flex-1 touch-pan-y overflow-y-auto overflow-x-clip overscroll-y-contain bg-background dark:bg-zinc-950">
         <div className="mx-auto w-full min-h-0 min-w-0 max-w-[1760px] px-6 py-10 sm:px-10 md:px-12">
           {children}
         </div>

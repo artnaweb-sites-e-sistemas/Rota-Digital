@@ -19,6 +19,7 @@ import {
   sanitizeAiServiceOfferingIds,
 } from "@/lib/ai-agency-services";
 import { getUserAiPromptSettingsAdmin } from "@/lib/user-settings-admin";
+import { buildReportCopyVoicePromptSection } from "@/lib/report-copy-voice-prompt";
 
 type GeminiUsageMetadata = {
   promptTokenCount?: number;
@@ -122,10 +123,9 @@ export async function POST(req: NextRequest) {
 
     const prompt = `Você vai reanalisar e ajustar um relatório já existente.
 
-${channelsPolicyBlock}${servicesFocusBlock}${scoringStrictnessBlock}Regra principal de escrita:
-- Use linguagem simples, direta e fácil de entender.
-- Evite termos técnicos complexos.
-- Se usar termo técnico, explique em uma frase curta.
+${channelsPolicyBlock}${servicesFocusBlock}${scoringStrictnessBlock}${buildReportCopyVoicePromptSection()}
+Regra principal de escrita:
+- Use linguagem simples, direta e fácil de entender; cumpra o bloco **Voz do relatório** em todos os textos atualizados.
 - Se website/instagram estiver vazio, quebrado ou genérico, declare isso claramente e ajuste a nota.
 - Escreva como alguém explicando o cenário para um cliente comum, não como um consultor tentando impressionar.
 - Evite tom excessivamente analítico, acadêmico ou cheio de jargão.
@@ -136,7 +136,7 @@ ${channelsPolicyBlock}${servicesFocusBlock}${scoringStrictnessBlock}Regra princi
 - Se o destino final do link da bio for WhatsApp, diga isso claramente e não invente Linktree com várias opções.
 
 Tom por campo:
-- "executiveSummary": 1 parágrafo curto, claro e humano, explicando o motivo da nota.
+- "executiveSummary": **um único parágrafo corrido** (sem \\n\\n). **Meta: no máximo ~420 caracteres**, 2 a 4 frases: motivo da nota de maturidade de forma objetiva; não repita strengths/diagnosticScores nem liste todos os canais.
 - "companyProfile": texto curto, direto e fácil de entender.
 - "strengths", "weaknesses", "opportunities", "quickWins", "longTermActions", "nextSteps": itens curtos e objetivos.
 - "recommendedChannels.description": explique de forma comercial simples por que o canal faz sentido.
@@ -156,7 +156,7 @@ ${JSON.stringify(report, null, 2)}
 
 Retorne SOMENTE um JSON válido com os campos atualizados:
 {
-  "executiveSummary": "string - 1 parágrafo com motivo da nota",
+  "executiveSummary": "string — 1 parágrafo corrido, sem \\n\\n; preferencialmente ≤420 caracteres",
   "companyProfile": "string",
   "digitalMaturityLevel": "Iniciante" | "Intermediário" | "Avançado",
   "digitalMaturityScore": number (0 a 10),

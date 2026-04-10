@@ -17,6 +17,11 @@ export interface BorderGlowProps {
   className?: string;
   /** Padding interno (px) entre o brilho na borda e o conteúdo; com card opaco cheio ajuda o efeito aparecer. */
   contentInset?: number;
+  /**
+   * Quando false (padrão), o conteúdo não cria scroll interno — o scroll fica só no `main`,
+   * o que evita “travamentos” com vários cards no relatório. Use true só se precisar de área rolável dentro do glow.
+   */
+  contentScrollable?: boolean;
   edgeSensitivity?: number;
   glowColor?: string;
   backgroundColor?: string;
@@ -123,6 +128,7 @@ const BorderGlow: FC<BorderGlowProps> = ({
   children,
   className = "",
   contentInset = 2,
+  contentScrollable = false,
   edgeSensitivity = 30,
   glowColor = "40 80 80",
   backgroundColor = "#060010",
@@ -135,10 +141,28 @@ const BorderGlow: FC<BorderGlowProps> = ({
   fillOpacity = 0.5,
 }) => {
   const cardRef = useRef<HTMLDivElement>(null);
+  const pointerRafRef = useRef<number | null>(null);
+  const pointerPendingRef = useRef<{ el: HTMLElement; x: number; y: number } | null>(null);
+  const [finePointer, setFinePointer] = useState(true);
   const [isHovered, setIsHovered] = useState(false);
   const [cursorAngle, setCursorAngle] = useState(45);
   const [edgeProximity, setEdgeProximity] = useState(0);
   const [sweepActive, setSweepActive] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(hover: hover) and (pointer: fine)");
+    const sync = () => setFinePointer(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (pointerRafRef.current != null) cancelAnimationFrame(pointerRafRef.current);
+    };
+  }, []);
 
   const getCenterOfElement = useCallback((el: HTMLElement) => {
     const { width, height } = el.getBoundingClientRect();
@@ -173,18 +197,37 @@ const BorderGlow: FC<BorderGlowProps> = ({
     [getCenterOfElement],
   );
 
+  const flushPointerFrame = useCallback(() => {
+    pointerRafRef.current = null;
+    const pending = pointerPendingRef.current;
+    if (!pending) return;
+    setEdgeProximity(getEdgeProximity(pending.el, pending.x, pending.y));
+    setCursorAngle(getCursorAngle(pending.el, pending.x, pending.y));
+  }, [getEdgeProximity, getCursorAngle]);
+
   const handlePointerMove = useCallback(
     (e: PointerEvent<HTMLDivElement>) => {
       const card = cardRef.current;
       if (!card) return;
       const rect = card.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      setEdgeProximity(getEdgeProximity(card, x, y));
-      setCursorAngle(getCursorAngle(card, x, y));
+      pointerPendingRef.current = {
+        el: card,
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+      };
+      if (pointerRafRef.current != null) return;
+      pointerRafRef.current = requestAnimationFrame(flushPointerFrame);
     },
-    [getEdgeProximity, getCursorAngle],
+    [flushPointerFrame],
   );
+
+  const cancelPointerFrame = useCallback(() => {
+    if (pointerRafRef.current != null) {
+      cancelAnimationFrame(pointerRafRef.current);
+      pointerRafRef.current = null;
+    }
+    pointerPendingRef.current = null;
+  }, []);
 
   useEffect(() => {
     if (!animated) return;
@@ -330,7 +373,10 @@ const BorderGlow: FC<BorderGlowProps> = ({
         style={{ padding: contentInset }}
       >
         <div
-          className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto"
+          className={cn(
+            "flex min-h-0 min-w-0 flex-1 flex-col",
+            contentScrollable ? "overflow-auto" : "overflow-visible",
+          )}
           style={{ borderRadius: `${innerRadius}px` }}
         >
           {children}

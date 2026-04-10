@@ -25,6 +25,7 @@ import {
   buildScoringStrictnessPromptSection,
   sanitizeAiScoringStrictness,
 } from "@/lib/ai-scoring-strictness-prompt";
+import { buildReportCopyVoicePromptSection } from "@/lib/report-copy-voice-prompt";
 import {
   buildInstagramRequestHeaders,
   fetchInstagramPublicPage,
@@ -1584,10 +1585,11 @@ ${aiGuidelinesBlock}${channelsPolicyBlock}${servicesFocusBlock}${scoringStrictne
   }
 
 **Tarefas**
-0) Escreva em linguagem simples, direta e humana. Frases curtas. Evite linguagem formal/corporativa exagerada.
+${buildReportCopyVoicePromptSection()}
+0) Escreva em linguagem simples, direta e humana. Frases curtas. Evite linguagem formal/corporativa exagerada. Siga o bloco **Voz do relatório** acima em todos os campos de texto do JSON (e no HTML da proposta).
 0.0) Não use markdown no texto (sem **negrito**, sem listas com *), apenas texto limpo.
-0.1) Se serviços ou objetivo não vierem preenchidos pelo usuário, deduza com base nas evidências (site, Instagram, pesquisa). Em "companyProfile" ou "executiveSummary", indique brevemente o que foi inferido versus o que foi observado diretamente.
-0.2) Escreva como um especialista explicando para um cliente comum. O texto precisa ser fácil de ler, claro e natural.
+0.1) Se serviços ou objetivo não vierem preenchidos pelo usuário, deduza com base nas evidências (site, Instagram, pesquisa). Em "companyProfile", indique brevemente o que foi inferido versus o que foi observado diretamente. Não use o "executiveSummary" para listar inferências longas — ele deve ser curto (veja regra de "executiveSummary" abaixo).
+0.2) Escreva como alguém explicando com clareza para um cliente comum — tom profissional acolhedor, sem jargão nem “voz de agência”.
 0.3) Evite tom excessivamente analítico, professoral ou "consultoria engessada". Não use frases infladas como "presença digital robusta", "sinergia entre canais", "alavancar resultados", "ecossistema digital" ou parecidas.
 0.4) Prefira frases concretas, como: "o perfil passa confiança", "a proposta está clara", "faltam provas visuais", "o CTA pode ficar mais forte".
 0.5) Não repita a mesma ideia em campos diferentes. Cada campo deve acrescentar algo novo.
@@ -1605,16 +1607,17 @@ ${aiGuidelinesBlock}${channelsPolicyBlock}${servicesFocusBlock}${scoringStrictne
 1.11) Se algum desses itens específicos não estiver legível na captura, escreva "não legível na captura" apenas para aquele item — não descarte a análise inteira por causa de um overlay parcial.
 1.12) Para Instagram, priorize SEMPRE a CAPTURA 2 como fonte principal. Somente diga "não foi possível analisar visualmente" se a CAPTURA 2 não foi fornecida OU se a imagem estiver totalmente ilegível (completamente preta/branca sem qualquer conteúdo visível).
 1.13) NUNCA diga que a captura mostra "tela de login" se houver conteúdo de perfil visível (foto, bio, posts). Um overlay de login por cima de conteúdo de perfil NÃO invalida a análise — extraia o que for possível.
-1.14) Quando a "Captura visual do destino do link da bio" estiver disponível (CAPTURA 3), use essa imagem para avaliar a experiência pós-clique: clareza da proposta, consistência com o Instagram, fricção e CTA da página de destino.
+1.14) Quando a "Captura visual do destino do link da bio" estiver disponível (CAPTURA 3), use essa imagem para avaliar a experiência pós-clique: clareza da proposta, consistência com o Instagram, facilidade de uso e convites para contato na página de destino.
 2) Avalie pontos com nota 0-10: posicionamento, identidade visual, clareza da proposta, consistência da comunicação, funil/CTA, presença digital geral.
 2.1) Em cada item de "diagnosticScores", se a nota for menor que 10, diga sempre o que falta para chegar a 10/10. Seja específico.
 2.2) Nunca use frases vagas como "há espaço para melhorar" ou "há espaço para otimizações técnicas" sem explicar exatamente o que deve ser ajustado.
 2.3) Em "Identidade Visual", analise harmonia visual, paleta, contraste, hierarquia, espaçamento, alinhamento, legibilidade e coerência entre site e Instagram.
 3) Faça comentários práticos e acionáveis.
-4) Em "proposalPageHtml", gere HTML5 completo e elegante (CSS no <style>), em português, voltado ao cliente final (${body.company}), com proposta comercial convincente, próximos passos claros e CTA para fechamento. Não inclua <script>. 
+4) Em "proposalPageHtml", gere HTML5 completo e elegante (CSS no <style>), em português, voltado ao cliente final (${body.company}), com proposta comercial convincente, próximos passos claros e convite claro para fechar (contato ou próximo passo). Não inclua <script>.
+4.1) No texto visível de "proposalPageHtml" (títulos, parágrafos, botões), aplique a **Voz do relatório**: linguagem natural, sem siglas nem jargão de agência.
 
 **Tom obrigatório por campo**
-- "executiveSummary": 1 parágrafo, tom humano, claro e objetivo. Explique o motivo da nota sem soar acadêmico.
+- "executiveSummary": **um único parágrafo corrido** (proibido usar \\n\\n ou quebrar em blocos como vários parágrafos). **Meta: no máximo ~420 caracteres** (com espaços), em **2 a 4 frases curtas**: (1) uma leitura objetiva do que a empresa já mostra no digital e (2) por que a nota de maturidade faz sentido. **Não** repita listas de canais, forças ou tópicos do diagnóstico — isso vai em outros campos. Tom humano, direto, não acadêmico.
 - "companyProfile": texto curto e claro sobre o que a empresa aparenta vender, para quem e com qual proposta.
 - "strengths", "weaknesses", "opportunities", "quickWins", "longTermActions", "nextSteps": itens curtos, diretos e fáceis de entender. Evite frases longas.
 - "recommendedChannels.description": explique em linguagem comercial simples por que aquele canal faz sentido.
@@ -1660,7 +1663,7 @@ REGRA DE OURO: na dúvida entre afirmar algo e dizer "não verificado", SEMPRE d
 Responda **somente** com um único objeto JSON válido (sem markdown fora do JSON), com esta estrutura:
 
 {
-  "executiveSummary": "string",
+  "executiveSummary": "string — 1 parágrafo corrido, sem \\n\\n; preferencialmente ≤420 caracteres",
   "companyProfile": "string",
   "digitalMaturityLevel": "Iniciante" | "Intermediário" | "Avançado",
   "digitalMaturityScore": number (0 a 10, usar casa decimal se necessário),
@@ -1689,7 +1692,7 @@ Responda **somente** com um único objeto JSON válido (sem markdown fora do JSO
   "proposalPageHtml": "string — HTML completo do documento"
 }
 
-No executiveSummary, explique claramente o motivo da nota de maturidade digital em 1 parágrafo único.
+No executiveSummary: um único parágrafo corrido, **sem** quebras duplas (\\n\\n), preferencialmente até ~420 caracteres. Motivo da nota de maturidade em poucas frases, **sem** reenumerar o diagnóstico completo.
 Seja específico para "${body.company}".`;
 }
 

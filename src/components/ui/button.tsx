@@ -20,6 +20,9 @@ const buttonVariants = cva(
         link: "text-primary underline-offset-4 hover:underline",
         /** Ação principal (contraste alto no tema escuro); use com `<Link>` via LinkButton */
         cta: "bg-indigo-600 text-white shadow-sm hover:bg-indigo-500 focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+        /** CTA com gradiente animado (relatório Rota Digital, alinhado ao botão Reanalise) */
+        ctaMotion:
+          "border-none bg-gradient-to-r from-violet-600 via-indigo-500 to-cyan-500 bg-[length:200%_100%] animate-[gradient-move_3s_ease_infinite] text-white shadow-lg transition hover:brightness-110 focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
       },
       size: {
         default:

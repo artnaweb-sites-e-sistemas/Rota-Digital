@@ -54,6 +54,7 @@ import {
   MessageSquare,
   Tag,
   ClipboardList,
+  FileText,
   Images,
   type LucideIcon,
 } from "lucide-react";
@@ -128,6 +129,15 @@ function InstagramBrandGlyph(props: SVGProps<SVGSVGElement>) {
  * Casco dos blocos principais: só padding vertical extra no Card (sem -mx / calc — isso “comia” a margem lateral).
  */
 const ROTA_REPORT_CARD_BOX = "py-6 sm:py-7";
+
+/**
+ * Capturas full-page no quadro: em repouso mostra o **topo** da página (início do screenshot).
+ * Ao passar o mouse, o pan desce até o fim (`EvidenceImage` + hoverScroll).
+ */
+const FULL_PAGE_SNAPSHOT_IDLE_FROM_TOP_RATIO = 0;
+
+/** Só no card Posicionamento (grid site + Instagram): repouso no meio do pan vertical. Clareza da proposta = topo. */
+const POSICIONAMENTO_COMBINED_SNAPSHOT_IDLE_CENTER_RATIO = 0.5;
 
 /** Linha de apoio sob o título do card (tom e escala iguais no relatório). */
 const ROTA_CARD_SUBTITLE =
@@ -211,6 +221,20 @@ function mergeOrphanExplicitParagraphs(parts: string[]): string[] {
   return out;
 }
 
+/** Um único parágrafo corrido (ex.: resumo executivo), sem vários `<p>` por frase. */
+function collapseProseToSingleParagraph(raw: string | undefined): string {
+  if (!raw?.trim()) return "";
+  let normalized = raw.replace(/\r\n/g, "\n").trim();
+  normalized = applyReadingHeuristics(normalized);
+  const explicitParts = mergeOrphanExplicitParagraphs(
+    normalized
+      .split(/\n{2,}/)
+      .map((p) => p.replace(/\s+/g, " ").trim())
+      .filter(Boolean),
+  );
+  return explicitParts.join(" ").replace(/\s+/g, " ").trim();
+}
+
 /**
  * Divide texto longo da IA em blocos curtos (1–2 frases) para leitura mais fluida.
  * Respeita parágrafos explícitos (`\\n\\n`) vindos do modelo.
@@ -246,21 +270,43 @@ function ReportProseBlocks({
   sentencesPerBlock = 2,
   size = "md",
   firstProminent = true,
+  collapseToOneParagraph = false,
 }: {
   text?: string;
   sentencesPerBlock?: 1 | 2;
   size?: "sm" | "md" | "lg";
   /** Se true, o primeiro bloco fica com contraste cheio; os seguintes levemente suavizados. */
   firstProminent?: boolean;
+  /** Um único `<p>` (ex.: resumo executivo), sem partir uma frase por parágrafo. */
+  collapseToOneParagraph?: boolean;
 }) {
-  const blocks = splitIntoReadableBlocks(text, sentencesPerBlock);
-  if (blocks.length === 0) return null;
   const sizeClass =
     size === "lg"
       ? "text-[15px] leading-[1.72]"
       : size === "sm"
         ? "text-[13.5px] leading-[1.68]"
         : "text-[14px] sm:text-[14.5px] leading-[1.7]";
+
+  if (collapseToOneParagraph) {
+    const single = collapseProseToSingleParagraph(text);
+    if (!single) return null;
+    return (
+      <div className="space-y-3.5">
+        <p
+          className={cn(
+            sizeClass,
+            "text-pretty antialiased [overflow-wrap:anywhere]",
+            "text-foreground",
+          )}
+        >
+          {single}
+        </p>
+      </div>
+    );
+  }
+
+  const blocks = splitIntoReadableBlocks(text, sentencesPerBlock);
+  if (blocks.length === 0) return null;
   return (
     <div className="space-y-3.5">
       {blocks.map((block, i) => (
@@ -713,6 +759,14 @@ function EvidenceImage({
     );
   }
 
+  /** Com hover: do topo ou do meio → desce até o fim; se o repouso já está no rodapé (funil/CTA) → sobe para o topo. */
+  const hoverPanTranslateY =
+    hovered && scrollOffset > 0
+      ? restOffset >= scrollOffset * 0.72
+        ? 0
+        : scrollOffset
+      : restOffset;
+
   if (fitContain) {
     if (fitContainMode === "cover") {
       if (hoverScroll) {
@@ -728,18 +782,15 @@ function EvidenceImage({
               ref={imageRef}
               src={resolvedSrc}
               alt={alt}
-              className={`absolute left-0 right-0 top-0 block h-auto min-h-full w-full object-cover object-top ${className || ""}`}
+              className={`absolute left-0 right-0 top-0 block h-auto min-h-full w-full object-cover ${className || ""}`}
               onError={() => setFailed(true)}
               onLoad={recalcScroll}
               style={{
                 objectFit: "cover",
-                objectPosition: "top center",
-                transform: `translateY(-${
-                  hovered && scrollOffset > 0
-                    ? (restOffset > 0 ? 0 : scrollOffset)
-                    : restOffset
-                }px)`,
-                transition: `transform ${transitionMs}ms ease-in-out`,
+                objectPosition: "center top",
+                transform: `translateY(-${hoverPanTranslateY}px)`,
+                // Pan longo só com o mouse em cima; em repouso não “anima” sozinho.
+                transition: hovered ? `transform ${transitionMs}ms ease-in-out` : "none",
                 willChange: "transform",
               }}
             />
@@ -764,7 +815,7 @@ function EvidenceImage({
             style={{
               minHeight: "auto",
               objectFit: "cover",
-              objectPosition: "top center",
+              objectPosition: "center top",
             }}
           />
         </div>
@@ -860,10 +911,6 @@ function isFunilOrCtaDiagnosticTopic(topicLower: string): boolean {
   );
 }
 
-function isPresencaDigitalGeralTopic(topic: string): boolean {
-  return normalizeTopicKey(topic).includes("presenca digital geral");
-}
-
 function isConsistenciaComunicacaoTopic(topic: string): boolean {
   const k = normalizeTopicKey(topic);
   return k.includes("consistencia") && k.includes("comunicacao");
@@ -951,6 +998,10 @@ function TopicEvidence({
     Boolean(instagramSrc);
 
   if (isCombinedTopic) {
+    const combinedGridIdleRatio = topic.includes("clareza da proposta")
+      ? FULL_PAGE_SNAPSHOT_IDLE_FROM_TOP_RATIO
+      : POSICIONAMENTO_COMBINED_SNAPSHOT_IDLE_CENTER_RATIO;
+
     return (
       <div className="grid h-56 w-full grid-cols-2 gap-2">
         <EvidenceImage
@@ -959,7 +1010,7 @@ function TopicEvidence({
           fitContain
           fitContainMode="cover"
           hoverScroll
-          initialOffsetRatio={0}
+          initialOffsetRatio={combinedGridIdleRatio}
           frameClassName="h-56 w-full rounded-md border border-border bg-muted/55"
           className="h-auto"
         />
@@ -972,6 +1023,7 @@ function TopicEvidence({
           fitContain
           fitContainMode="cover"
           hoverScroll
+          initialOffsetRatio={combinedGridIdleRatio}
           frameClassName="h-56 w-full rounded-md border border-border bg-muted/55"
           className="h-auto"
         />
@@ -1007,8 +1059,7 @@ function TopicEvidence({
   const evidenceScrollInitialRatio = (() => {
     if (useFitContain) {
       if (siteFooterFocus) return 0.88;
-      if (isPresencaDigitalGeralTopic(item.topic)) return 0.5;
-      return 0;
+      return FULL_PAGE_SNAPSHOT_IDLE_FROM_TOP_RATIO;
     }
     if (isConsistenciaComunicacaoTopic(item.topic)) return 0.75;
     return 0;
@@ -1098,12 +1149,17 @@ export type RotaDigitalReportViewProps = {
   variant: RotaDigitalReportViewVariant;
   /** Atualiza o relatório no pai após salvar edição ou reanálise (só dashboard). */
   onReportChange?: (next: RotaDigitalReport) => void;
+  /**
+   * CTAs já resolvidos no servidor (página pública). O cliente anônimo não lê `userSettings`.
+   */
+  initialCtaSettings?: UserReportCtaSettings | null;
 };
 
 export function RotaDigitalReportView({
   report: initialReport,
   variant,
   onReportChange,
+  initialCtaSettings,
 }: RotaDigitalReportViewProps) {
   const router = useRouter();
   const isDashboard = variant === "dashboard";
@@ -1121,7 +1177,9 @@ export function RotaDigitalReportView({
   const [reanalyzeNotes, setReanalyzeNotes] = useState("");
   const [reanalyzing, setReanalyzing] = useState(false);
   const [reanalyzeError, setReanalyzeError] = useState<string | null>(null);
-  const [ctaSettings, setCtaSettings] = useState<UserReportCtaSettings | null>(null);
+  const [ctaSettings, setCtaSettings] = useState<UserReportCtaSettings | null>(
+    () => initialCtaSettings ?? null
+  );
 
   const reportCta = useMemo(
     () => resolveReportCtas(ctaSettings, process.env.NEXT_PUBLIC_ROTA_REPORT_CTA_URL),
@@ -1137,6 +1195,12 @@ export function RotaDigitalReportView({
   }, []);
 
   useEffect(() => {
+    if (variant !== "public") return;
+    setCtaSettings(initialCtaSettings ?? null);
+  }, [variant, initialCtaSettings]);
+
+  useEffect(() => {
+    if (variant === "public") return;
     if (!report?.userId) return;
     let cancelled = false;
     void getUserReportCtaSettings(report.userId)
@@ -1149,7 +1213,7 @@ export function RotaDigitalReportView({
     return () => {
       cancelled = true;
     };
-  }, [report?.userId]);
+  }, [report?.userId, variant]);
 
   const startEdit = () => {
     if (!report) return;
@@ -1480,7 +1544,7 @@ export function RotaDigitalReportView({
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <label className="text-sm text-muted-foreground">Resumo executivo</label>
+              <label className="text-sm text-muted-foreground">Resumo</label>
               <Textarea
                 value={editSummary}
                 onChange={(e) => setEditSummary(e.target.value)}
@@ -1547,12 +1611,16 @@ export function RotaDigitalReportView({
             <div className="flex items-center gap-2.5">
               <SectionHeaderIcon Icon={Sparkles} tone="indigo" />
               <CardTitle className="text-xs font-semibold uppercase tracking-wider text-foreground/78 dark:text-muted-foreground">
-                Resumo Executivo
+                Resumo
               </CardTitle>
             </div>
           </CardHeader>
           <CardContent>
-                       <ReportProseBlocks text={report.executiveSummary} size="lg" sentencesPerBlock={1} />
+            <ReportProseBlocks
+              text={report.executiveSummary}
+              size="lg"
+              collapseToOneParagraph
+            />
           </CardContent>
         </Card>
 
@@ -1588,8 +1656,8 @@ export function RotaDigitalReportView({
             )}
             <div className="space-y-1">
               <h3 className="text-lg font-bold text-foreground">{report.leadCompany}</h3>
-              <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                Análise de Presença
+              <p className="text-sm font-medium leading-snug text-muted-foreground">
+                Análise de presença digital
               </p>
             </div>
           </CardContent>
@@ -1708,8 +1776,8 @@ export function RotaDigitalReportView({
                   : "Falar com um especialista da Rota Digital para colocar o plano do relatório em prática"
               }
               className={cn(
-                buttonVariants({ variant: "cta", size: "lg" }),
-                "no-print h-10 min-h-10 w-full justify-center gap-2 px-4 text-center text-sm leading-snug shadow-md sm:px-5",
+                buttonVariants({ variant: "ctaMotion", size: "lg" }),
+                "no-print relative h-10 min-h-10 w-full justify-center gap-2 overflow-hidden px-4 text-center text-sm leading-snug sm:px-5",
               )}
             >
               {reportCta.top.useWhatsAppIcon ? (
@@ -1789,10 +1857,15 @@ export function RotaDigitalReportView({
         </Card>
       </div>
 
-      {(report.brief?.servicesOffered || report.brief?.objective) ? (
+      {isDashboard && (report.brief?.servicesOffered || report.brief?.objective) ? (
         <Card className={cn("bg-card border-border print-white", ROTA_REPORT_CARD_BOX)}>
-          <CardHeader>
-            <CardTitle className="text-foreground">Briefing informado</CardTitle>
+          <CardHeader className="pb-4">
+            <div className="flex items-center gap-2.5">
+              <SectionHeaderIcon Icon={FileText} tone="indigo" />
+              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-foreground/78 dark:text-muted-foreground">
+                Briefing informado
+              </CardTitle>
+            </div>
           </CardHeader>
           <CardContent className="grid gap-5 md:grid-cols-2">
             <div className="space-y-2">
@@ -1819,16 +1892,13 @@ export function RotaDigitalReportView({
 
       {sortedDiagnosticScores.length > 0 ? (
         <Card className={cn("border-border bg-card/95 print-white", ROTA_REPORT_CARD_BOX)}>
-          <CardHeader className="space-y-3 pb-4">
+          <CardHeader className="pb-4">
             <div className="flex items-center gap-2.5">
               <SectionHeaderIcon Icon={ClipboardList} tone="indigo" />
               <CardTitle className="text-xs font-semibold uppercase tracking-wider text-foreground/78 dark:text-muted-foreground">
                 Diagnóstico por tópico
               </CardTitle>
             </div>
-            <p className={ROTA_CARD_SUBTITLE}>
-              Priorize os itens com menor nota para gerar impacto mais rápido.
-            </p>
           </CardHeader>
           <CardContent className="space-y-5 lg:space-y-6">
             {sortedDiagnosticScores.map((item, idx) => {
@@ -1954,7 +2024,7 @@ export function RotaDigitalReportView({
                 fitContain
                 fitContainMode="cover"
                 hoverScroll
-                initialOffsetRatio={0}
+                initialOffsetRatio={FULL_PAGE_SNAPSHOT_IDLE_FROM_TOP_RATIO}
                 frameClassName="h-64 w-full rounded-md border border-border bg-muted"
                 className="h-auto"
               />
@@ -1969,7 +2039,7 @@ export function RotaDigitalReportView({
                   fitContain
                   fitContainMode="cover"
                   hoverScroll
-                  initialOffsetRatio={0}
+                  initialOffsetRatio={FULL_PAGE_SNAPSHOT_IDLE_FROM_TOP_RATIO}
                   frameClassName="h-64 w-full rounded-md border border-border bg-muted"
                   className="h-auto"
                 />
@@ -2157,18 +2227,15 @@ export function RotaDigitalReportView({
             ROTA_REPORT_CARD_BOX,
           )}
         >
-          <CardHeader className="space-y-3 pb-4">
+          <CardHeader className="pb-4">
             <div className="flex items-center gap-3">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-yellow-500/10 ring-1 ring-yellow-500/20">
                 <Zap size={18} className="text-yellow-800 dark:text-yellow-400" />
               </div>
               <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground/78 dark:text-muted-foreground">
-                Quick Wins
+                O que fazer primeiro
               </CardTitle>
             </div>
-            <p className={ROTA_CARD_SUBTITLE}>
-              Ações de alto impacto a implementar imediatamente.
-            </p>
           </CardHeader>
           <CardContent>
             <ul className="space-y-4">
@@ -2190,7 +2257,7 @@ export function RotaDigitalReportView({
             ROTA_REPORT_CARD_BOX,
           )}
         >
-          <CardHeader className="space-y-3 pb-4">
+          <CardHeader className="pb-4">
             <div className="flex items-center gap-3">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-500/10 ring-1 ring-purple-500/20">
                 <Target size={18} className="text-purple-800 dark:text-purple-400" />
@@ -2199,9 +2266,6 @@ export function RotaDigitalReportView({
                 Ações de Longo Prazo
               </CardTitle>
             </div>
-            <p className={ROTA_CARD_SUBTITLE}>
-              Estratégias para construção de presença digital sustentável.
-            </p>
           </CardHeader>
           <CardContent>
             <ul className="space-y-4">
@@ -2227,16 +2291,13 @@ export function RotaDigitalReportView({
             "py-0 gap-0",
           )}
         >
-          <CardHeader className="space-y-3 px-4 pb-4 pt-0 sm:px-7 sm:pt-0">
+          <CardHeader className="px-4 pb-4 pt-0 sm:px-7 sm:pt-0">
             <div className="flex items-center gap-2.5">
               <SectionHeaderIcon Icon={ArrowRight} tone="indigo" />
               <CardTitle className="text-xs font-semibold uppercase tracking-wider text-foreground/78 dark:text-muted-foreground">
                 Próximos Passos
               </CardTitle>
             </div>
-            <p className={ROTA_CARD_SUBTITLE}>
-              Esta é a etapa mais importante para transformar o diagnóstico em plano de ação.
-            </p>
           </CardHeader>
           <CardContent className="px-4 sm:px-7">
             <div className="space-y-3">
@@ -2269,8 +2330,8 @@ export function RotaDigitalReportView({
                     : "Agendar reunião estratégica para validar prioridades e cronograma"
                 }
                 className={cn(
-                  buttonVariants({ variant: "cta", size: "lg" }),
-                  "no-print h-10 min-h-10 w-full justify-center gap-2 px-4 shadow-md sm:w-auto sm:px-5",
+                  buttonVariants({ variant: "ctaMotion", size: "lg" }),
+                  "no-print relative h-10 min-h-10 w-full justify-center gap-2 overflow-hidden px-4 sm:w-auto sm:px-5",
                 )}
               >
                 {reportCta.bottom.useWhatsAppIcon ? (
