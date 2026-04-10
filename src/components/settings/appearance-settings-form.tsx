@@ -10,10 +10,10 @@ import type { UserUiTheme } from "@/types/user-settings";
 import { Loader2, Monitor, Moon, Sun } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const OPTIONS: { id: UserUiTheme; label: string; hint: string; icon: typeof Sun }[] = [
-  { id: "light", label: "Claro", hint: "Fundo claro, texto escuro", icon: Sun },
-  { id: "dark", label: "Escuro", hint: "Igual ao painel atual", icon: Moon },
-  { id: "system", label: "Sistema", hint: "Segue o dispositivo", icon: Monitor },
+const OPTIONS: { id: UserUiTheme; label: string; icon: typeof Sun }[] = [
+  { id: "light", label: "Claro", icon: Sun },
+  { id: "dark", label: "Escuro", icon: Moon },
+  { id: "system", label: "Sistema", icon: Monitor },
 ];
 
 function ThemeChip({
@@ -43,7 +43,7 @@ function ThemeChip({
 
 export function AppearanceSettingsForm() {
   const { user } = useAuth();
-  const { theme, setTheme } = useTheme();
+  const { setTheme } = useTheme();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [preference, setPreference] = useState<UserUiTheme>("dark");
@@ -98,11 +98,11 @@ export function AppearanceSettingsForm() {
   };
 
   return (
-    <Card className="border-white/5 bg-white/[0.02] shadow-xl overflow-hidden">
-      <CardHeader className="space-y-2 pb-4 border-b border-white/5">
+    <Card className="border-border bg-card shadow-xl overflow-hidden dark:border-white/5 dark:bg-white/[0.02]">
+      <CardHeader className="space-y-2 border-b border-border pb-4 dark:border-white/5">
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-500/10 ring-1 ring-indigo-500/20">
-            <Sun className="size-4 text-indigo-400" aria-hidden />
+            <Sun className="size-4 text-indigo-600 dark:text-indigo-400" aria-hidden />
           </div>
           <div>
             <CardTitle className="text-lg font-bold text-foreground dark:text-white">Aparência</CardTitle>
@@ -115,7 +115,7 @@ export function AppearanceSettingsForm() {
       </CardHeader>
       <CardContent className="space-y-6 pt-6">
         {loading ? (
-          <div className="flex items-center gap-3 py-10 text-sm text-zinc-500">
+          <div className="flex items-center gap-3 py-10 text-sm text-muted-foreground">
             <Loader2 className="size-5 animate-spin shrink-0 text-indigo-400" aria-hidden />
             Carregando…
           </div>
@@ -130,18 +130,11 @@ export function AppearanceSettingsForm() {
                     <Icon className="size-4 shrink-0 text-indigo-600 dark:text-indigo-400" aria-hidden />
                     <div className="min-w-0">
                       <p className="text-sm font-semibold">{opt.label}</p>
-                      <p className="text-xs font-normal text-muted-foreground">{opt.hint}</p>
                     </div>
                   </ThemeChip>
                 );
               })}
             </div>
-            <p className="text-xs text-zinc-500">
-              Ativo agora (pré-visualização):{" "}
-              <span className="font-medium text-zinc-300">
-                {theme === "system" ? "Sistema" : theme === "light" ? "Claro" : "Escuro"}
-              </span>
-            </p>
             {error ? (
               <p className="rounded-lg border border-red-500/35 bg-red-500/10 px-3 py-2 text-sm text-red-800 dark:text-red-300">
                 {error}

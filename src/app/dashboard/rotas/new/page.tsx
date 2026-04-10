@@ -18,6 +18,7 @@ import {
   sanitizeAiServiceOfferingIds,
 } from "@/lib/ai-agency-services";
 import { sanitizeAiScoringStrictness } from "@/lib/ai-scoring-strictness-prompt";
+import { sanitizeAiOpenRecommendedChannelCount } from "@/lib/ai-recommended-channels-prompt";
 import type {
   AiRecommendedChannelsPolicy,
   AiScoringStrictness,
@@ -128,6 +129,8 @@ export default function NewRotaPage() {
   const [leadId, setLeadId] = useState<string>("");
   const [leadQuery, setLeadQuery] = useState("");
   const [leadSearchOpen, setLeadSearchOpen] = useState(false);
+  /** Evita autofill nativo do navegador (que cobre o dropdown da app). Libera no 1.º foco ou quando já há lead. */
+  const [leadComboUnlocked, setLeadComboUnlocked] = useState(false);
   const [websiteUrl, setWebsiteUrl] = useState("");
   const [instagramUrl, setInstagramUrl] = useState("");
   const [servicesOffered, setServicesOffered] = useState("");
@@ -148,6 +151,7 @@ export default function NewRotaPage() {
   const [aiBasePromptGuidelines, setAiBasePromptGuidelines] = useState("");
   const [aiChannelPolicy, setAiChannelPolicy] = useState<AiRecommendedChannelsPolicy>("open");
   const [aiChannelIds, setAiChannelIds] = useState<string[]>([]);
+  const [aiOpenChannelCount, setAiOpenChannelCount] = useState(2);
   const [aiServicesPolicy, setAiServicesPolicy] = useState<AiServicesFocusPolicy>("open");
   const [aiServiceIds, setAiServiceIds] = useState<string[]>([]);
   const [aiCustomServicesText, setAiCustomServicesText] = useState("");
@@ -207,6 +211,7 @@ export default function NewRotaPage() {
         setAiChannelIds(
           data?.aiRecommendedChannelIds?.length ? [...data.aiRecommendedChannelIds] : [],
         );
+        setAiOpenChannelCount(sanitizeAiOpenRecommendedChannelCount(data?.aiOpenRecommendedChannelCount));
         setAiServicesPolicy(data?.aiServicesFocusPolicy === "restricted" ? "restricted" : "open");
         setAiServiceIds(data?.aiServiceOfferingIds?.length ? [...data.aiServiceOfferingIds] : []);
         const custom = data?.aiCustomServiceLabels?.length ? [...data.aiCustomServiceLabels] : [];
@@ -219,6 +224,7 @@ export default function NewRotaPage() {
           setAiBasePromptGuidelines("");
           setAiChannelPolicy("open");
           setAiChannelIds([]);
+          setAiOpenChannelCount(sanitizeAiOpenRecommendedChannelCount(undefined));
           setAiServicesPolicy("open");
           setAiServiceIds([]);
           setAiCustomServicesText("");
@@ -239,6 +245,10 @@ export default function NewRotaPage() {
     if (!initialLeadId) return;
     setLeadId((current) => current || initialLeadId);
   }, [searchParams]);
+
+  useEffect(() => {
+    if (leadId) setLeadComboUnlocked(true);
+  }, [leadId]);
 
   useEffect(() => {
     if (!selectedLead) return;
@@ -345,6 +355,7 @@ export default function NewRotaPage() {
       const aiRecommendedChannelIds = sanitizeAiRecommendedChannelIds(
         aiChannelPolicy === "restricted" ? aiChannelIds : [],
       );
+      const aiOpenRecommendedChannelCount = sanitizeAiOpenRecommendedChannelCount(aiOpenChannelCount);
       const aiServicesFocusPolicy: AiServicesFocusPolicy =
         aiServicesPolicy === "restricted" ? "restricted" : "open";
       const aiServiceOfferingIds = sanitizeAiServiceOfferingIds(
@@ -371,6 +382,7 @@ export default function NewRotaPage() {
         aiBasePromptGuidelines: guidelinesTrim,
         aiRecommendedChannelsPolicy,
         aiRecommendedChannelIds,
+        aiOpenRecommendedChannelCount,
         aiServicesFocusPolicy,
         aiServiceOfferingIds,
         aiCustomServiceLabels,
@@ -571,28 +583,54 @@ export default function NewRotaPage() {
           ) : (
             <>
               <div className="space-y-2">
-                <Label>Lead</Label>
-                <div className="relative">
-                  <Search
-                    className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-                    aria-hidden
-                  />
-                  <Input
-                    value={leadQuery}
-                    onChange={(e) => {
-                      setLeadQuery(e.target.value);
-                      setLeadSearchOpen(true);
-                      if (!e.target.value.trim()) setLeadId("");
-                    }}
-                    onFocus={() => setLeadSearchOpen(true)}
-                    onBlur={() => {
-                      window.setTimeout(() => setLeadSearchOpen(false), 120);
-                    }}
-                    placeholder="Digite o nome da empresa ou do lead"
-                    className="pl-9"
-                  />
+                <Label htmlFor="rota-new-lead-combobox">Lead</Label>
+                <form
+                  className="contents"
+                  autoComplete="off"
+                  onSubmit={(e) => e.preventDefault()}
+                >
+                  <div className="relative">
+                    <Search
+                      className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                      aria-hidden
+                    />
+                    <Input
+                      id="rota-new-lead-combobox"
+                      name="rota_digital_lead_search"
+                      value={leadQuery}
+                      readOnly={!leadComboUnlocked}
+                      autoComplete="off"
+                      autoCorrect="off"
+                      autoCapitalize="off"
+                      spellCheck={false}
+                      data-1p-ignore
+                      data-lpignore="true"
+                      data-form-type="other"
+                      aria-autocomplete="list"
+                      aria-expanded={leadSearchOpen}
+                      aria-controls="rota-new-lead-suggestions"
+                      role="combobox"
+                      onChange={(e) => {
+                        setLeadQuery(e.target.value);
+                        setLeadSearchOpen(true);
+                        if (!e.target.value.trim()) setLeadId("");
+                      }}
+                      onFocus={() => {
+                        setLeadComboUnlocked(true);
+                        setLeadSearchOpen(true);
+                      }}
+                      onBlur={() => {
+                        window.setTimeout(() => setLeadSearchOpen(false), 120);
+                      }}
+                      placeholder="Digite o nome da empresa ou do lead"
+                      className="pl-9"
+                    />
                   {leadSearchOpen ? (
-                    <div className="absolute z-20 mt-2 w-full overflow-hidden rounded-xl border border-border bg-background shadow-lg">
+                    <div
+                      id="rota-new-lead-suggestions"
+                      className="absolute z-50 mt-2 w-full overflow-hidden rounded-xl border border-border bg-background shadow-lg"
+                      role="listbox"
+                    >
                       {leadSuggestions.length > 0 ? (
                         <div className="max-h-64 overflow-y-auto py-1">
                           {leadSuggestions.map((lead) => (
@@ -633,44 +671,65 @@ export default function NewRotaPage() {
                       </div>
                     </div>
                   ) : null}
-                </div>
+                  </div>
+                </form>
               </div>
 
               <div className="space-y-2">
-                <Label>Site da empresa</Label>
+                <Label htmlFor="rota-new-website">Site da empresa</Label>
                 <Input
+                  id="rota-new-website"
+                  name="rota_new_website_url"
                   value={websiteUrl}
                   onChange={(e) => setWebsiteUrl(e.target.value)}
                   placeholder="https://site.com.br"
+                  autoComplete="off"
+                  data-1p-ignore
+                  data-lpignore="true"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label>Instagram</Label>
+                <Label htmlFor="rota-new-instagram">Instagram</Label>
                 <Input
+                  id="rota-new-instagram"
+                  name="rota_new_instagram"
                   value={instagramUrl}
                   onChange={(e) => setInstagramUrl(e.target.value)}
                   placeholder="https://instagram.com/empresa ou @empresa"
+                  autoComplete="off"
+                  data-1p-ignore
+                  data-lpignore="true"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label>Serviços oferecidos (opcional)</Label>
+                <Label htmlFor="rota-new-services">Serviços oferecidos (opcional)</Label>
                 <Textarea
+                  id="rota-new-services"
+                  name="rota_new_services"
                   value={servicesOffered}
                   onChange={(e) => setServicesOffered(e.target.value)}
                   placeholder="Se vazio, a IA tenta inferir pelo site e Instagram."
                   className="min-h-[90px]"
+                  autoComplete="off"
+                  data-1p-ignore
+                  data-lpignore="true"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label>Objetivo (opcional)</Label>
+                <Label htmlFor="rota-new-objective">Objetivo (opcional)</Label>
                 <Textarea
+                  id="rota-new-objective"
+                  name="rota_new_objective"
                   value={objective}
                   onChange={(e) => setObjective(e.target.value)}
                   placeholder="Se vazio, a IA sugere objetivos e gargalos com base na análise."
                   className="min-h-[90px]"
+                  autoComplete="off"
+                  data-1p-ignore
+                  data-lpignore="true"
                 />
               </div>
 
@@ -757,6 +816,28 @@ export default function NewRotaPage() {
                             Só selecionados
                           </button>
                         </div>
+                        {aiChannelPolicy === "open" ? (
+                          <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                            <span className="text-[11px] text-muted-foreground">Quantidade:</span>
+                            <Select
+                              value={String(aiOpenChannelCount)}
+                              onValueChange={(v) =>
+                                setAiOpenChannelCount(sanitizeAiOpenRecommendedChannelCount(Number(v)))
+                              }
+                            >
+                              <SelectTrigger className="h-8 w-[130px] text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {[2, 3, 4, 5, 6, 7, 8].map((n) => (
+                                  <SelectItem key={n} value={String(n)} className="text-xs">
+                                    {n} canais
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        ) : null}
                         <div className="max-h-28 overflow-y-auto rounded-md border border-border/80 bg-background/50 px-2 py-1.5">
                           <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
                             {AI_RECOMMENDED_CHANNEL_OPTIONS.map((opt) => (

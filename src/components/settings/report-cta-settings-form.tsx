@@ -145,11 +145,11 @@ export function ReportCtaSettingsForm() {
       <CardHeader className="space-y-2 pb-4 border-b border-border dark:border-white/5">
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-500/10 ring-1 ring-indigo-500/20">
-            <Link2 className="size-4 text-indigo-400" aria-hidden />
+            <Link2 className="size-4 text-indigo-600 dark:text-indigo-400" aria-hidden />
           </div>
           <div>
-            <CardTitle className="text-lg font-bold text-white">Destino dos CTAs</CardTitle>
-            <CardDescription className="text-sm text-zinc-500 leading-relaxed">
+            <CardTitle className="text-lg font-bold text-foreground dark:text-white">Destino dos CTAs</CardTitle>
+            <CardDescription className="text-sm text-muted-foreground leading-relaxed">
               Aplica-se aos botões do relatório (ex.: falar com especialista / agendar).
             </CardDescription>
           </div>
@@ -176,14 +176,17 @@ export function ReportCtaSettingsForm() {
 
             {form.ctaMode === "whatsapp" ? (
               <div className="space-y-2">
-                <Label htmlFor="wa-phone" className="text-xs font-bold uppercase tracking-widest text-zinc-500">
+                <Label htmlFor="wa-phone" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                   WhatsApp
                 </Label>
                 <Input
                   id="wa-phone"
                   type="tel"
                   inputMode="numeric"
-                  autoComplete="tel"
+                  autoComplete="off"
+                  name="report_cta_whatsapp"
+                  data-1p-ignore
+                  data-lpignore="true"
                   placeholder="+55 (11) 98765-4321"
                   value={maskWhatsappBRDisplay(form.whatsappPhone)}
                   onChange={(e) => {
@@ -201,6 +204,10 @@ export function ReportCtaSettingsForm() {
                 <Input
                   id="cta-url"
                   type="url"
+                  name="report_cta_url"
+                  autoComplete="off"
+                  data-1p-ignore
+                  data-lpignore="true"
                   placeholder="https://…"
                   value={form.ctaUrl}
                   onChange={(e) => setForm((f) => ({ ...f, ctaUrl: e.target.value }))}

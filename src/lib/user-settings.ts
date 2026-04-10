@@ -81,6 +81,7 @@ export async function saveUserAiPromptSettings(
       aiBasePromptGuidelines: settings.aiBasePromptGuidelines,
       aiRecommendedChannelsPolicy: settings.aiRecommendedChannelsPolicy,
       aiRecommendedChannelIds: settings.aiRecommendedChannelIds,
+      aiOpenRecommendedChannelCount: settings.aiOpenRecommendedChannelCount,
       aiServicesFocusPolicy: settings.aiServicesFocusPolicy,
       aiServiceOfferingIds: settings.aiServiceOfferingIds,
       aiCustomServiceLabels: settings.aiCustomServiceLabels,

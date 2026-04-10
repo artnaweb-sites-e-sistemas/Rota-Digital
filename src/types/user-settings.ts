@@ -30,6 +30,10 @@ export interface UserAiPromptSettings {
   aiRecommendedChannelsPolicy: AiRecommendedChannelsPolicy;
   /** IDs de `AI_RECOMMENDED_CHANNEL_OPTIONS` quando policy === "restricted". */
   aiRecommendedChannelIds: string[];
+  /**
+   * Modo livre: quantos canais a IA deve retornar em recommendedChannels (2–8). Ignorado em modo restrito.
+   */
+  aiOpenRecommendedChannelCount: number;
   aiServicesFocusPolicy: AiServicesFocusPolicy;
   /** IDs de `AI_AGENCY_SERVICE_OPTIONS` quando serviços restritos. */
   aiServiceOfferingIds: string[];

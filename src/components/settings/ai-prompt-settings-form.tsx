@@ -7,6 +7,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useAuth } from "@/lib/auth-context";
 import { getUserAiPromptSettings, saveUserAiPromptSettings } from "@/lib/user-settings";
 import type {
@@ -15,6 +22,7 @@ import type {
   AiServicesFocusPolicy,
 } from "@/types/user-settings";
 import { sanitizeAiScoringStrictness } from "@/lib/ai-scoring-strictness-prompt";
+import { sanitizeAiOpenRecommendedChannelCount } from "@/lib/ai-recommended-channels-prompt";
 import { AI_RECOMMENDED_CHANNEL_OPTIONS } from "@/lib/ai-recommended-channel-options";
 import {
   AI_AGENCY_SERVICE_OPTIONS,
@@ -75,6 +83,7 @@ export function AiPromptSettingsForm() {
   const [guidelines, setGuidelines] = useState("");
   const [channelPolicy, setChannelPolicy] = useState<AiRecommendedChannelsPolicy>("open");
   const [channelIds, setChannelIds] = useState<string[]>([]);
+  const [openChannelCount, setOpenChannelCount] = useState(2);
   const [servicesPolicy, setServicesPolicy] = useState<AiServicesFocusPolicy>("open");
   const [serviceIds, setServiceIds] = useState<string[]>([]);
   const [servicesOthersEnabled, setServicesOthersEnabled] = useState(false);
@@ -94,6 +103,7 @@ export function AiPromptSettingsForm() {
       setChannelIds(
         data?.aiRecommendedChannelIds?.length ? [...data.aiRecommendedChannelIds] : []
       );
+      setOpenChannelCount(sanitizeAiOpenRecommendedChannelCount(data?.aiOpenRecommendedChannelCount));
       setServicesPolicy(data?.aiServicesFocusPolicy === "restricted" ? "restricted" : "open");
       setServiceIds(data?.aiServiceOfferingIds?.length ? [...data.aiServiceOfferingIds] : []);
       const customServ = data?.aiCustomServiceLabels?.length ? [...data.aiCustomServiceLabels] : [];
@@ -106,6 +116,7 @@ export function AiPromptSettingsForm() {
       setGuidelines("");
       setChannelPolicy("open");
       setChannelIds([]);
+      setOpenChannelCount(sanitizeAiOpenRecommendedChannelCount(undefined));
       setServicesPolicy("open");
       setServiceIds([]);
       setServicesOthersEnabled(false);
@@ -160,6 +171,7 @@ export function AiPromptSettingsForm() {
         aiBasePromptGuidelines: trimmed,
         aiRecommendedChannelsPolicy: channelPolicy,
         aiRecommendedChannelIds: channelPolicy === "restricted" ? channelIds : [],
+        aiOpenRecommendedChannelCount: sanitizeAiOpenRecommendedChannelCount(openChannelCount),
         aiServicesFocusPolicy: servicesPolicy,
         aiServiceOfferingIds: servicesPolicy === "restricted" ? serviceIds : [],
         aiCustomServiceLabels: servicesPolicy === "restricted" ? parsedServicesCustom : [],
@@ -320,7 +332,7 @@ export function AiPromptSettingsForm() {
                   "relative rounded-xl border px-4 py-3 text-left text-sm font-semibold transition-all",
                   channelPolicy === "restricted" && "pr-[3.35rem] sm:pr-[3.85rem]",
                   channelPolicy === "restricted"
-                    ? "border-indigo-500/50 bg-indigo-500/15 text-white ring-1 ring-indigo-500/25"
+                    ? "border-indigo-600/45 bg-indigo-500/12 text-indigo-950 ring-1 ring-indigo-600/30 dark:border-indigo-500/50 dark:bg-indigo-500/15 dark:text-white dark:ring-indigo-500/25"
                     : policyUnselectedClasses(),
                 )}
               >
@@ -334,6 +346,35 @@ export function AiPromptSettingsForm() {
               </button>
             </div>
           </div>
+
+          {channelPolicy === "open" ? (
+            <div className="space-y-2 rounded-xl border border-border bg-muted/15 px-3 py-3 dark:border-white/10 dark:bg-white/[0.02]">
+              <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                Quantidade no modo livre
+              </Label>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                A IA recomenda exatamente este número de canais e define a prioridade de cada um (Alta, Média ou
+                Baixa), conforme a análise.
+              </p>
+              <Select
+                value={String(openChannelCount)}
+                onValueChange={(v) =>
+                  setOpenChannelCount(sanitizeAiOpenRecommendedChannelCount(Number(v)))
+                }
+              >
+                <SelectTrigger className="h-10 w-full max-w-[240px] rounded-xl border-input bg-background text-foreground dark:border-white/10 dark:bg-white/5 dark:text-zinc-100">
+                  <SelectValue placeholder="Quantidade" />
+                </SelectTrigger>
+                <SelectContent>
+                  {[2, 3, 4, 5, 6, 7, 8].map((n) => (
+                    <SelectItem key={n} value={String(n)}>
+                      {n} canais
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
 
           <div className="space-y-2">
             <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
@@ -449,7 +490,7 @@ export function AiPromptSettingsForm() {
                     "flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-2.5 transition-colors",
                     servicesPolicy === "restricted" && serviceIds.includes(opt.id)
                       ? "border-emerald-500/40 bg-emerald-500/10"
-                      : "border-white/10 bg-white/[0.02]",
+                      : "border-border bg-muted/20 dark:border-white/10 dark:bg-white/[0.02]",
                     servicesPolicy !== "restricted" && "cursor-not-allowed opacity-50",
                   )}
                 >
@@ -460,7 +501,7 @@ export function AiPromptSettingsForm() {
                     disabled={servicesPolicy !== "restricted"}
                     onChange={() => toggleService(opt.id)}
                   />
-                  <span className="text-sm text-zinc-200">{opt.label}</span>
+                  <span className="text-sm text-foreground dark:text-zinc-200">{opt.label}</span>
                 </label>
               ))}
             </div>
@@ -486,7 +527,7 @@ export function AiPromptSettingsForm() {
                     if (!on) setServicesOthersText("");
                   }}
                 />
-                <span className="text-sm font-medium text-zinc-200">
+                <span className="text-sm font-medium text-foreground dark:text-zinc-200">
                   Outros serviços (personalizar)
                   <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
                     Ex.: agente de IA no WhatsApp, motion 3D, podcast.

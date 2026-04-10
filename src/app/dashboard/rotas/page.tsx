@@ -172,10 +172,17 @@ export default function RotasPage() {
                 aria-hidden
               />
               <Input
+                id="rotas-list-search"
+                name="rotas_list_search"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Buscar por empresa, lead, e-mail ou trecho do resumo…"
                 className="h-10 border-input bg-background pl-9 text-foreground placeholder:text-muted-foreground dark:border-zinc-800 dark:bg-zinc-900/80 dark:text-zinc-100 dark:placeholder:text-zinc-600"
+                autoComplete="off"
+                autoCorrect="off"
+                spellCheck={false}
+                data-1p-ignore
+                data-lpignore="true"
               />
             </div>
             <Select

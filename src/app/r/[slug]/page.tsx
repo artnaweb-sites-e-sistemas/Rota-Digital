@@ -1,7 +1,14 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { RotaDigitalReportView } from "@/components/rotas/rota-digital-report-view";
-import { getPublicProposalReportBySlug } from "@/lib/public-report-server";
+import { getCachedPublicProposalReportBySlug } from "@/lib/public-report-cache";
+import {
+  buildPublicReportCanonicalUrl,
+  buildReportShareDescription,
+  getSiteOrigin,
+  resolveReportShareImageUrl,
+} from "@/lib/report-open-graph";
 import type { RotaDigitalReport } from "@/types/report";
 
 export const dynamic = "force-dynamic";
@@ -22,10 +29,57 @@ function toClientReport(raw: RotaDigitalReport): RotaDigitalReport {
   };
 }
 
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  if (!slug) notFound();
+
+  const raw = await getCachedPublicProposalReportBySlug(slug);
+  if (!raw) notFound();
+
+  const company = raw.leadCompany?.trim() || "Empresa";
+  const title = `Rota Digital - ${company}`;
+  const description = buildReportShareDescription(raw);
+  const origin = getSiteOrigin();
+  const canonical = buildPublicReportCanonicalUrl(slug, origin);
+  const imageUrl = resolveReportShareImageUrl(raw, origin);
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      siteName: "Rota Digital",
+      locale: "pt_BR",
+      type: "website",
+      url: canonical,
+      images: imageUrl
+        ? [
+            {
+              url: imageUrl,
+              alt: `Logo ou identidade visual — ${company}`,
+            },
+          ]
+        : undefined,
+    },
+    twitter: {
+      card: imageUrl ? "summary_large_image" : "summary",
+      title,
+      description,
+      images: imageUrl ? [imageUrl] : undefined,
+    },
+  };
+}
+
 /**
  * Página pública do relatório (mesmo layout que no dashboard, sem login).
  *
  * Em produção, defina `FIREBASE_SERVICE_ACCOUNT_JSON` na Vercel para leitura via Admin SDK.
+ * Para prévias de link (Open Graph) corretas, defina `NEXT_PUBLIC_SITE_URL` com a URL pública do deploy.
  */
 export default async function PublicProposalPage({
   params,
@@ -35,7 +89,7 @@ export default async function PublicProposalPage({
   const { slug } = await params;
   if (!slug) notFound();
 
-  const raw = await getPublicProposalReportBySlug(slug);
+  const raw = await getCachedPublicProposalReportBySlug(slug);
   if (!raw) notFound();
 
   const report = toClientReport(raw);

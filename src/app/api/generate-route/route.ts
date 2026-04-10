@@ -4,18 +4,19 @@ import {
   DynamicRetrievalMode,
 } from "@google/generative-ai";
 import { randomBytes } from "crypto";
-import type { DiagnosticScore, DigitalChannel, RotaDigitalReport } from "@/types/report";
+import type { DiagnosticScore, RotaDigitalReport } from "@/types/report";
 import type {
   AiRecommendedChannelsPolicy,
   AiScoringStrictness,
   AiServicesFocusPolicy,
 } from "@/types/user-settings";
-import { buildRecommendedChannelsPolicyPromptSection } from "@/lib/ai-recommended-channels-prompt";
-import { buildServicesFocusPromptSection } from "@/lib/ai-services-focus-prompt";
 import {
-  labelsForChannelIds,
-  sanitizeAiRecommendedChannelIds,
-} from "@/lib/ai-recommended-channel-options";
+  buildRecommendedChannelsPolicyPromptSection,
+  sanitizeAiOpenRecommendedChannelCount,
+} from "@/lib/ai-recommended-channels-prompt";
+import { normalizeRecommendedChannels } from "@/lib/recommended-channels-normalize";
+import { buildServicesFocusPromptSection } from "@/lib/ai-services-focus-prompt";
+import { sanitizeAiRecommendedChannelIds } from "@/lib/ai-recommended-channel-options";
 import {
   sanitizeAiCustomServiceLabels,
   sanitizeAiServiceOfferingIds,
@@ -85,87 +86,6 @@ function normalizeUrl(input?: string): string | undefined {
     return value.startsWith("http") ? value : `https://${value}`;
   }
   return `https://${value}`;
-}
-
-function normalizeChannelName(name: string): string {
-  return name
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function sanitizeChannelEntry(input: unknown, forcedName?: string): DigitalChannel | null {
-  if (!input || typeof input !== "object") return null;
-  const row = input as Record<string, unknown>;
-  const rawName = typeof row.name === "string" ? row.name.trim() : "";
-  const name = (forcedName || rawName).trim();
-  if (!name) return null;
-  const priority: DigitalChannel["priority"] =
-    row.priority === "Alta" || row.priority === "Baixa" ? row.priority : "Média";
-  const description =
-    typeof row.description === "string" && row.description.trim().length > 0
-      ? row.description.trim()
-      : `Canal recomendado para acelerar resultados em ${name}.`;
-  const actions = Array.isArray(row.actions)
-    ? row.actions.filter((x): x is string => typeof x === "string" && x.trim().length > 0).slice(0, 5)
-    : [];
-  return {
-    name,
-    priority,
-    description,
-    actions: actions.length > 0 ? actions : [`Iniciar plano de execução para ${name}.`],
-  };
-}
-
-function normalizeRecommendedChannels(
-  input: unknown,
-  policy: AiRecommendedChannelsPolicy,
-  restrictedChannelIds: string[]
-): DigitalChannel[] {
-  const source = Array.isArray(input) ? input : [];
-  const deduped: DigitalChannel[] = [];
-  const used = new Set<string>();
-
-  const pushIfUnique = (row: DigitalChannel | null) => {
-    if (!row) return;
-    const key = normalizeChannelName(row.name);
-    if (!key || used.has(key)) return;
-    used.add(key);
-    deduped.push(row);
-  };
-
-  if (policy === "restricted" && restrictedChannelIds.length > 0) {
-    const allowedLabels = labelsForChannelIds(restrictedChannelIds);
-    const allowedByNorm = new Map<string, string>();
-    for (const label of allowedLabels) {
-      allowedByNorm.set(normalizeChannelName(label), label);
-    }
-    for (const row of source) {
-      const rawName = typeof (row as Record<string, unknown>)?.name === "string"
-        ? String((row as Record<string, unknown>).name)
-        : "";
-      const canonical = allowedByNorm.get(normalizeChannelName(rawName));
-      if (!canonical) continue;
-      pushIfUnique(sanitizeChannelEntry(row, canonical));
-    }
-    // Fallback: garante saída consistente com os canais permitidos, mesmo se a IA falhar no formato.
-    for (const label of allowedLabels) {
-      pushIfUnique({
-        name: label,
-        priority: "Média",
-        description: `Canal autorizado na configuração da agência para este diagnóstico.`,
-        actions: [`Definir plano de execução para ${label}.`],
-      });
-    }
-    return deduped.slice(0, allowedLabels.length);
-  }
-
-  for (const row of source) {
-    pushIfUnique(sanitizeChannelEntry(row));
-  }
-  return deduped;
 }
 
 const RESERVED_INSTAGRAM_PATHS = new Set([
@@ -526,7 +446,8 @@ async function downloadImageAsInlinePart(
       typeof timeoutMsOverride === "number"
         ? timeoutMsOverride
         : isInstagramSnapshot
-          ? 35000
+          ? /* Rota /api/instagram-profile-snapshot pode levar 40–50s no cold start (maxDuration 120). */
+            110000
           : isInternalApi
             ? 18000
             : 10000;
@@ -1568,6 +1489,7 @@ function buildPrompt(body: {
   aiBasePromptGuidelines?: string;
   aiRecommendedChannelsPolicy?: AiRecommendedChannelsPolicy;
   aiRecommendedChannelIds?: string[];
+  aiOpenRecommendedChannelCount?: number;
   aiServicesFocusPolicy?: AiServicesFocusPolicy;
   aiServiceOfferingIds?: string[];
   aiCustomServiceLabels?: string[];
@@ -1598,7 +1520,12 @@ function buildPrompt(body: {
   if (channelPolicy === "restricted" && channelIds.length === 0) {
     channelPolicy = "open";
   }
-  const channelsPolicyBlock = `\n${buildRecommendedChannelsPolicyPromptSection(channelPolicy, channelIds)}\n`;
+  const openChannelCount = sanitizeAiOpenRecommendedChannelCount(body.aiOpenRecommendedChannelCount);
+  const channelsPolicyBlock = `\n${buildRecommendedChannelsPolicyPromptSection(
+    channelPolicy,
+    channelIds,
+    openChannelCount,
+  )}\n`;
 
   let servicesPolicy: AiServicesFocusPolicy =
     body.aiServicesFocusPolicy === "restricted" ? "restricted" : "open";
@@ -1784,6 +1711,7 @@ export async function POST(req: NextRequest) {
       aiBasePromptGuidelines: rawAiBasePromptGuidelines,
       aiRecommendedChannelsPolicy: rawAiRecommendedChannelsPolicy,
       aiRecommendedChannelIds: rawAiRecommendedChannelIds,
+      aiOpenRecommendedChannelCount: rawAiOpenRecommendedChannelCount,
       aiServicesFocusPolicy: rawAiServicesFocusPolicy,
       aiServiceOfferingIds: rawAiServiceOfferingIds,
       aiCustomServiceLabels: rawAiCustomServiceLabels,
@@ -1799,6 +1727,9 @@ export async function POST(req: NextRequest) {
     const aiRecommendedChannelsPolicy: AiRecommendedChannelsPolicy =
       rawAiRecommendedChannelsPolicy === "restricted" ? "restricted" : "open";
     const aiRecommendedChannelIds = sanitizeAiRecommendedChannelIds(rawAiRecommendedChannelIds);
+    const aiOpenRecommendedChannelCount = sanitizeAiOpenRecommendedChannelCount(
+      rawAiOpenRecommendedChannelCount,
+    );
     const aiServicesFocusPolicy: AiServicesFocusPolicy =
       rawAiServicesFocusPolicy === "restricted" ? "restricted" : "open";
     const aiServiceOfferingIds = sanitizeAiServiceOfferingIds(rawAiServiceOfferingIds);
@@ -1872,21 +1803,6 @@ export async function POST(req: NextRequest) {
     if (selectedWebsiteSnapshotUrl) siteHeroSnapshotUrl = selectedWebsiteSnapshotUrl;
     if (selectedInstagramSnapshotUrl) instagramSnapshotUrl = selectedInstagramSnapshotUrl;
     if (selectedBioLinkSnapshotUrl) instagramBioLinkSnapshotUrl = selectedBioLinkSnapshotUrl;
-
-    if (!instagramImagePart && selectedInstagramSnapshotUrl) {
-      const abs = toAbsoluteUrl(requestOrigin, selectedInstagramSnapshotUrl);
-      if (abs) {
-        const retry = await downloadImageAsInlinePart(abs, 60000);
-        if (retry) instagramImagePart = retry;
-      }
-    }
-    if (!websiteImagePart && selectedWebsiteSnapshotUrl) {
-      const abs = toAbsoluteUrl(requestOrigin, selectedWebsiteSnapshotUrl);
-      if (abs) {
-        const retry = await downloadImageAsInlinePart(abs, 45000);
-        if (retry) websiteImagePart = retry;
-      }
-    }
     console.info("[IG_DEBUG][generate-route] URLs de evidência selecionadas.", {
       hasBrowserless,
       siteHeroSnapshotUrl: siteHeroSnapshotUrl || null,
@@ -1912,6 +1828,7 @@ export async function POST(req: NextRequest) {
       aiBasePromptGuidelines,
       aiRecommendedChannelsPolicy,
       aiRecommendedChannelIds,
+      aiOpenRecommendedChannelCount,
       aiServicesFocusPolicy,
       aiServiceOfferingIds,
       aiCustomServiceLabels,
@@ -2204,7 +2121,8 @@ export async function POST(req: NextRequest) {
       recommendedChannels: normalizeRecommendedChannels(
         aiData.recommendedChannels,
         aiRecommendedChannelsPolicy,
-        aiRecommendedChannelIds
+        aiRecommendedChannelIds,
+        aiRecommendedChannelsPolicy === "open" ? aiOpenRecommendedChannelCount : undefined,
       ),
       quickWins: (aiData.quickWins as string[]) || [],
       longTermActions: (aiData.longTermActions as string[]) || [],

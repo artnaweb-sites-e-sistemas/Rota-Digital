@@ -10,6 +10,7 @@ import {
   sanitizeAiServiceOfferingIds,
 } from "@/lib/ai-agency-services";
 import { sanitizeAiScoringStrictness } from "@/lib/ai-scoring-strictness-prompt";
+import { sanitizeAiOpenRecommendedChannelCount } from "@/lib/ai-recommended-channels-prompt";
 
 export function coerceUserAiPromptSettingsRaw(raw: Record<string, unknown>): UserAiPromptSettings {
   const channelPolicy: AiRecommendedChannelsPolicy =
@@ -22,6 +23,7 @@ export function coerceUserAiPromptSettingsRaw(raw: Record<string, unknown>): Use
       typeof raw.aiBasePromptGuidelines === "string" ? raw.aiBasePromptGuidelines : "",
     aiRecommendedChannelsPolicy: channelPolicy,
     aiRecommendedChannelIds: sanitizeAiRecommendedChannelIds(raw.aiRecommendedChannelIds),
+    aiOpenRecommendedChannelCount: sanitizeAiOpenRecommendedChannelCount(raw.aiOpenRecommendedChannelCount),
     aiServicesFocusPolicy: servicesPolicy,
     aiServiceOfferingIds: sanitizeAiServiceOfferingIds(raw.aiServiceOfferingIds),
     aiCustomServiceLabels: sanitizeAiCustomServiceLabels(raw.aiCustomServiceLabels),

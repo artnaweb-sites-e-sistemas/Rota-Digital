@@ -416,11 +416,18 @@ export default function LeadsPage() {
                   aria-hidden
                 />
                 <Input
+                  id="leads-table-search"
+                  name="leads_table_search"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Buscar por nome, empresa, e-mail ou telefone…"
                   className="h-10 w-full rounded-xl border-input bg-background pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:border-indigo-500/50 focus-visible:ring-indigo-500/20 dark:border-white/10 dark:bg-white/5 dark:text-zinc-100 dark:placeholder:text-zinc-600"
                   aria-label="Buscar leads"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  data-1p-ignore
+                  data-lpignore="true"
                 />
               </div>
               <Select

@@ -3,7 +3,11 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 import type { DiagnosticScore, RotaDigitalReport } from "@/types/report";
 import type { AiRecommendedChannelsPolicy, AiServicesFocusPolicy } from "@/types/user-settings";
-import { buildRecommendedChannelsPolicyPromptSection } from "@/lib/ai-recommended-channels-prompt";
+import {
+  buildRecommendedChannelsPolicyPromptSection,
+  sanitizeAiOpenRecommendedChannelCount,
+} from "@/lib/ai-recommended-channels-prompt";
+import { normalizeRecommendedChannels } from "@/lib/recommended-channels-normalize";
 import { buildServicesFocusPromptSection } from "@/lib/ai-services-focus-prompt";
 import {
   buildScoringStrictnessPromptSection,
@@ -96,7 +100,14 @@ export async function POST(req: NextRequest) {
     if (channelPolicy === "restricted" && channelIds.length === 0) {
       channelPolicy = "open";
     }
-    const channelsPolicyBlock = `${buildRecommendedChannelsPolicyPromptSection(channelPolicy, channelIds)}\n\n`;
+    const openChannelCount = sanitizeAiOpenRecommendedChannelCount(
+      storedAi?.aiOpenRecommendedChannelCount,
+    );
+    const channelsPolicyBlock = `${buildRecommendedChannelsPolicyPromptSection(
+      channelPolicy,
+      channelIds,
+      openChannelCount,
+    )}\n\n`;
 
     let servicesPolicy: AiServicesFocusPolicy =
       storedAi?.aiServicesFocusPolicy === "restricted" ? "restricted" : "open";
@@ -255,10 +266,12 @@ Retorne SOMENTE um JSON válido com os campos atualizados:
         strengths: (aiData.strengths as string[]) || report.strengths || [],
         weaknesses: (aiData.weaknesses as string[]) || report.weaknesses || [],
         opportunities: (aiData.opportunities as string[]) || report.opportunities || [],
-        recommendedChannels:
-          (aiData.recommendedChannels as RotaDigitalReport["recommendedChannels"]) ||
-          report.recommendedChannels ||
-          [],
+        recommendedChannels: normalizeRecommendedChannels(
+          aiData.recommendedChannels ?? report.recommendedChannels,
+          channelPolicy,
+          channelIds,
+          channelPolicy === "open" ? openChannelCount : undefined,
+        ),
         quickWins: (aiData.quickWins as string[]) || report.quickWins || [],
         longTermActions: (aiData.longTermActions as string[]) || report.longTermActions || [],
         estimatedTimelineMonths:

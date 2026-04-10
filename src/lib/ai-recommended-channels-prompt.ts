@@ -1,13 +1,28 @@
 import type { AiRecommendedChannelsPolicy } from "@/types/user-settings";
 import { labelsForChannelIds } from "@/lib/ai-recommended-channel-options";
 
+export const AI_OPEN_RECOMMENDED_CHANNEL_COUNT_MIN = 2;
+export const AI_OPEN_RECOMMENDED_CHANNEL_COUNT_MAX = 8;
+export const AI_OPEN_RECOMMENDED_CHANNEL_COUNT_DEFAULT = 2;
+
+export function sanitizeAiOpenRecommendedChannelCount(raw: unknown): number {
+  const n = typeof raw === "number" ? raw : Number(raw);
+  if (!Number.isFinite(n)) return AI_OPEN_RECOMMENDED_CHANNEL_COUNT_DEFAULT;
+  return Math.max(
+    AI_OPEN_RECOMMENDED_CHANNEL_COUNT_MIN,
+    Math.min(AI_OPEN_RECOMMENDED_CHANNEL_COUNT_MAX, Math.round(n)),
+  );
+}
+
 /** Texto injetado no prompt (geração e reanálise) para respeitar a política de **canais** da conta. */
 export function buildRecommendedChannelsPolicyPromptSection(
   policy: AiRecommendedChannelsPolicy,
-  channelIds: string[]
+  channelIds: string[],
+  openChannelCount: number = AI_OPEN_RECOMMENDED_CHANNEL_COUNT_DEFAULT,
 ): string {
   if (policy !== "restricted" || channelIds.length === 0) {
-    return `**Política de recommendedChannels:** Você pode sugerir quaisquer canais digitais relevantes para o caso. Retorne no mínimo 3 itens em "recommendedChannels", com nomes claros em português.`;
+    const n = sanitizeAiOpenRecommendedChannelCount(openChannelCount);
+    return `**Política de recommendedChannels (modo livre):** Sugira canais digitais realmente relevantes para o caso. Retorne **exatamente ${n}** itens em "recommendedChannels" (nem mais nem menos), com nomes claros em português. Para cada item, defina "priority" como "Alta", "Média" ou "Baixa" conforme o peso na sua análise — distribua as prioridades de forma coerente (não use a mesma prioridade em todos se houver diferença clara de impacto).`;
   }
 
   const labels = labelsForChannelIds(channelIds);
