@@ -326,7 +326,7 @@ const BorderGlow: FC<BorderGlowProps> = ({
       onPointerEnter={() => setIsHovered(true)}
       onPointerLeave={() => setIsHovered(false)}
       className={cn(
-        "relative isolate flex min-h-0 flex-col overflow-visible border border-border dark:border-white/15",
+        "relative isolate flex min-h-0 touch-auto flex-col overflow-visible border border-border dark:border-white/15",
         className,
       )}
       style={{

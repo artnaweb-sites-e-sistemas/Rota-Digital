@@ -21,7 +21,10 @@ export function PublicThemeToggle({ className }: PublicThemeToggleProps) {
   if (!mounted) {
     return (
       <span
-        className={cn("inline-flex h-9 w-9 shrink-0 rounded-lg border border-transparent", className)}
+        className={cn(
+          "inline-flex h-12 w-12 shrink-0 rounded-xl border border-transparent sm:h-7 sm:w-7 sm:rounded-lg",
+          className,
+        )}
         aria-hidden
       />
     );
@@ -36,13 +39,19 @@ export function PublicThemeToggle({ className }: PublicThemeToggleProps) {
       size="icon-sm"
       className={cn(
         "shrink-0 border-border bg-background/80 text-foreground shadow-sm backdrop-blur-sm hover:bg-muted",
+        /* Mobile: área de toque e ícone maiores; desktop: mantém icon-sm */
+        "h-12 w-12 rounded-xl sm:h-7 sm:w-7 sm:rounded-[min(var(--radius-md),12px)]",
         className,
       )}
       onClick={() => setTheme(isDark ? "light" : "dark")}
       title={isDark ? "Modo claro" : "Modo escuro"}
       aria-label={isDark ? "Ativar modo claro" : "Ativar modo escuro"}
     >
-      {isDark ? <Sun className="size-4" aria-hidden /> : <Moon className="size-4" aria-hidden />}
+      {isDark ? (
+        <Sun className="size-6 sm:size-4" aria-hidden />
+      ) : (
+        <Moon className="size-6 sm:size-4" aria-hidden />
+      )}
     </Button>
   );
 }

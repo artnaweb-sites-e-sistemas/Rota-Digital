@@ -88,11 +88,11 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     );
 
   return (
-    <div className="fixed inset-0 flex min-h-0 overflow-hidden bg-background text-foreground font-sans">
+    <div className="fixed inset-0 flex h-dvh max-h-dvh min-h-0 w-full flex-row overflow-hidden bg-background text-foreground font-sans">
       {/* Sidebar principal — expandida ou só ícones */}
       <aside
         className={cn(
-          "flex shrink-0 flex-col justify-between border-r border-sidebar-border bg-sidebar/95 text-sidebar-foreground shadow-sm backdrop-blur-xl transition-[width] duration-200 ease-out dark:shadow-[1px_0_0_0_rgba(255,255,255,0.05)] dark:bg-zinc-950/50",
+          "flex max-h-full min-h-0 shrink-0 flex-col justify-between overflow-y-auto border-r border-sidebar-border bg-sidebar/95 text-sidebar-foreground shadow-sm backdrop-blur-xl transition-[width] duration-200 ease-out dark:shadow-[1px_0_0_0_rgba(255,255,255,0.05)] dark:bg-zinc-950/50",
           mainCollapsed ? "w-[4.5rem]" : "w-64",
         )}
       >
@@ -238,7 +238,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 
       {/* Segunda sidebar — só na área Configurações */}
       {settingsSection ? (
-        <aside className="flex w-[13.5rem] shrink-0 flex-col border-r border-sidebar-border bg-sidebar/90 text-sidebar-foreground backdrop-blur-xl dark:border-white/5 dark:bg-zinc-950/70">
+        <aside className="flex max-h-full min-h-0 w-[13.5rem] shrink-0 flex-col overflow-y-auto border-r border-sidebar-border bg-sidebar/90 text-sidebar-foreground backdrop-blur-xl dark:border-white/5 dark:bg-zinc-950/70">
           <div className="border-b border-sidebar-border px-4 py-5 dark:border-white/5">
             <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Configurações</p>
             <p className="mt-1 text-sm font-semibold text-foreground dark:text-zinc-200">Sua conta</p>
@@ -266,7 +266,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         </aside>
       ) : null}
 
-      <main className="min-h-0 min-w-0 flex-1 touch-pan-y overflow-y-auto overflow-x-clip overscroll-y-contain bg-background dark:bg-zinc-950">
+      <main className="min-h-0 min-w-0 max-h-full flex-1 overflow-y-auto overflow-x-hidden bg-background dark:bg-zinc-950">
         <div className="mx-auto w-full min-h-0 min-w-0 max-w-[1760px] px-6 py-10 sm:px-10 md:px-12">
           {children}
         </div>
