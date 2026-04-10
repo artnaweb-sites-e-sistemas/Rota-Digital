@@ -602,12 +602,20 @@ function normalizeResearchNotesText(text: string): string {
     .trim();
 }
 
+/** Normaliza o corpo das notas de pesquisa: até 2 parágrafos (\n\n), texto corrido dentro de cada um. */
 function normalizeAiResearchBody(text: unknown): string {
   if (typeof text !== "string") return "";
-  return normalizeResearchNotesText(text)
+  const stripped = normalizeResearchNotesText(text)
     .replace(/^(website|site|instagram)\s*(?:\(.*?\))?\s*:\s*/i, "")
-    .replace(/\s+/g, " ")
     .trim();
+  if (!stripped) return "";
+  const paragraphs = stripped
+    .split(/\n{2,}/)
+    .map((p) => p.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+  if (paragraphs.length === 0) return "";
+  if (paragraphs.length <= 2) return paragraphs.join("\n\n");
+  return `${paragraphs[0]}\n\n${paragraphs.slice(1).join(" ")}`.trim();
 }
 
 function buildScoredResearchNote(
@@ -640,7 +648,8 @@ function sanitizeInstagramAiBody(text: unknown, evidence: InstagramEvidence): st
   const cleanup = (value: string) =>
     value
       .replace(/\bO\s+O\s+link\b/gi, "O link")
-      .replace(/\s{2,}/g, " ")
+      .replace(/[ \t]+/g, " ")
+      .replace(/\n{3,}/g, "\n\n")
       .trim();
 
   if (!misleadingPattern.test(normalized)) {
@@ -718,7 +727,8 @@ function alignInstagramTextWithEvidence(text: string, evidence: InstagramEvidenc
     result = result
       .replace(/perfil[^.]*vazio[^.]*\./gi, "")
       .replace(/sem conteúdo ativo[^.]*\./gi, "")
-      .replace(/\s{2,}/g, " ")
+      .replace(/[ \t]+/g, " ")
+      .replace(/\n{3,}/g, "\n\n")
       .trim();
   }
   return result;
@@ -1371,17 +1381,9 @@ function buildInstagramResearchNote(
     return `certifique-se de que está logado no Instagram, para que o sistema consiga acessar o perfil e validar métricas públicas com mais precisão.`;
   }
   const handle = e.handle ? `@${e.handle}` : "identificado";
-  const parts: string[] = [];
-  if (typeof e.followers === "number" && !isNaN(e.followers))
-    parts.push(`${e.followers.toLocaleString("pt-BR")} seguidores`);
-  if (typeof e.following === "number" && !isNaN(e.following))
-    parts.push(`seguindo ${e.following.toLocaleString("pt-BR")}`);
-  if (typeof e.posts === "number" && !isNaN(e.posts))
-    parts.push(`${e.posts.toLocaleString("pt-BR")} publicações`);
-  const metrics = parts.length > 0 ? parts.join(", ") : "métricas não coletadas";
-  const bioText = e.bio
-    ? "a bio deixa claro o posicionamento principal do perfil."
-    : "a bio não foi coletada automaticamente.";
+  const bioSentence = e.bio
+    ? "Tem uma bio clara sobre posicionamento e público."
+    : "A bio não foi coletada automaticamente.";
   const finalUrl = (e.bioLinkResolvedUrl || e.bioLinkUrl || "").toLowerCase();
   const linkText =
     finalUrl.includes("api.whatsapp.com") ||
@@ -1393,7 +1395,7 @@ function buildInstagramResearchNote(
         : e.bioLinkUrl
           ? `O link da bio aponta para ${e.bioLinkUrl}.`
           : "Nenhum link na bio foi verificado.";
-  return `perfil ${handle}. ${bioText} ${linkText} Indicadores públicos: ${metrics}.`;
+  return `O perfil ${handle} ${bioSentence} ${linkText}`.replace(/\s+/g, " ").trim();
 }
 
 function buildTechnicalImprovementHints(e: WebsiteEvidence): string[] {
@@ -1592,8 +1594,8 @@ ${aiGuidelinesBlock}${channelsPolicyBlock}${servicesFocusBlock}${scoringStrictne
 1) Analise alinhamento entre posicionamento atual e o objetivo (informado ou inferido).
 1.1) Se o site estiver vazio, quebrado, em placeholder (ex.: "hello world") ou sem conteúdo útil, deixe isso explícito e reduza as notas relacionadas a website.
 1.2) Se o Instagram estiver vazio/sem consistência, deixe explícito e ajuste as notas.
-1.3) Em "websiteResearchNote" e "instagramResearchNote", escreva observações curtas, específicas e naturais sobre o que foi avaliado. Não seja genérico.
-1.4) Em "instagramResearchNote", fale de posicionamento, clareza da bio, consistência visual, destaques, link na bio, prova social e CTA. Não copie a bio literalmente e não repita o texto inteiro da bio.
+1.3) Em "websiteResearchNote" e "instagramResearchNote": no máximo 2 parágrafos cada (separar com uma linha em branco \\n\\n no JSON). Texto corrido, um fio de raciocínio; evite sequência de frases telegráficas ou uma frase por linha.
+1.4) Em "instagramResearchNote": sintetize a ideia da bio (ex.: "a bio deixa claro que…"). PROIBIDO transcrever a bio entre aspas ou colar emojis. NÃO comece citando seguidores, posts ou outras métricas (essas já aparecem nas evidências). Fale de posicionamento, clareza, consistência visual, destaques, link na bio e CTA quando fizer sentido com o que foi verificado.
 1.5) Ao comentar o link da bio, use o "destino final verificado". Se ele levar direto para WhatsApp, diga isso claramente. Não invente Linktree, menu com várias opções ou múltiplos destinos se isso não estiver verificado.
 1.6) Use análise VISUAL apenas quando houver captura real do canal.
 1.7) Se "Captura visual do website antes da análise" estiver "não disponível", não faça análise visual do website; escreva explicitamente "não foi possível analisar visualmente o website".
@@ -1618,7 +1620,8 @@ ${aiGuidelinesBlock}${channelsPolicyBlock}${servicesFocusBlock}${scoringStrictne
 - "recommendedChannels.description": explique em linguagem comercial simples por que aquele canal faz sentido.
 - "recommendedChannels.actions": ações práticas, em tom de orientação direta.
 - "diagnosticScores.comment": comentário humano, específico e acionável. Se a nota for menor que 10, termine dizendo o que precisa ser feito para chegar a 10/10.
-- Quando o texto de "diagnosticScores.comment", "websiteResearchNote", "instagramResearchNote" ou "recommendedChannels.description" ficar longo, divida em 2 parágrafos curtos para facilitar a leitura.
+- Quando o texto de "diagnosticScores.comment" ou "recommendedChannels.description" ficar longo, divida em 2 parágrafos curtos.
+- "websiteResearchNote" e "instagramResearchNote": sempre no máximo 2 parágrafos cada, como acima.
 
 **REGRA ABSOLUTA: NUNCA INVENTE INFORMAÇÃO**
 Esta é a regra mais importante de todo o relatório. Quebre qualquer outra regra antes de quebrar esta.
@@ -1679,10 +1682,10 @@ Responda **somente** com um único objeto JSON válido (sem markdown fora do JSO
   "diagnosticScores": [
     { "topic": "Posicionamento", "score": number, "comment": "string" }
   ],
-  "websiteResearchNote": "string",
-  "instagramResearchNote": "string",
+  "websiteResearchNote": "string (máx. 2 parágrafos \\n\\n; texto corrido; sem métricas repetidas das evidências)",
+  "instagramResearchNote": "string (máx. 2 parágrafos; sem citar seguidores/posts no início; sem bio entre aspas; sintese)",
   "instagramBioExcerpt": "string",
-  "researchNotes": "string (2 parágrafos completos e claros: 1) Website: UX/diagramação/paleta/CTA/SEO/prova social 2) Instagram: bio/linha editorial/engajamento/apelo visual/CTA; sem markdown)",
+  "researchNotes": "string (exatamente 2 blocos separados por \\n\\n: linha 1) Website (nota X/10): … pode ter até 2 parágrafos internos com \\n\\n; linha 2) Instagram (nota X/10): … idem; sem markdown)",
   "proposalPageHtml": "string — HTML completo do documento"
 }
 
@@ -2079,7 +2082,7 @@ export async function POST(req: NextRequest) {
         : "não foi possível analisar visualmente o website porque a captura real não ficou disponível."
     );
     const instagramEvidenceNote = instagramImagePart
-      ? `${buildInstagramResearchNote(instagramEvidence)} IMPORTANTE: a CAPTURA 2 do Instagram foi enviada — use-a como fonte principal da análise visual. Mesmo com overlay parcial, extraia o que estiver legível.`
+      ? buildInstagramResearchNote(instagramEvidence)
       : "não foi possível analisar visualmente o Instagram porque a captura real não ficou disponível.";
     const instagramNote = alignInstagramTextWithEvidence(buildScoredResearchNote(
       "Instagram",

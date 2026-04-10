@@ -145,7 +145,8 @@ Tom por campo:
 - Se a nota de um tópico for menor que 10, diga sempre o que falta para chegar a 10/10.
 - Nunca escreva frases vagas como "há espaço para melhorar" ou "há espaço para otimizações técnicas" sem explicar exatamente o que deve ser feito.
 - Em "Identidade Visual", comente harmonia visual, paleta, contraste, hierarquia, espaçamento, alinhamento, legibilidade e coerência entre site e Instagram.
-- Se o texto ficar longo em "diagnosticScores.comment", "websiteResearchNote", "instagramResearchNote" ou "recommendedChannels.description", divida em 2 parágrafos curtos.
+- Se o texto ficar longo em "diagnosticScores.comment" ou "recommendedChannels.description", divida em 2 parágrafos curtos.
+- "websiteResearchNote" e "instagramResearchNote": no máximo 2 parágrafos cada (\\n\\n), texto corrido; em Instagram não comece com seguidores/posts e não transcreva a bio entre aspas — sintetize.
 
 Observação do usuário:
 ${observation}
@@ -182,7 +183,7 @@ Retorne SOMENTE um JSON válido com os campos atualizados:
   "websiteResearchNote": "string",
   "instagramResearchNote": "string",
   "instagramBioExcerpt": "string",
-  "researchNotes": "string (2 parágrafos: 1) Website (nota X/10): ... 2) Instagram (nota X/10): ...)",
+  "researchNotes": "string (bloco Website (nota X/10): até 2 parágrafos internos \\n\\n; linha em branco; bloco Instagram (nota X/10): idem)",
   "proposalPageHtml": "string"
 }`;
 

@@ -163,43 +163,162 @@ const MATURITY_CONFIG = {
   Avançado: { color: "text-emerald-800 dark:text-green-400", bar: "bg-green-500", range: "7.0-10.0" },
 };
 
-function formatReadableParagraphs(text?: string): string {
-  if (!text) return "";
-
-  let normalized = text.replace(/\r\n/g, "\n").trim();
-  if (!normalized) return "";
-
-  normalized = normalized
+/** Quebras “manuais” antes de frases que costumam ser recomendações (melhor escaneabilidade). */
+function applyReadingHeuristics(text: string): string {
+  return text
     .replace(/\s+(Para (?:chegar a 10\/10|um 10\/10|ficar 10\/10))/gi, "\n\n$1")
     .replace(/\s+(O que falta(?: para .*?)?10\/10)/gi, "\n\n$1")
-    .replace(/\s+(Enquanto )/g, "\n\n$1")
-    .replace(/\n{3,}/g, "\n\n");
-
-  if (normalized.includes("\n\n")) {
-    return normalized;
-  }
-
-  const sentences = normalized
-    .split(/(?<=[.!?])\s+/)
-    .map((part) => part.trim())
-    .filter(Boolean);
-
-  if (sentences.length >= 3) {
-    return `${sentences.slice(0, 2).join(" ")}\n\n${sentences.slice(2).join(" ")}`.trim();
-  }
-
-  if (sentences.length === 2 && normalized.length > 180) {
-    return `${sentences[0]}\n\n${sentences[1]}`.trim();
-  }
-
-  return normalized;
+    .replace(/\s+(Enquanto )/g, "\n\n$1");
 }
 
-function splitReadableParagraphs(text?: string): string[] {
-  return formatReadableParagraphs(text)
-    .split(/\n{2,}/)
-    .map((p) => p.trim())
+function splitIntoSentences(paragraph: string): string[] {
+  const t = paragraph.replace(/\s+/g, " ").trim();
+  if (!t) return [];
+  return t
+    .split(/(?<=[.!?])\s+/u)
+    .map((s) => s.trim())
     .filter(Boolean);
+}
+
+/**
+ * A IA às vezes coloca `\\n\\n` no meio de uma frase (ex.: "Contudo," sozinho + continuação).
+ * Junta esses fragmentos ao parágrafo seguinte para não aparecer uma linha isolada.
+ */
+const CONJUNCTION_ORPHAN_ONLY =
+  /^(contudo|porém|entretanto|no entanto|todavia|assim|portanto|dessa forma|desse modo)\s*,?\s*$/i;
+
+function mergeOrphanExplicitParagraphs(parts: string[]): string[] {
+  const out: string[] = [];
+  let i = 0;
+  while (i < parts.length) {
+    const cur = parts[i];
+    const t = cur.trim();
+    const next = parts[i + 1];
+    const shortIncomplete =
+      Boolean(next) &&
+      t.length > 0 &&
+      t.length <= 55 &&
+      !/[.!?]$/.test(t) &&
+      (t.endsWith(",") || CONJUNCTION_ORPHAN_ONLY.test(t));
+    if (shortIncomplete) {
+      out.push(`${t} ${parts[i + 1]!.trim()}`);
+      i += 2;
+      continue;
+    }
+    out.push(cur);
+    i += 1;
+  }
+  return out;
+}
+
+/**
+ * Divide texto longo da IA em blocos curtos (1–2 frases) para leitura mais fluida.
+ * Respeita parágrafos explícitos (`\\n\\n`) vindos do modelo.
+ */
+function splitIntoReadableBlocks(
+  raw: string | undefined,
+  sentencesPerBlock: 1 | 2 = 2,
+): string[] {
+  if (!raw?.trim()) return [];
+  let normalized = raw.replace(/\r\n/g, "\n").trim();
+  normalized = applyReadingHeuristics(normalized);
+  normalized = normalized.replace(/\n{3,}/g, "\n\n");
+  const explicitParts = mergeOrphanExplicitParagraphs(
+    normalized
+      .split(/\n{2,}/)
+      .map((p) => p.replace(/\s+/g, " ").trim())
+      .filter(Boolean),
+  );
+  const blocks: string[] = [];
+  for (const part of explicitParts) {
+    const sentences = splitIntoSentences(part);
+    if (sentences.length === 0) continue;
+    for (let i = 0; i < sentences.length; i += sentencesPerBlock) {
+      blocks.push(sentences.slice(i, i + sentencesPerBlock).join(" "));
+    }
+  }
+  return blocks;
+}
+
+/** Blocos de texto com respiro entre frases — uso nos cards do relatório. */
+function ReportProseBlocks({
+  text,
+  sentencesPerBlock = 2,
+  size = "md",
+  firstProminent = true,
+}: {
+  text?: string;
+  sentencesPerBlock?: 1 | 2;
+  size?: "sm" | "md" | "lg";
+  /** Se true, o primeiro bloco fica com contraste cheio; os seguintes levemente suavizados. */
+  firstProminent?: boolean;
+}) {
+  const blocks = splitIntoReadableBlocks(text, sentencesPerBlock);
+  if (blocks.length === 0) return null;
+  const sizeClass =
+    size === "lg"
+      ? "text-[15px] leading-[1.72]"
+      : size === "sm"
+        ? "text-[13.5px] leading-[1.68]"
+        : "text-[14px] sm:text-[14.5px] leading-[1.7]";
+  return (
+    <div className="space-y-3.5">
+      {blocks.map((block, i) => (
+        <p
+          key={i}
+          className={cn(
+            sizeClass,
+            "text-pretty antialiased [overflow-wrap:anywhere]",
+            firstProminent && i > 0
+              ? "text-foreground/90 dark:text-foreground/85"
+              : "text-foreground",
+          )}
+        >
+          {block}
+        </p>
+      ))}
+    </div>
+  );
+}
+
+/** Notas Website/Instagram: no máx. 2 parágrafos (só quebras \\n\\n), sem partir por frase. */
+function EvidenceResearchNoteProse({
+  text,
+  size = "md",
+}: {
+  text?: string;
+  size?: "sm" | "md";
+}) {
+  if (!text?.trim()) return null;
+  let normalized = text.replace(/\r\n/g, "\n").trim();
+  normalized = applyReadingHeuristics(normalized);
+  const rawParts = normalized
+    .split(/\n{2,}/)
+    .map((p) => p.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+  const paragraphs =
+    rawParts.length <= 2 ? rawParts : [rawParts[0], rawParts.slice(1).join(" ")];
+  if (paragraphs.length === 0) return null;
+  const sizeClass =
+    size === "sm"
+      ? "text-[13.5px] leading-[1.68]"
+      : "text-[14px] sm:text-[14.5px] leading-[1.7]";
+  return (
+    <div className="space-y-3.5">
+      {paragraphs.map((block, i) => (
+        <p
+          key={i}
+          className={cn(
+            sizeClass,
+            "text-pretty antialiased [overflow-wrap:anywhere]",
+            i > 0 ? "text-foreground/90 dark:text-foreground/85" : "text-foreground",
+          )}
+        >
+          {block}
+        </p>
+      ))}
+    </div>
+  );
 }
 
 function withSnapshotParams(src?: string, params?: Record<string, string | number | undefined>): string | undefined {
@@ -373,19 +492,44 @@ function parseResearchNotes(text?: string): {
     return { website: "", instagram: "", general: [] };
   }
 
-  const lines = text
+  const cleaned = text
+    .replace(/\*\*/g, "")
+    .replace(/^#+\s*/gm, "")
+    .replace(/\r\n/g, "\n")
+    .trim();
+
+  const general: string[] = [];
+
+  const channelSplit = cleaned.match(
+    /^(?:Website|Site)\s*\([^)]*\):\s*([\s\S]*?)\n+Instagram\s*\([^)]*\):\s*([\s\S]*)$/i,
+  );
+
+  if (channelSplit) {
+    const website = channelSplit[1].trim();
+    const instagram = channelSplit[2].trim();
+    return {
+      website: stripResearchNoteChannelPrefix(
+        stripResearchNoteScoreParen(website),
+        "website",
+      ),
+      instagram: stripResearchNoteChannelPrefix(
+        stripResearchNoteScoreParen(instagram),
+        "instagram",
+      ),
+      general,
+    };
+  }
+
+  const lines = cleaned
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean);
 
   let website = "";
   let instagram = "";
-  const general: string[] = [];
 
   for (const line of lines) {
     const normalizedLine = line
-      .replace(/\*\*/g, "")
-      .replace(/^#+\s*/, "")
       .replace(/^Validação automática:?$/i, "")
       .trim();
     if (!normalizedLine) continue;
@@ -404,11 +548,11 @@ function parseResearchNotes(text?: string): {
   return {
     website: stripResearchNoteChannelPrefix(
       stripResearchNoteScoreParen(website),
-      "website"
+      "website",
     ),
     instagram: stripResearchNoteChannelPrefix(
       stripResearchNoteScoreParen(instagram),
-      "instagram"
+      "instagram",
     ),
     general,
   };
@@ -463,7 +607,8 @@ function alignInstagramNoteForDisplay(
     result = result
       .replace(/perfil[^.]*vazio[^.]*\./gi, "")
       .replace(/sem conteúdo ativo[^.]*\./gi, "")
-      .replace(/\s{2,}/g, " ")
+      .replace(/[ \t]+/g, " ")
+      .replace(/\n{3,}/g, "\n\n")
       .trim();
   }
 
@@ -927,14 +1072,15 @@ function ChannelCard({ channel }: { channel: DigitalChannel }) {
             {channel.priority}
           </Badge>
         </div>
-        <p className="text-[13.5px] leading-relaxed text-foreground whitespace-pre-line">
-          {formatReadableParagraphs(channel.description)}
-        </p>
+        <ReportProseBlocks text={channel.description} size="sm" sentencesPerBlock={1} />
         {channel.actions.length > 0 && (
           <ul className="space-y-2">
             {channel.actions.map((action, i) => (
               <li key={i} className="flex items-start gap-2 text-[13px] leading-relaxed text-foreground/90">
-                <ArrowRight size={14} className="mt-1 shrink-0 text-primary" />
+                <ArrowRight
+                  size={14}
+                  className="mt-1 shrink-0 text-[color:var(--rota-brand-lilac)]"
+                />
                 {action}
               </li>
             ))}
@@ -1406,11 +1552,7 @@ export function RotaDigitalReportView({
             </div>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              <p className="text-[15px] leading-relaxed text-foreground antialiased whitespace-pre-line">
-                {formatReadableParagraphs(report.executiveSummary || "")}
-              </p>
-            </div>
+                       <ReportProseBlocks text={report.executiveSummary} size="lg" sentencesPerBlock={1} />
           </CardContent>
         </Card>
 
@@ -1500,7 +1642,7 @@ export function RotaDigitalReportView({
                   Nível {report.digitalMaturityLevel}
                 </Badge>
                 <span className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
-                  Score consolidado
+                  Score
                 </span>
               </div>
             </div>
@@ -1566,14 +1708,14 @@ export function RotaDigitalReportView({
                   : "Falar com um especialista da Rota Digital para colocar o plano do relatório em prática"
               }
               className={cn(
-                buttonVariants({ variant: "cta", size: "sm" }),
-                "no-print w-full justify-center gap-1.5 px-2 text-center leading-tight shadow-md",
+                buttonVariants({ variant: "cta", size: "lg" }),
+                "no-print h-10 min-h-10 w-full justify-center gap-2 px-4 text-center text-sm leading-snug shadow-md sm:px-5",
               )}
             >
               {reportCta.top.useWhatsAppIcon ? (
-                <WhatsAppIcon className="size-3.5 shrink-0" />
+                <WhatsAppIcon className="size-4 shrink-0" />
               ) : (
-                <MessageSquare className="size-3.5 shrink-0" aria-hidden />
+                <MessageSquare className="size-4 shrink-0" aria-hidden />
               )}
               {reportCta.top.label}
             </a>
@@ -1655,11 +1797,21 @@ export function RotaDigitalReportView({
           <CardContent className="grid gap-5 md:grid-cols-2">
             <div className="space-y-2">
               <p className="text-xs text-muted-foreground mb-1">Serviços oferecidos</p>
-              <p className="text-sm leading-7 text-foreground/90 whitespace-pre-line">{report.brief?.servicesOffered || "—"}</p>
+              <ReportProseBlocks
+                text={report.brief?.servicesOffered?.trim() ? report.brief.servicesOffered : "—"}
+                size="sm"
+                sentencesPerBlock={2}
+                firstProminent={false}
+              />
             </div>
             <div className="space-y-2">
               <p className="text-xs text-muted-foreground mb-1">Objetivo</p>
-              <p className="text-sm leading-7 text-foreground/90 whitespace-pre-line">{report.brief?.objective || "—"}</p>
+              <ReportProseBlocks
+                text={report.brief?.objective?.trim() ? report.brief.objective : "—"}
+                size="sm"
+                sentencesPerBlock={2}
+                firstProminent={false}
+              />
             </div>
           </CardContent>
         </Card>
@@ -1712,31 +1864,7 @@ export function RotaDigitalReportView({
                           {item.score}/10
                         </Badge>
                       </div>
-                      {(() => {
-                        const paragraphs = splitReadableParagraphs(item.comment);
-                        const firstParagraph = paragraphs[0] || "";
-                        const secondParagraph = paragraphs[1] || "";
-                        const remaining = paragraphs.slice(2).join("\n\n");
-                        return (
-                          <div className="space-y-3">
-                            {firstParagraph ? (
-                              <p className="text-[14.5px] leading-relaxed text-foreground whitespace-pre-line">
-                                {firstParagraph}
-                              </p>
-                            ) : null}
-                            {secondParagraph ? (
-                              <p className="text-[14px] leading-relaxed text-foreground/90 whitespace-pre-line">
-                                {secondParagraph}
-                              </p>
-                            ) : null}
-                            {remaining ? (
-                              <p className="text-[14px] leading-relaxed text-foreground/90 whitespace-pre-line">
-                                {remaining}
-                              </p>
-                            ) : null}
-                          </div>
-                        );
-                      })()}
+                      <ReportProseBlocks text={item.comment} size="md" sentencesPerBlock={1} />
                     </div>
                   </div>
                 </div>
@@ -1756,9 +1884,6 @@ export function RotaDigitalReportView({
                 Evidências coletadas
               </CardTitle>
             </div>
-            <p className={ROTA_CARD_SUBTITLE}>
-              Base visual e textual usada para compor este diagnóstico.
-            </p>
           </CardHeader>
           <CardContent
             className={`grid gap-5 ${
@@ -1768,9 +1893,11 @@ export function RotaDigitalReportView({
             <div className="flex h-full min-h-0 flex-col gap-3">
               <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Bio do Instagram</p>
               <div className="shrink-0 rounded-xl border border-border bg-card p-5">
-                <p className="text-[14px] leading-relaxed text-foreground whitespace-pre-line">
-                  {report.evidences.instagramBioExcerpt ||
-                    "Bio não disponível na coleta automática."}
+                {/* Bio: manter quebras de linha como no Instagram (`\\n` na coleta), sem normalizar em frases. */}
+                <p className="text-[14px] leading-relaxed text-foreground whitespace-pre-line break-words [overflow-wrap:anywhere]">
+                  {report.evidences.instagramBioExcerpt?.trim()
+                    ? report.evidences.instagramBioExcerpt
+                    : "Bio não disponível na coleta automática."}
                 </p>
               </div>
               {briefWebsiteHref || briefInstagramHref ? (
@@ -1871,12 +1998,13 @@ export function RotaDigitalReportView({
                         <Globe className="size-3.5 shrink-0 stroke-[1.75] text-sky-400" aria-hidden />
                         <span className={TOPIC_PILL_LABEL_NEXT_TO_ICON}>Website</span>
                       </div>
-                      <p className="text-[14px] leading-relaxed text-foreground break-words whitespace-pre-line">
-                        {formatReadableParagraphs(
+                      <EvidenceResearchNoteProse
+                        text={
                           notes.website ||
-                            "Website: não foi possível validar conteúdo relevante; tratar como presença fraca ou inexistente até revisão manual."
-                        )}
-                      </p>
+                          "Website: não foi possível validar conteúdo relevante; tratar como presença fraca ou inexistente até revisão manual."
+                        }
+                        size="md"
+                      />
                     </div>
                   </BorderGlow>
                   <BorderGlow
@@ -1898,17 +2026,19 @@ export function RotaDigitalReportView({
                         <InstagramBrandGlyph className="size-3.5 text-[#f472b6]" aria-hidden />
                         <span className={TOPIC_PILL_LABEL_NEXT_TO_ICON}>Instagram</span>
                       </div>
-                      <p className="text-[14px] leading-relaxed text-foreground break-words whitespace-pre-line">
-                        {formatReadableParagraphs(normalizedInstagramNote)}
-                      </p>
+                      <EvidenceResearchNoteProse text={normalizedInstagramNote} size="md" />
                     </div>
                   </BorderGlow>
                   {notes.general.length > 0 ? (
                     <div className="space-y-3">
                       {notes.general.map((paragraph, i) => (
-                        <p key={i} className="text-sm text-foreground/90 leading-relaxed break-words whitespace-pre-line">
-                          {formatReadableParagraphs(paragraph)}
-                        </p>
+                        <ReportProseBlocks
+                          key={i}
+                          text={paragraph}
+                          size="sm"
+                          sentencesPerBlock={2}
+                          firstProminent={false}
+                        />
                       ))}
                     </div>
                   ) : null}
@@ -2139,8 +2269,8 @@ export function RotaDigitalReportView({
                     : "Agendar reunião estratégica para validar prioridades e cronograma"
                 }
                 className={cn(
-                  buttonVariants({ variant: "cta", size: "default" }),
-                  "no-print w-full justify-center gap-2 shadow-md sm:w-auto",
+                  buttonVariants({ variant: "cta", size: "lg" }),
+                  "no-print h-10 min-h-10 w-full justify-center gap-2 px-4 shadow-md sm:w-auto sm:px-5",
                 )}
               >
                 {reportCta.bottom.useWhatsAppIcon ? (
