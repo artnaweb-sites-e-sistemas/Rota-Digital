@@ -751,12 +751,17 @@ function getDiagnosticTopicPillVisual(topic: string): {
   return { Icon: Tag, iconClass: "text-zinc-400" };
 }
 
+/** Texto da pill no UI: remove sufixo redundante " geral" (ex.: "Presença digital geral"). */
+function formatDiagnosticTopicPillLabel(topic: string): string {
+  return topic.replace(/\s+geral\s*$/i, "").trim();
+}
+
 function DiagnosticTopicPill({ topic }: { topic: string }) {
   const { Icon, iconClass } = getDiagnosticTopicPillVisual(topic);
   return (
     <div className={TOPIC_PILL_CLASS}>
       <Icon className={cn("size-3.5 shrink-0 stroke-[1.75]", iconClass)} aria-hidden />
-      <span className={TOPIC_PILL_LABEL_NEXT_TO_ICON}>{topic}</span>
+      <span className={TOPIC_PILL_LABEL_NEXT_TO_ICON}>{formatDiagnosticTopicPillLabel(topic)}</span>
     </div>
   );
 }

@@ -3,10 +3,21 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, List, CheckCircle, Clock, Sparkles, Loader2, ChevronRight } from "lucide-react";
+import {
+  Users,
+  List,
+  CheckCircle,
+  Clock,
+  Sparkles,
+  Loader2,
+  ChevronRight,
+  TrendingUp,
+  Plus,
+} from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { getLeads } from "@/lib/leads";
 import { getReportsByUser } from "@/lib/reports";
+import { cn } from "@/lib/utils";
 import type { Lead } from "@/types/lead";
 import type { RotaDigitalReport } from "@/types/report";
 import { ReportSiteAvatar } from "@/components/report-site-avatar";
@@ -234,30 +245,34 @@ export default function DashboardPage() {
   }, [leads, reportCount]);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">Visão geral</h1>
-        <p className="text-muted-foreground mt-1">Resumo das atividades da plataforma.</p>
+    <div className="space-y-8">
+      <div className="flex flex-col gap-1">
+        <h1 className="text-4xl font-extrabold tracking-tight text-white">Visão geral</h1>
+        <p className="text-zinc-400 text-lg">Bem-vindo à sua central de inteligência digital.</p>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat, i) => (
-          <Link key={i} href={stat.href} className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
-            <Card className="h-full transition-colors hover:bg-accent/30 border-border">
+          <Link key={i} href={stat.href} className="block group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950">
+            <Card className="h-full transition-all duration-300 hover:bg-white/[0.04] border-white/5 bg-white/[0.02] shadow-lg overflow-visible">
               <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                <CardTitle className="text-sm font-medium text-foreground">{stat.title}</CardTitle>
-                <stat.icon className={`w-4 h-4 shrink-0 ${stat.color}`} aria-hidden />
+                <CardTitle className="text-xs font-bold uppercase tracking-widest text-zinc-500 group-hover:text-zinc-400 transition-colors">{stat.title}</CardTitle>
+                <div className={cn(
+                  "flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 ring-1 ring-white/10 transition-all duration-300 group-hover:scale-110 group-hover:ring-white/20",
+                  stat.color.replace("text-", "text-")
+                )}>
+                  <stat.icon className="w-4 h-4 shrink-0" aria-hidden />
+                </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="pt-2">
                 {loading ? (
-                  <div className="flex items-center gap-2 text-muted-foreground">
+                  <div className="flex items-center gap-2 text-zinc-500">
                     <Loader2 className="size-5 animate-spin shrink-0" aria-hidden />
-                    <span className="text-sm">Carregando…</span>
                   </div>
                 ) : (
                   <>
-                    <div className="text-2xl font-bold text-foreground">{stat.value}</div>
-                    <p className="text-xs text-muted-foreground mt-1">{stat.description}</p>
+                    <div className="text-3xl font-bold text-white tracking-tight">{stat.value}</div>
+                    <p className="text-xs text-zinc-500 mt-2 leading-relaxed font-medium">{stat.description}</p>
                   </>
                 )}
               </CardContent>
@@ -267,74 +282,95 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-7">
-        <Card className="md:col-span-4 border-border">
-          <CardHeader>
-            <CardTitle>Desempenho semanal</CardTitle>
-            <CardDescription>Leads novos cadastrados nos últimos 7 dias (por dia)</CardDescription>
+        <Card className="md:col-span-4 border-white/5 bg-white/[0.02] shadow-xl overflow-hidden">
+          <CardHeader className="pb-6">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-500/10 ring-1 ring-indigo-500/20">
+                <TrendingUp className="size-5 text-indigo-400" />
+              </div>
+              <div>
+                <CardTitle className="text-lg font-bold text-white">Desempenho semanal</CardTitle>
+                <CardDescription className="text-zinc-500">Acompanhamento de novos leads nos últimos 7 dias</CardDescription>
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="rounded-md border border-dashed border-border">
-              <WeeklyLeadsChart data={weekBuckets} loading={loading} />
+            <div className="px-6 pb-6">
+              <div className="rounded-2xl border border-white/5 bg-zinc-900/40 p-2 shadow-inner">
+                <WeeklyLeadsChart data={weekBuckets} loading={loading} />
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="md:col-span-3 border-border">
-          <CardHeader>
-            <CardTitle>Últimas rotas geradas</CardTitle>
-            <CardDescription>Acesso rápido aos relatórios mais recentes</CardDescription>
+        <Card className="md:col-span-3 border-white/5 bg-white/[0.02] shadow-xl overflow-hidden">
+          <CardHeader className="pb-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-500/10 ring-1 ring-violet-500/20">
+                <Sparkles className="size-5 text-violet-400" />
+              </div>
+              <div>
+                <CardTitle className="text-lg font-bold text-white">Últimas rotas</CardTitle>
+                <CardDescription className="text-zinc-500">Relatórios gerados recentemente</CardDescription>
+              </div>
+            </div>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="space-y-4 pt-2">
             {loading ? (
-              <div className="flex justify-center py-10 text-muted-foreground">
-                <Loader2 className="size-6 animate-spin" aria-hidden />
+              <div className="flex justify-center py-12">
+                <Loader2 className="size-8 animate-spin text-zinc-700" aria-hidden />
               </div>
             ) : latestReports.length === 0 ? (
-              <div className="rounded-lg border border-border bg-muted/30 px-3 py-6 text-center text-sm text-muted-foreground">
-                <p>Nenhuma rota gerada ainda.</p>
+              <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] px-4 py-10 text-center">
+                <p className="text-sm text-zinc-500 font-medium">Nenhuma rota gerada ainda.</p>
                 <Link
                   href="/dashboard/rotas/new"
-                  className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-violet-600 hover:text-violet-500 dark:text-violet-400 dark:hover:text-violet-300"
+                  className="mt-4 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white transition-all hover:bg-indigo-500 hover:scale-105 active:scale-95 shadow-lg shadow-indigo-500/20"
                 >
-                  <Sparkles className="size-4 shrink-0" aria-hidden />
-                  Gerar rota digital
+                  <Plus className="size-4 shrink-0" aria-hidden />
+                  Gerar primeira rota
                 </Link>
               </div>
             ) : (
-              <ul className="space-y-1">
-                {latestReports.map((r) => (
-                  <li key={r.id}>
-                    <Link
-                      href={`/dashboard/rotas/${r.id}`}
-                      className="flex items-center gap-3 rounded-lg border border-transparent px-2 py-2.5 text-left text-sm transition-colors hover:border-border hover:bg-muted/50"
-                    >
-                      <ReportSiteAvatar report={r} />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate font-medium text-foreground">{r.leadCompany}</p>
-                        <p className="truncate text-xs text-muted-foreground">
-                          {new Date(r.createdAt).toLocaleString("pt-BR", {
-                            day: "2-digit",
-                            month: "short",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </p>
-                      </div>
-                      <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+              <div className="space-y-2">
+                <ul className="space-y-1.5">
+                  {latestReports.map((r) => (
+                    <li key={r.id}>
+                      <Link
+                        href={`/dashboard/rotas/${r.id}`}
+                        className="flex items-center gap-4 rounded-xl border border-transparent px-3 py-3 transition-all hover:bg-white/5 hover:border-white/5 group"
+                      >
+                        <div className="relative">
+                          <div className="absolute -inset-1 rounded-full bg-indigo-500/20 blur-sm opacity-0 group-hover:opacity-100 transition-opacity" />
+                          <ReportSiteAvatar report={r} className="relative ring-1 ring-white/10 group-hover:ring-indigo-500/30 transition-all" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-bold text-zinc-100 group-hover:text-white transition-colors">{r.leadCompany}</p>
+                          <p className="truncate text-[11px] font-semibold uppercase tracking-wider text-zinc-500 mt-0.5">
+                            {new Date(r.createdAt).toLocaleDateString("pt-BR", {
+                              day: "2-digit",
+                              month: "short",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </p>
+                        </div>
+                        <ChevronRight className="size-4 shrink-0 text-zinc-700 group-hover:text-zinc-400 group-hover:translate-x-0.5 transition-all" aria-hidden />
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+                <div className="pt-2">
+                  <Link
+                    href="/dashboard/rotas"
+                    className="flex items-center justify-center gap-2 rounded-xl border border-white/5 bg-white/5 py-2.5 text-xs font-bold text-zinc-400 transition-all hover:bg-white/10 hover:text-zinc-200"
+                  >
+                    <List className="size-3.5 shrink-0" aria-hidden />
+                    Ver todas as rotas
+                  </Link>
+                </div>
+              </div>
             )}
-            {!loading && latestReports.length > 0 ? (
-              <Link
-                href="/dashboard/rotas"
-                className="mt-2 flex items-center justify-center gap-1 text-xs font-medium text-violet-600 hover:text-violet-500 dark:text-violet-400 dark:hover:text-violet-300"
-              >
-                <List className="size-3.5 shrink-0" aria-hidden />
-                Ver todas as rotas
-              </Link>
-            ) : null}
           </CardContent>
         </Card>
       </div>
