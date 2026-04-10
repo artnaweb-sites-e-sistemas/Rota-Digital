@@ -288,7 +288,9 @@ async function downloadImageAsInlinePart(
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     const ctrl = new AbortController();
-    const timeoutMs = imageUrl.includes("/api/") ? 18000 : 10000;
+    const isInstagramSnapshot = imageUrl.includes("/api/instagram-profile-snapshot");
+    const isInternalApi = imageUrl.includes("/api/");
+    const timeoutMs = isInstagramSnapshot ? 35000 : (isInternalApi ? 18000 : 10000);
     timer = setTimeout(() => ctrl.abort(), timeoutMs);
     const res = await fetch(imageUrl, {
       method: "GET",
@@ -1472,19 +1474,9 @@ export async function POST(req: NextRequest) {
     let siteHeroSnapshotUrl = hasBrowserless
       ? (internalWebsiteSnapshotUrl || externalWebsiteSnapshotUrl)
       : (externalWebsiteSnapshotUrl || internalWebsiteSnapshotUrl);
-    const instagramSnapshotCandidates = hasBrowserless
-      ? [
-          internalInstagramSnapshotUrl,
-          proxiedInstagramRecentPostImageUrl,
-          proxiedInstagramProfileImageUrl,
-          externalInstagramScreenshotUrl,
-        ]
-      : [
-          proxiedInstagramRecentPostImageUrl,
-          proxiedInstagramProfileImageUrl,
-          externalInstagramScreenshotUrl,
-          internalInstagramSnapshotUrl,
-        ];
+    // A imagem principal do Instagram deve representar o PERFIL (bio + destaques + grade),
+    // nunca um post isolado ou thumbnail.
+    const instagramSnapshotCandidates = [internalInstagramSnapshotUrl];
     let instagramSnapshotUrl = instagramSnapshotCandidates.find(Boolean);
     if (siteHeroSnapshotUrl && siteHeroSnapshotUrl === instagramSnapshotUrl) {
       siteHeroSnapshotUrl = undefined;
