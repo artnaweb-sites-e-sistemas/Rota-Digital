@@ -1038,7 +1038,7 @@ async function repairModelJsonWithGemini(
 ): Promise<Record<string, unknown>> {
   const repairModel = genAI.getGenerativeModel(
     {
-      model: "gemini-2.0-flash-lite",
+      model: "gemini-2.5-flash",
     },
     { apiVersion: "v1" }
   );
@@ -1541,8 +1541,8 @@ export async function POST(req: NextRequest) {
     });
 
     const candidateModels = [
-      "gemini-2.0-flash-lite",
-      "gemini-2.0-flash",
+      "gemini-2.5-flash",
+      "gemini-1.5-flash-latest",
     ];
 
     let responseText = "";
