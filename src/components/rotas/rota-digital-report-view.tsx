@@ -160,6 +160,19 @@ function InstagramBrandGlyph(props: SVGProps<SVGSVGElement>) {
  */
 const ROTA_REPORT_CARD_BOX = "py-6 sm:py-7";
 
+/**
+ * Superfície das secções do relatório (dashboard): no escuro alinha ao zinc da página + painel `white/[0.02]`.
+ */
+const ROTA_REPORT_SURFACE_SECTION =
+  "border border-border bg-card/95 shadow-sm ring-1 ring-foreground/[0.04] print-white dark:border-border dark:bg-card dark:shadow-none dark:ring-white/[0.06]";
+
+/** Blocos encaixados (linhas da lista de canais, caixas de texto). */
+const ROTA_REPORT_SURFACE_INSET =
+  "border border-border/60 bg-card shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)] dark:border-border dark:bg-background dark:shadow-[inset_0_1px_0_0_oklch(1_0_0/5%)]";
+
+/** Conteúdo dentro de BorderGlow (diagnóstico, evidências): levemente mais escuro que o card = leitura em camadas sem tom acinzentado frio. */
+const ROTA_REPORT_SURFACE_GLOW_INNER = "bg-card dark:bg-background";
+
 /** SWOT (3 colunas): menos padding vertical + fundo sólido alinhado ao `card` do tema. */
 const ROTA_SWOT_CARD_BOX = "gap-2 py-4 sm:gap-3 sm:py-5";
 
@@ -1266,7 +1279,12 @@ function ChannelCard({ channel }: { channel: DigitalChannel }) {
         restingBorderColor={restingBorder}
         className={cn("relative z-10 rounded-lg md:overflow-hidden max-md:overflow-visible")}
       >
-        <div className="overflow-visible rounded-lg bg-card space-y-3 px-5 py-5 sm:px-7 sm:py-5 dark:bg-card">
+        <div
+          className={cn(
+            "overflow-visible space-y-3 rounded-lg px-5 py-5 sm:px-7 sm:py-5",
+            ROTA_REPORT_SURFACE_GLOW_INNER,
+          )}
+        >
           <div className="flex items-start justify-between gap-2 pb-1">
             <h4 className="m-0 min-w-0 flex-1 font-normal leading-none" title={channel.name}>
               <span className={TOPIC_PILL_CLASS}>
@@ -1667,7 +1685,13 @@ export function RotaDigitalReportView({
       ) : null}
 
       {isDashboard && report.publicSlug && origin ? (
-        <Card className={cn("no-print border-brand/25 bg-brand/[0.08] dark:border-brand/35 dark:bg-brand/15", ROTA_REPORT_CARD_BOX)}>
+        <Card
+          className={cn(
+            "no-print border border-border bg-card shadow-lg dark:border-border dark:bg-card dark:shadow-xl",
+            "border-l-[3px] border-l-brand/45 dark:border-l-brand/40",
+            ROTA_REPORT_CARD_BOX,
+          )}
+        >
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-3 text-base text-foreground">
               <RotaHeaderIcon tone="indigo">
@@ -1715,7 +1739,7 @@ export function RotaDigitalReportView({
       ) : null}
 
       {isDashboard && isEditing ? (
-        <Card className={cn("no-print border-border bg-card", ROTA_REPORT_CARD_BOX)}>
+        <Card className={cn("no-print", ROTA_REPORT_SURFACE_SECTION, ROTA_REPORT_CARD_BOX)}>
           <CardHeader>
             <CardTitle className="text-base">Editar rota gerada</CardTitle>
           </CardHeader>
@@ -1780,7 +1804,7 @@ export function RotaDigitalReportView({
       <div className="grid min-w-0 grid-cols-1 gap-5 md:grid-cols-12">
         <Card
           className={cn(
-            "min-w-0 overflow-visible border-brand/20 bg-gradient-to-b from-brand/[0.04] to-transparent print-white md:col-span-8",
+            "min-w-0 overflow-visible border-border bg-gradient-to-b from-muted/40 to-transparent print-white md:col-span-8 dark:border-white/[0.06] dark:from-zinc-900/80 dark:to-transparent",
             ROTA_REPORT_CARD_BOX,
           )}
         >
@@ -1803,7 +1827,7 @@ export function RotaDigitalReportView({
 
         <Card
           className={cn(
-            "flex min-w-0 flex-col items-center justify-center overflow-visible border-border bg-muted/50 md:col-span-4",
+            "flex min-w-0 flex-col items-center justify-center overflow-visible border-border bg-muted/50 md:col-span-4 dark:border-border dark:bg-card/80",
             ROTA_REPORT_CARD_BOX,
           )}
         >
@@ -1812,8 +1836,8 @@ export function RotaDigitalReportView({
               <div
                 className={
                   isWebsiteLogo
-                    ? "rounded-2xl bg-gradient-to-tr from-brand/20 to-brand/35 p-1.5 ring-1 ring-white/10"
-                    : "rounded-full bg-gradient-to-tr from-brand/20 to-brand/35 p-1.5 ring-1 ring-white/10"
+                    ? "rounded-2xl bg-gradient-to-tr from-brand/20 to-brand/35 p-1.5 ring-1 ring-white/10 dark:from-white/[0.08] dark:to-white/[0.04] dark:ring-white/10"
+                    : "rounded-full bg-gradient-to-tr from-brand/20 to-brand/35 p-1.5 ring-1 ring-white/10 dark:from-white/[0.08] dark:to-white/[0.04] dark:ring-white/10"
                 }
               >
                 <EvidenceImage
@@ -1827,7 +1851,7 @@ export function RotaDigitalReportView({
                 />
               </div>
             ) : (
-              <div className="flex h-28 w-28 items-center justify-center rounded-full border-2 border-dashed border-border bg-card/95">
+              <div className="flex h-28 w-28 items-center justify-center rounded-full border-2 border-dashed border-border bg-card/95 dark:border-border dark:bg-muted/30">
                 <Globe className="size-10 text-muted-foreground" />
               </div>
             )}
@@ -1846,7 +1870,7 @@ export function RotaDigitalReportView({
         {/* Maturidade Digital - Destaque */}
         <Card
           className={cn(
-            "relative flex flex-col overflow-hidden border-brand/20 bg-gradient-to-b from-brand/[0.04] to-transparent md:col-span-5",
+            "relative flex flex-col overflow-hidden border-border bg-gradient-to-b from-muted/40 to-transparent md:col-span-5 dark:border-white/[0.06] dark:from-zinc-900/80 dark:to-transparent",
             ROTA_REPORT_CARD_BOX,
           )}
         >
@@ -1897,16 +1921,16 @@ export function RotaDigitalReportView({
         {/* Prazo estimado — fundo em destaque + CTA para apoio / especialista */}
         <Card
           className={cn(
-            "relative flex flex-col overflow-hidden border-brand/25 bg-gradient-to-b from-brand/[0.08] to-transparent md:col-span-3 print-white",
+            "relative flex flex-col overflow-hidden border-border bg-gradient-to-b from-muted/45 to-transparent md:col-span-3 print-white dark:border-white/[0.06] dark:from-zinc-900/85 dark:to-transparent",
             ROTA_REPORT_CARD_BOX,
           )}
         >
           <div
-            className="pointer-events-none absolute -right-8 -top-10 h-36 w-36 rounded-full bg-brand/[0.16] blur-3xl"
+            className="pointer-events-none absolute -right-8 -top-10 h-36 w-36 rounded-full bg-brand/[0.14] blur-3xl dark:bg-brand/15"
             aria-hidden
           />
           <div
-            className="pointer-events-none absolute -bottom-12 -left-10 h-28 w-28 rounded-full bg-brand/10 blur-2xl"
+            className="pointer-events-none absolute -bottom-12 -left-10 h-28 w-28 rounded-full bg-brand/10 blur-2xl dark:bg-brand/12"
             aria-hidden
           />
           <CardHeader className="relative pb-4">
@@ -1970,13 +1994,14 @@ export function RotaDigitalReportView({
         {/* Canais Recomendados - Lista Compacta */}
         <Card
           className={cn(
-            "flex flex-col overflow-visible border-border bg-card/95 md:col-span-4",
+            "flex flex-col overflow-visible md:col-span-4",
+            ROTA_REPORT_SURFACE_SECTION,
             ROTA_REPORT_CARD_BOX,
           )}
         >
           <CardHeader className="pb-6">
             <div className="flex items-center gap-2.5">
-              <div className="flex h-6 w-6 items-center justify-center rounded-md border border-border bg-muted">
+              <div className="flex h-6 w-6 items-center justify-center rounded-md border border-border bg-muted dark:border-border dark:bg-muted">
                 <Sparkles size={14} className="text-brand dark:text-brand" />
               </div>
               <CardTitle className="text-xs font-semibold uppercase tracking-wider text-foreground/78 dark:text-muted-foreground">
@@ -1997,7 +2022,12 @@ export function RotaDigitalReportView({
                   key={ch.name}
                   className={cn("relative overflow-visible", i === 0 && "mt-1.5")}
                 >
-                  <div className="relative z-10 flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-card p-2.5 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]">
+                  <div
+                    className={cn(
+                      "relative z-10 flex items-center justify-between gap-3 rounded-lg p-2.5",
+                      ROTA_REPORT_SURFACE_INSET,
+                    )}
+                  >
                     <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
                       <div className="flex min-w-0 items-center gap-2">
                         {i === 0 ? (
@@ -2040,7 +2070,7 @@ export function RotaDigitalReportView({
       </div>
 
       {isDashboard && (report.brief?.servicesOffered || report.brief?.objective) ? (
-        <Card className={cn("bg-card border-border print-white", ROTA_REPORT_CARD_BOX)}>
+        <Card className={cn(ROTA_REPORT_SURFACE_SECTION, "print-white", ROTA_REPORT_CARD_BOX)}>
           <CardHeader className="pb-4">
             <div className="flex items-center gap-2.5">
               <SectionHeaderIcon Icon={FileText} tone="indigo" />
@@ -2073,7 +2103,7 @@ export function RotaDigitalReportView({
       ) : null}
 
       {sortedDiagnosticScores.length > 0 ? (
-        <Card className={cn("border-border bg-card/95 print-white", ROTA_REPORT_CARD_BOX)}>
+        <Card className={cn(ROTA_REPORT_SURFACE_SECTION, "print-white", ROTA_REPORT_CARD_BOX)}>
           <CardHeader className="pb-6">
             <div className="flex items-center gap-2.5">
               <SectionHeaderIcon Icon={ClipboardList} tone="indigo" />
@@ -2102,7 +2132,7 @@ export function RotaDigitalReportView({
                 restingBorderColor={topicGlow.restingBorderColor}
                 className="overflow-hidden rounded-xl print-white ring-1 ring-foreground/10"
               >
-                <div className="rounded-[10px] bg-card p-6 sm:p-7">
+                <div className={cn("rounded-[10px] p-6 sm:p-7", ROTA_REPORT_SURFACE_GLOW_INNER)}>
                   <div className="grid gap-5 md:grid-cols-[360px_minmax(0,1fr)] md:items-start md:gap-6">
                     <TopicEvidence item={item} report={report} />
                     <div className="space-y-4">
@@ -2126,7 +2156,7 @@ export function RotaDigitalReportView({
       ) : null}
 
       {report.evidences ? (
-        <Card className={cn("border-border bg-card/95 print-white", ROTA_REPORT_CARD_BOX)}>
+        <Card className={cn(ROTA_REPORT_SURFACE_SECTION, "print-white", ROTA_REPORT_CARD_BOX)}>
           <CardHeader className="space-y-3 pb-6">
             <div className="flex items-center gap-2.5">
               <SectionHeaderIcon Icon={Images} tone="indigo" />
@@ -2144,7 +2174,13 @@ export function RotaDigitalReportView({
               {/* Mobile: bio em texto duplica a captura do perfil — só mostrar a partir de md. */}
               <div className="flex flex-col gap-3 max-md:hidden">
                 <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Bio do Instagram</p>
-                <div className="shrink-0 rounded-xl border border-border bg-card p-5">
+                <div
+                  className={cn(
+                    "shrink-0 rounded-xl p-5",
+                    ROTA_REPORT_SURFACE_INSET,
+                    "shadow-none",
+                  )}
+                >
                   {/* Bio: manter quebras de linha como no Instagram (`\\n` na coleta), sem normalizar em frases. */}
                   <p className="text-[14px] leading-relaxed text-foreground whitespace-pre-line break-words [overflow-wrap:anywhere]">
                     {report.evidences.instagramBioExcerpt?.trim()
@@ -2248,7 +2284,12 @@ export function RotaDigitalReportView({
                     contentInset={2}
                     className={cn("overflow-hidden rounded-lg border-0 print-white")}
                   >
-                    <div className="rounded-[8px] border border-border bg-card p-5 shadow-sm sm:p-6 dark:border-white/12 print:border-zinc-300">
+                    <div
+                      className={cn(
+                        "rounded-[8px] border border-border p-5 shadow-sm sm:p-6 dark:border-border print:border-zinc-300",
+                        ROTA_REPORT_SURFACE_GLOW_INNER,
+                      )}
+                    >
                       <div className={cn("mb-5", TOPIC_PILL_CLASS)}>
                         <Globe className="size-3.5 shrink-0 stroke-[1.75] text-sky-400" aria-hidden />
                         <span className={TOPIC_PILL_LABEL_NEXT_TO_ICON}>Website</span>
@@ -2276,7 +2317,12 @@ export function RotaDigitalReportView({
                     contentInset={2}
                     className={cn("overflow-hidden rounded-lg border-0 print-white")}
                   >
-                    <div className="rounded-[8px] border border-border bg-card p-5 shadow-sm sm:p-6 dark:border-white/12 print:border-zinc-300">
+                    <div
+                      className={cn(
+                        "rounded-[8px] border border-border p-5 shadow-sm sm:p-6 dark:border-border print:border-zinc-300",
+                        ROTA_REPORT_SURFACE_GLOW_INNER,
+                      )}
+                    >
                       <div className={cn("mb-5", TOPIC_PILL_CLASS)}>
                         <InstagramBrandGlyph className="size-3.5 text-[#f472b6]" aria-hidden />
                         <span className={TOPIC_PILL_LABEL_NEXT_TO_ICON}>Instagram</span>
@@ -2469,7 +2515,9 @@ export function RotaDigitalReportView({
       {/* Recommended Channels */}
       <Card
         className={cn(
-          "overflow-visible border-border bg-card/95 print-white",
+          "overflow-visible",
+          ROTA_REPORT_SURFACE_SECTION,
+          "print-white",
           ROTA_REPORT_CARD_BOX,
         )}
       >
@@ -2494,13 +2542,15 @@ export function RotaDigitalReportView({
       <div className="grid min-w-0 grid-cols-1 gap-5 md:grid-cols-2">
         <Card
           className={cn(
-            "min-w-0 overflow-visible border border-border bg-card/95 shadow-sm ring-1 ring-foreground/[0.04] print-white dark:bg-zinc-900/55 dark:ring-white/[0.06]",
+            "min-w-0 overflow-visible",
+            ROTA_REPORT_SURFACE_SECTION,
+            "print-white",
             ROTA_REPORT_CARD_BOX,
           )}
         >
           <CardHeader className="pb-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-md border border-brand/25 bg-brand/[0.09] dark:border-brand/30 dark:bg-brand/15">
+              <div className="flex h-8 w-8 items-center justify-center rounded-md border border-brand/25 bg-brand/[0.09] dark:border-border dark:bg-muted">
                 <Zap size={18} className="text-brand dark:text-brand" aria-hidden />
               </div>
               <CardTitle className="text-xs font-semibold uppercase tracking-wider text-foreground dark:text-zinc-200">
@@ -2519,7 +2569,7 @@ export function RotaDigitalReportView({
                       "before:pointer-events-none before:absolute before:left-0 before:right-[8%] before:top-0 before:h-px before:rounded-full before:bg-gradient-to-r before:from-border before:via-border/70 before:to-transparent before:content-[''] dark:before:from-white/22 dark:before:via-white/12 print:before:hidden",
                   )}
                 >
-                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-border bg-background text-[11px] font-semibold tabular-nums text-foreground/90 ring-1 ring-border/80 dark:border-white/12 dark:bg-zinc-950/80 dark:text-zinc-300 dark:ring-white/10">
+                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-border bg-background text-[11px] font-semibold tabular-nums text-foreground/90 ring-1 ring-border/80 dark:border-border dark:bg-background dark:text-zinc-300 dark:ring-border">
                     {i + 1}
                   </div>
                   <span>{win}</span>
@@ -2531,13 +2581,15 @@ export function RotaDigitalReportView({
 
         <Card
           className={cn(
-            "min-w-0 overflow-visible border border-border bg-card/95 shadow-sm ring-1 ring-foreground/[0.04] print-white dark:bg-zinc-900/55 dark:ring-white/[0.06]",
+            "min-w-0 overflow-visible",
+            ROTA_REPORT_SURFACE_SECTION,
+            "print-white",
             ROTA_REPORT_CARD_BOX,
           )}
         >
           <CardHeader className="pb-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-md border border-brand/25 bg-brand/[0.09] dark:border-brand/30 dark:bg-brand/15">
+              <div className="flex h-8 w-8 items-center justify-center rounded-md border border-brand/25 bg-brand/[0.09] dark:border-border dark:bg-muted">
                 <Target size={18} className="text-brand dark:text-brand" aria-hidden />
               </div>
               <CardTitle className="text-xs font-semibold uppercase tracking-wider text-foreground dark:text-zinc-200">
@@ -2553,10 +2605,10 @@ export function RotaDigitalReportView({
                   className={cn(
                     "relative flex items-center gap-4 py-3.5 text-[14px] leading-relaxed text-foreground sm:py-4 dark:text-zinc-200/95",
                     i > 0 &&
-                      "before:pointer-events-none before:absolute before:absolute before:left-0 before:right-[8%] before:top-0 before:h-px before:rounded-full before:bg-gradient-to-r before:from-border before:via-border/70 before:to-transparent before:content-[''] dark:before:from-white/22 dark:before:via-white/12 print:before:hidden",
+                      "before:pointer-events-none before:absolute before:left-0 before:right-[8%] before:top-0 before:h-px before:rounded-full before:bg-gradient-to-r before:from-border before:via-border/70 before:to-transparent before:content-[''] dark:before:from-white/22 dark:before:via-white/12 print:before:hidden",
                   )}
                 >
-                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-border bg-background text-[11px] font-semibold tabular-nums text-foreground/90 ring-1 ring-border/80 dark:border-white/12 dark:bg-zinc-950/80 dark:text-zinc-300 dark:ring-white/10">
+                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-border bg-background text-[11px] font-semibold tabular-nums text-foreground/90 ring-1 ring-border/80 dark:border-border dark:bg-background dark:text-zinc-300 dark:ring-border">
                     {i + 1}
                   </div>
                   <span>{action}</span>
@@ -2589,7 +2641,7 @@ export function RotaDigitalReportView({
               {report.nextSteps.map((step, i) => (
                 <div
                   key={i}
-                  className="flex min-w-0 w-full items-center gap-4 rounded-xl border border-border/90 bg-card/75 p-4 transition-colors hover:border-brand/40"
+                  className="flex min-w-0 w-full items-center gap-4 rounded-xl border border-border/90 bg-card/75 p-4 transition-colors hover:border-brand/40 dark:border-border dark:bg-secondary/55"
                 >
                   <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-brand/40 bg-brand/10">
                     <span className="text-[11px] font-bold text-brand dark:text-brand">{i + 1}</span>

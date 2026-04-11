@@ -571,7 +571,7 @@ export default function NewRotaPage() {
         </p>
       </div>
 
-      <Card className="border-border">
+      <Card className="border-border bg-card shadow-xl dark:border-white/5 dark:bg-white/[0.02]">
         <CardHeader>
           <CardTitle>Briefing da análise</CardTitle>
         </CardHeader>

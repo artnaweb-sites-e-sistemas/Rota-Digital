@@ -67,6 +67,12 @@ function SelectTrigger({
   )
 }
 
+const SELECT_COLLISION_DEFAULT = {
+  side: "shift" as const,
+  align: "shift" as const,
+  fallbackAxisSide: "none" as const,
+}
+
 function SelectContent({
   className,
   children,
@@ -74,12 +80,21 @@ function SelectContent({
   sideOffset = 6,
   align = "center",
   alignOffset = 0,
-  alignItemWithTrigger = true,
+  /** Se true, o painel tenta alinhar o texto do item ao valor do trigger (pode parecer que abre “para cima”). */
+  alignItemWithTrigger = false,
+  collisionAvoidance = SELECT_COLLISION_DEFAULT,
+  collisionPadding = 8,
   ...props
 }: SelectPrimitive.Popup.Props &
   Pick<
     SelectPrimitive.Positioner.Props,
-    "align" | "alignOffset" | "side" | "sideOffset" | "alignItemWithTrigger"
+    | "align"
+    | "alignOffset"
+    | "side"
+    | "sideOffset"
+    | "alignItemWithTrigger"
+    | "collisionAvoidance"
+    | "collisionPadding"
   >) {
   return (
     <SelectPrimitive.Portal>
@@ -89,6 +104,8 @@ function SelectContent({
         align={align}
         alignOffset={alignOffset}
         alignItemWithTrigger={alignItemWithTrigger}
+        collisionAvoidance={collisionAvoidance}
+        collisionPadding={collisionPadding}
         className="isolate z-50"
       >
         <SelectPrimitive.Popup

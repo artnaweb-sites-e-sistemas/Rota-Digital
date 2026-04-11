@@ -39,7 +39,6 @@ import {
   Phone,
   Plus,
   Search,
-  UserRound,
   Users,
 } from "lucide-react";
 import Link from "next/link";
@@ -313,44 +312,44 @@ function LeadsPageContent() {
             "rounded-2xl ring-1 ring-white/10",
           )}
         >
-          <div className="relative border-b border-white/5 px-6 pb-6 pt-7 pr-14 sm:px-8 sm:pb-7 sm:pt-8 sm:pr-16">
-            <div className="flex gap-4 sm:gap-5">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand/12 ring-1 ring-brand/25 sm:h-14 sm:w-14">
-                <UserRound className="size-6 text-brand sm:size-7" aria-hidden />
-              </div>
-              <DialogHeader className="flex-1 text-left">
-                <DialogTitle className="text-xl font-bold tracking-tight text-white sm:text-2xl">
-                  {editingLead ? "Editar lead" : "Novo lead"}
-                </DialogTitle>
-              </DialogHeader>
-            </div>
+          <div className="relative border-b border-white/[0.06] bg-white/[0.015] px-6 pb-5 pt-6 pr-14 sm:px-8 sm:pb-6 sm:pt-7 sm:pr-16">
+            <DialogHeader className="gap-1.5 space-y-0 text-left">
+              <DialogTitle className="font-heading text-lg font-semibold tracking-tight text-white sm:text-xl">
+                {editingLead ? "Editar lead" : "Novo lead"}
+              </DialogTitle>
+              <DialogDescription className="text-[13px] leading-relaxed text-zinc-500 sm:text-sm">
+                {editingLead
+                  ? "Atualize os dados do contacto. As alterações refletem-se na lista e nas rotas associadas."
+                  : "Preencha os dados básicos para criar o contacto e acompanhar o funil na Rota Digital."}
+              </DialogDescription>
+            </DialogHeader>
           </div>
 
-          <div className="space-y-7 px-6 py-7 sm:px-8 sm:py-8">
-            <section className="space-y-4">
-              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6">
-                <div className="space-y-2.5">
-                  <Label htmlFor="lead-name" className="text-sm font-medium text-zinc-300">
+          <div className="space-y-6 px-6 py-6 sm:px-8 sm:py-7">
+            <section className="space-y-3.5">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
+                <div className="space-y-2">
+                  <Label htmlFor="lead-name" className="text-xs font-medium text-zinc-500">
                     Nome completo <span className="text-red-400/90">*</span>
                   </Label>
                   <Input
                     id="lead-name"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="h-12 rounded-xl border-white/10 bg-white/[0.04] text-base text-zinc-100 placeholder:text-zinc-600 focus-visible:border-brand/50 focus-visible:ring-brand/20"
+                    className="h-10 rounded-md border-white/10 bg-white/[0.04] text-sm text-zinc-100 placeholder:text-zinc-600 focus-visible:border-brand/45 focus-visible:ring-2 focus-visible:ring-brand/20"
                     placeholder="Ex.: João Silva"
                     autoComplete="name"
                   />
                 </div>
-                <div className="space-y-2.5">
-                  <Label htmlFor="lead-company" className="text-sm font-medium text-zinc-300">
+                <div className="space-y-2">
+                  <Label htmlFor="lead-company" className="text-xs font-medium text-zinc-500">
                     Empresa <span className="text-red-400/90">*</span>
                   </Label>
                   <Input
                     id="lead-company"
                     value={company}
                     onChange={(e) => setCompany(e.target.value)}
-                    className="h-12 rounded-xl border-white/10 bg-white/[0.04] text-base text-zinc-100 placeholder:text-zinc-600 focus-visible:border-brand/50 focus-visible:ring-brand/20"
+                    className="h-10 rounded-md border-white/10 bg-white/[0.04] text-sm text-zinc-100 placeholder:text-zinc-600 focus-visible:border-brand/45 focus-visible:ring-2 focus-visible:ring-brand/20"
                     placeholder="Ex.: Tech Solutions"
                     autoComplete="organization"
                   />
@@ -358,10 +357,10 @@ function LeadsPageContent() {
               </div>
             </section>
 
-            <section className="space-y-4">
-              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6">
-                <div className="space-y-2.5">
-                  <Label htmlFor="lead-email" className="text-sm font-medium text-zinc-300">
+            <section className="space-y-3.5">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
+                <div className="space-y-2">
+                  <Label htmlFor="lead-email" className="text-xs font-medium text-zinc-500">
                     E-mail
                   </Label>
                   <Input
@@ -369,18 +368,18 @@ function LeadsPageContent() {
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="h-12 rounded-xl border-white/10 bg-white/[0.04] text-base text-zinc-100 placeholder:text-zinc-600 focus-visible:border-brand/50 focus-visible:ring-brand/20"
+                    className="h-10 rounded-md border-white/10 bg-white/[0.04] text-sm text-zinc-100 placeholder:text-zinc-600 focus-visible:border-brand/45 focus-visible:ring-2 focus-visible:ring-brand/20"
                     placeholder="nome@empresa.com"
                     autoComplete="email"
                   />
                 </div>
-                <div className="space-y-2.5">
-                  <Label htmlFor="lead-phone" className="text-sm font-medium text-zinc-300">
+                <div className="space-y-2">
+                  <Label htmlFor="lead-phone" className="text-xs font-medium text-zinc-500">
                     Telefone / WhatsApp
                   </Label>
                   <div className="relative">
                     <Phone
-                      className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-zinc-600"
+                      className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-zinc-600"
                       aria-hidden
                     />
                     <Input
@@ -388,7 +387,7 @@ function LeadsPageContent() {
                       type="tel"
                       value={phone}
                       onChange={(e) => setPhone(formatPhoneBr(e.target.value))}
-                      className="h-12 rounded-xl border-white/10 bg-white/[0.04] pl-10 text-base text-zinc-100 placeholder:text-zinc-600 focus-visible:border-brand/50 focus-visible:ring-brand/20"
+                      className="h-10 rounded-md border-white/10 bg-white/[0.04] pl-9 text-sm text-zinc-100 placeholder:text-zinc-600 focus-visible:border-brand/45 focus-visible:ring-2 focus-visible:ring-brand/20"
                       placeholder="(11) 99999-9999"
                       autoComplete="tel"
                     />
@@ -397,9 +396,9 @@ function LeadsPageContent() {
               </div>
             </section>
 
-            <section className="space-y-4">
-              <div className="space-y-2.5">
-                <Label htmlFor="lead-status" className="text-sm font-medium text-zinc-300">
+            <section className="space-y-3.5">
+              <div className="space-y-2">
+                <Label htmlFor="lead-status" className="text-xs font-medium text-zinc-500">
                   Status atual
                 </Label>
                 <Select
@@ -410,7 +409,7 @@ function LeadsPageContent() {
                 >
                   <SelectTrigger
                     id="lead-status"
-                    className="h-12 w-full rounded-md border-white/10 bg-white/[0.04] text-base text-zinc-100 focus-visible:border-brand/50 dark:hover:bg-white/[0.06]"
+                    className="h-10 w-full rounded-md border-white/10 bg-white/[0.04] text-sm text-zinc-100 focus-visible:border-brand/45 dark:hover:bg-white/[0.06]"
                   >
                     <SelectValue placeholder="Selecione o status" />
                   </SelectTrigger>
@@ -428,14 +427,14 @@ function LeadsPageContent() {
             {saveError ? (
               <div
                 role="alert"
-                className="rounded-xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm font-medium leading-relaxed text-red-300"
+                className="rounded-md border border-red-500/25 bg-red-500/10 px-3.5 py-2.5 text-sm font-medium leading-relaxed text-red-300"
               >
                 {saveError}
               </div>
             ) : null}
           </div>
 
-          <div className="flex flex-col-reverse gap-3 border-t border-white/5 bg-white/[0.02] px-6 py-5 sm:flex-row sm:items-center sm:justify-end sm:gap-3 sm:px-8 sm:py-6">
+          <div className="flex flex-col-reverse gap-3 border-t border-white/[0.06] bg-white/[0.02] px-6 py-4 sm:flex-row sm:items-center sm:justify-end sm:gap-3 sm:px-8 sm:py-5">
             <Button
               type="button"
               variant="ghost"
@@ -475,7 +474,7 @@ function LeadsPageContent() {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Buscar por nome, empresa, e-mail ou telefone…"
-                  className="h-10 w-full rounded-xl border-input bg-background pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:border-brand/50 focus-visible:ring-brand/20 dark:border-white/10 dark:bg-white/5 dark:text-zinc-100 dark:placeholder:text-zinc-600"
+                  className="h-10 w-full rounded-md border-input bg-background pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:border-brand/50 focus-visible:ring-brand/20 dark:border-white/10 dark:bg-white/5 dark:text-zinc-100 dark:placeholder:text-zinc-600"
                   aria-label="Buscar leads"
                   autoComplete="off"
                   autoCorrect="off"

@@ -211,7 +211,7 @@ export default function DashboardPage() {
         value: formatInt(total),
         description: total === 0 ? "Nenhum lead cadastrado ainda" : describeLeadMonthComparison(leads),
         icon: Users,
-        color: "text-blue-500",
+        color: "text-brand",
         href: "/dashboard/leads",
       },
       {
@@ -269,7 +269,10 @@ export default function DashboardPage() {
                 </CardTitle>
                 <div
                   className={cn(
-                    "flex h-8 w-8 items-center justify-center rounded-lg bg-muted ring-1 ring-border transition-all duration-300 group-hover:scale-110 group-hover:ring-border/80 dark:bg-white/5 dark:ring-white/10 dark:group-hover:ring-white/20",
+                    "flex h-8 w-8 items-center justify-center rounded-lg ring-1 transition-all duration-300 group-hover:scale-110",
+                    stat.color === "text-brand"
+                      ? "bg-brand/10 ring-brand/25 group-hover:ring-brand/40 dark:bg-brand/[0.12] dark:ring-brand/30 dark:group-hover:ring-brand/45"
+                      : "bg-muted ring-border group-hover:ring-border/80 dark:bg-white/5 dark:ring-white/10 dark:group-hover:ring-white/20",
                     stat.color,
                   )}
                 >
@@ -301,7 +304,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="p-0">
             <div className="px-6 pb-6">
-              <div className="rounded-2xl border border-border bg-muted/50 p-2 shadow-inner dark:border-white/5 dark:bg-zinc-900/40">
+              <div className="rounded-md border border-border bg-muted/50 p-2 shadow-inner dark:border-white/5 dark:bg-zinc-900/40">
                 <WeeklyLeadsChart data={weekBuckets} loading={loading} />
               </div>
             </div>
@@ -319,7 +322,7 @@ export default function DashboardPage() {
                 <Loader2 className="size-8 animate-spin text-muted-foreground" aria-hidden />
               </div>
             ) : latestReports.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-border bg-muted/30 px-4 py-10 text-center dark:border-white/10 dark:bg-white/[0.02]">
+              <div className="rounded-md border border-dashed border-border bg-muted/30 px-4 py-10 text-center dark:border-white/10 dark:bg-white/[0.02]">
                 <p className="text-sm font-medium text-muted-foreground">Nenhuma rota gerada ainda.</p>
                 <LinkButton href="/dashboard/rotas/new" className="mt-4 gap-2">
                   <Plus className="size-4 shrink-0" aria-hidden />
@@ -333,7 +336,7 @@ export default function DashboardPage() {
                     <li key={r.id}>
                       <Link
                         href={`/dashboard/rotas/${r.id}`}
-                        className="group flex items-center gap-4 rounded-xl border border-transparent px-3 py-3 transition-all hover:border-border hover:bg-muted/60 dark:hover:border-white/5 dark:hover:bg-white/5"
+                        className="group flex items-center gap-4 rounded-md border border-transparent px-3 py-3 transition-all hover:border-border hover:bg-muted/60 dark:hover:border-white/5 dark:hover:bg-white/5"
                       >
                         <div className="relative">
                           <div className="absolute -inset-1 rounded-full bg-brand/20 opacity-0 blur-sm transition-opacity group-hover:opacity-100" />
@@ -358,7 +361,7 @@ export default function DashboardPage() {
                 <div className="pt-2">
                   <Link
                     href="/dashboard/rotas"
-                    className="flex items-center justify-center gap-2 rounded-xl border border-border bg-muted/40 py-2.5 text-xs font-bold text-muted-foreground transition-all hover:bg-muted hover:text-foreground dark:border-white/5 dark:bg-white/5 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-zinc-200"
+                    className="flex items-center justify-center gap-2 rounded-md border border-border bg-muted/40 py-2.5 text-xs font-bold text-muted-foreground transition-all hover:bg-muted hover:text-foreground dark:border-white/5 dark:bg-white/5 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-zinc-200"
                   >
                     <List className="size-3.5 shrink-0" aria-hidden />
                     Ver todas as rotas
