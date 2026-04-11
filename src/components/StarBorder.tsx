@@ -41,19 +41,19 @@ export default function StarBorder({
     >
       <div
         aria-hidden
-        className="rota-star-border-bottom pointer-events-none absolute right-[-250%] z-0 h-[55%] w-[320%] rounded-full opacity-90"
+        className="rota-star-border-bottom pointer-events-none absolute right-[-290%] z-0 h-[72%] w-[410%] rounded-full opacity-90"
         style={{
-          bottom: `${-11 * thickness}px`,
-          background: `radial-gradient(circle, ${bottomColor}, transparent ${Math.min(38, Math.round(14 + thickness * 8))}%)`,
+          bottom: `${-19 * thickness}px`,
+          background: `radial-gradient(circle, ${bottomColor}, transparent ${Math.min(42, Math.round(14 + thickness * 9))}%)`,
           animationDuration: speed,
         }}
       />
       <div
         aria-hidden
-        className="rota-star-border-top pointer-events-none absolute left-[-250%] z-0 h-[55%] w-[320%] rounded-full opacity-90"
+        className="rota-star-border-top pointer-events-none absolute left-[-290%] z-0 h-[72%] w-[410%] rounded-full opacity-90"
         style={{
-          top: `${-10 * thickness}px`,
-          background: `radial-gradient(circle, ${color}, transparent ${Math.min(38, Math.round(14 + thickness * 8))}%)`,
+          top: `${-17 * thickness}px`,
+          background: `radial-gradient(circle, ${color}, transparent ${Math.min(42, Math.round(14 + thickness * 9))}%)`,
           animationDuration: speed,
         }}
       />

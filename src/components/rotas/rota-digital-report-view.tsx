@@ -158,6 +158,9 @@ function InstagramBrandGlyph(props: SVGProps<SVGSVGElement>) {
  */
 const ROTA_REPORT_CARD_BOX = "py-6 sm:py-7";
 
+/** SWOT (3 colunas): menos padding vertical + fundo sólido alinhado ao `card` do tema. */
+const ROTA_SWOT_CARD_BOX = "gap-2 py-4 sm:gap-3 sm:py-5";
+
 /**
  * Capturas full-page no quadro: em repouso mostra o **topo** da página (início do screenshot).
  * Com `hoverScroll`: no desktop o pan segue o rato; no touch, um toque alterna o pan (sobe/desce).
@@ -2289,7 +2292,7 @@ export function RotaDigitalReportView({
       ) : null}
 
       {/* SWOT — moldura com BorderGlow (antes eram só Card, sem hover na borda). */}
-      <div className="grid min-w-0 grid-cols-1 gap-5 md:grid-cols-3 md:items-stretch [--rota-swot-surface:#d4d4d8] dark:[--rota-swot-surface:#09090b]">
+      <div className="grid min-w-0 grid-cols-1 gap-5 md:grid-cols-3 md:items-stretch [--rota-swot-surface:var(--card)] dark:[--rota-swot-surface:#09090b]">
         <BorderGlow
           edgeSensitivity={30}
           glowColor="142 55 52"
@@ -2300,17 +2303,18 @@ export function RotaDigitalReportView({
           coneSpread={25}
           animated={false}
           colors={["#4ade80", "#34d399", "#86efac"]}
-          fillOpacity={0.35}
+          fillOpacity={1}
           contentInset={2}
+          disableBorderGlowOnMobile
           className="h-full min-h-0 min-w-0 overflow-hidden rounded-xl border-green-500/20 ring-1 ring-foreground/10 print-white"
         >
           <Card
             className={cn(
-              "flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-visible border-0 bg-zinc-300 text-foreground shadow-none ring-0 rounded-[10px] dark:bg-zinc-950",
-              ROTA_REPORT_CARD_BOX,
+              "relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden border border-green-500/20 bg-gradient-to-b from-green-500/[0.06] to-transparent text-foreground shadow-none ring-0 rounded-[10px] print-white",
+              ROTA_SWOT_CARD_BOX,
             )}
           >
-            <CardHeader className="flex flex-row items-center gap-3 pb-4">
+            <CardHeader className="flex flex-row items-center gap-2.5 pb-2 sm:gap-3">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-500/10 ring-1 ring-green-500/20">
                 <TrendingUp size={18} className="text-green-400" />
               </div>
@@ -2348,17 +2352,18 @@ export function RotaDigitalReportView({
           coneSpread={25}
           animated={false}
           colors={["#f87171", "#fb7185", "#fca5a5"]}
-          fillOpacity={0.35}
+          fillOpacity={1}
           contentInset={2}
+          disableBorderGlowOnMobile
           className="h-full min-h-0 min-w-0 overflow-hidden rounded-xl border-red-500/20 ring-1 ring-foreground/10 print-white"
         >
           <Card
             className={cn(
-              "flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-visible border-0 bg-zinc-300 text-foreground shadow-none ring-0 rounded-[10px] dark:bg-zinc-950",
-              ROTA_REPORT_CARD_BOX,
+              "relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden border border-red-500/20 bg-gradient-to-b from-red-500/[0.06] to-transparent text-foreground shadow-none ring-0 rounded-[10px] print-white",
+              ROTA_SWOT_CARD_BOX,
             )}
           >
-            <CardHeader className="flex flex-row items-center gap-3 pb-4">
+            <CardHeader className="flex flex-row items-center gap-2.5 pb-2 sm:gap-3">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-500/10 ring-1 ring-red-500/20">
                 <TrendingDown size={18} className="text-red-400" />
               </div>
@@ -2396,17 +2401,18 @@ export function RotaDigitalReportView({
           coneSpread={25}
           animated={false}
           colors={["#38bdf8", "#6366f1", "#7dd3fc"]}
-          fillOpacity={0.35}
+          fillOpacity={1}
           contentInset={2}
+          disableBorderGlowOnMobile
           className="h-full min-h-0 min-w-0 overflow-hidden rounded-xl border-blue-500/20 ring-1 ring-foreground/10 print-white"
         >
           <Card
             className={cn(
-              "flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-visible border-0 bg-zinc-300 text-foreground shadow-none ring-0 rounded-[10px] dark:bg-zinc-950",
-              ROTA_REPORT_CARD_BOX,
+              "relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden border border-blue-500/20 bg-gradient-to-b from-blue-500/[0.06] to-transparent text-foreground shadow-none ring-0 rounded-[10px] print-white",
+              ROTA_SWOT_CARD_BOX,
             )}
           >
-            <CardHeader className="flex flex-row items-center gap-3 pb-4">
+            <CardHeader className="flex flex-row items-center gap-2.5 pb-2 sm:gap-3">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10 ring-1 ring-blue-500/20">
                 <Target size={18} className="text-blue-400" />
               </div>

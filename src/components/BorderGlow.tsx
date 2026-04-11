@@ -32,6 +32,16 @@ export interface BorderGlowProps {
   animated?: boolean;
   colors?: string[];
   fillOpacity?: number;
+  /**
+   * Quando true, em mobile não usa as elipses animadas (`.rota-star-border-*`).
+   * Útil com fundos em gradiente para `transparent`, onde o brilho atravessa e “vaza” dois círculos.
+   */
+  disableMobileStarBorder?: boolean;
+  /**
+   * Em mobile (toque grosseiro ou ≤767px): desliga **todo** o efeito BorderGlow (estrelas + camadas de hover/mesh),
+   * ficando só o fundo sólido e o conteúdo — evita travar o scroll em cards pesados.
+   */
+  disableBorderGlowOnMobile?: boolean;
   /** Velocidade do brilho “estrela” na borda (≤767px ou toque grosseiro), ex. `4s`. */
   mobileStarSpeed?: CSSProperties["animationDuration"];
   /** Espessura relativa do brilho (1 ≈ referência original; 1.5 mais largo). */
@@ -143,6 +153,8 @@ const BorderGlow: FC<BorderGlowProps> = ({
   animated = false,
   colors = ["#c084fc", "#f472b6", "#38bdf8"],
   fillOpacity = 0.5,
+  disableMobileStarBorder = false,
+  disableBorderGlowOnMobile = false,
   mobileStarSpeed = "4s",
   mobileStarThickness = 1.5,
 }) => {
@@ -152,9 +164,12 @@ const BorderGlow: FC<BorderGlowProps> = ({
   const [coarseTouch, setCoarseTouch] = useState(false);
   /** `md` do Tailwind — emulação Chrome costuma manter `pointer: fine`; largura garante o efeito. */
   const [narrowViewport, setNarrowViewport] = useState(false);
+  const isMobileChassis = coarseTouch || narrowViewport;
+  const suppressGlowOnMobile = Boolean(disableBorderGlowOnMobile && isMobileChassis);
   /** Brilho “estrela” na borda (substitui camadas pesadas do hover). */
-  const useMobileStarShimmer = coarseTouch || narrowViewport;
-  const finePointer = !useMobileStarShimmer;
+  const useMobileStarShimmer =
+    !disableMobileStarBorder && !suppressGlowOnMobile && isMobileChassis;
+  const finePointer = !useMobileStarShimmer && !suppressGlowOnMobile;
   const [isHovered, setIsHovered] = useState(false);
   const [cursorAngle, setCursorAngle] = useState(45);
   const [edgeProximity, setEdgeProximity] = useState(0);
@@ -353,7 +368,8 @@ const BorderGlow: FC<BorderGlowProps> = ({
   const starTopColor = colors[0] ?? "#a78bfa";
   const starBottomColor = colors[1] ?? colors[0] ?? "#38bdf8";
   const starTh = mobileStarThickness;
-  const starFadePct = Math.min(38, Math.round(14 + starTh * 8));
+  /** Gradiente radial: elipse maior pede fade um pouco mais largo. */
+  const starFadePct = Math.min(42, Math.round(14 + starTh * 9));
 
   return (
     <div
@@ -385,23 +401,23 @@ const BorderGlow: FC<BorderGlowProps> = ({
         style={{ backgroundColor }}
       />
 
-      {useMobileStarShimmer ? (
+      {suppressGlowOnMobile ? null : useMobileStarShimmer ? (
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 z-[2] overflow-hidden rounded-[inherit] print:hidden"
         >
           <div
-            className="rota-star-border-bottom pointer-events-none absolute right-[-250%] z-0 h-[55%] w-[320%] rounded-full opacity-90"
+            className="rota-star-border-bottom pointer-events-none absolute right-[-290%] z-0 h-[72%] w-[410%] rounded-full opacity-90"
             style={{
-              bottom: `${-11 * starTh}px`,
+              bottom: `${-19 * starTh}px`,
               background: `radial-gradient(circle, ${starBottomColor}, transparent ${starFadePct}%)`,
               animationDuration: mobileStarSpeed,
             }}
           />
           <div
-            className="rota-star-border-top pointer-events-none absolute left-[-250%] z-0 h-[55%] w-[320%] rounded-full opacity-90"
+            className="rota-star-border-top pointer-events-none absolute left-[-290%] z-0 h-[72%] w-[410%] rounded-full opacity-90"
             style={{
-              top: `${-10 * starTh}px`,
+              top: `${-17 * starTh}px`,
               background: `radial-gradient(circle, ${starTopColor}, transparent ${starFadePct}%)`,
               animationDuration: mobileStarSpeed,
             }}
