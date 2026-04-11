@@ -46,6 +46,11 @@ export interface BorderGlowProps {
   mobileStarSpeed?: CSSProperties["animationDuration"];
   /** Espessura relativa do brilho (1 ≈ referência original; 1.5 mais largo). */
   mobileStarThickness?: number;
+  /**
+   * Cor da borda em repouso (1px). Em `style` para vencer `border-border` do tema e permitir
+   * `color-mix` com variáveis CSS (ex.: relatório por nota / SWOT).
+   */
+  restingBorderColor?: string;
 }
 
 function parseHSL(hslStr: string): { h: number; s: number; l: number } {
@@ -157,6 +162,7 @@ const BorderGlow: FC<BorderGlowProps> = ({
   disableBorderGlowOnMobile = false,
   mobileStarSpeed = "4s",
   mobileStarThickness = 1.5,
+  restingBorderColor,
 }) => {
   const cardRef = useRef<HTMLDivElement>(null);
   const pointerRafRef = useRef<number | null>(null);
@@ -386,11 +392,13 @@ const BorderGlow: FC<BorderGlowProps> = ({
         if (finePointer) setIsHovered(false);
       }}
       className={cn(
-        "relative isolate flex min-h-0 touch-auto flex-col overflow-visible border border-border dark:border-white/15",
+        "relative isolate flex min-h-0 touch-auto flex-col overflow-visible border border-solid",
+        restingBorderColor == null && "border-border dark:border-white/15",
         className,
       )}
       style={{
         borderRadius: `${borderRadius}px`,
+        ...(restingBorderColor ? { borderColor: restingBorderColor } : {}),
         // Camada extra em cada card pesa o compositor no scroll mobile.
         transform: finePointer ? "translate3d(0, 0, 0.01px)" : undefined,
         boxShadow: "var(--rota-border-glow-shadow, rgba(0,0,0,0.08) 0 4px 12px)",

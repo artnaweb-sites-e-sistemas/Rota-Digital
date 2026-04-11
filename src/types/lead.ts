@@ -1,11 +1,12 @@
 /** Status ativos no funil (Novo e Qualificado foram descontinuados). */
-export const LEAD_STATUSES = ["Em Contato", "Convertido", "Perdido"] as const;
+export const LEAD_STATUSES = ["Novo Lead", "Convertido", "Perdido"] as const;
 export type LeadStatus = (typeof LEAD_STATUSES)[number];
 
 const LEGACY_TO_ACTIVE: Record<string, LeadStatus> = {
-  Novo: "Em Contato",
-  Qualificado: "Em Contato",
-  "Em Contato": "Em Contato",
+  Novo: "Novo Lead",
+  Qualificado: "Novo Lead",
+  "Em Contato": "Novo Lead",
+  "Novo Lead": "Novo Lead",
   Convertido: "Convertido",
   Perdido: "Perdido",
 };
@@ -14,7 +15,7 @@ const LEGACY_TO_ACTIVE: Record<string, LeadStatus> = {
 export function normalizeLeadStatus(raw: unknown): LeadStatus {
   const s = typeof raw === "string" ? raw.trim() : "";
   if (s in LEGACY_TO_ACTIVE) return LEGACY_TO_ACTIVE[s]!;
-  return "Em Contato";
+  return "Novo Lead";
 }
 
 export interface Lead {

@@ -11,17 +11,13 @@ type LinkButtonProps = Omit<React.ComponentProps<typeof Link>, "className"> &
 export function LinkButton({
   className,
   variant = "cta",
-  size = "default",
+  size = "lg",
   href,
   children,
   ...props
 }: LinkButtonProps) {
   return (
-    <Link
-      href={href}
-      className={cn(buttonVariants({ variant, size, className }))}
-      {...props}
-    >
+    <Link href={href} className={cn(buttonVariants({ variant, size }), className)} {...props}>
       {children}
     </Link>
   );

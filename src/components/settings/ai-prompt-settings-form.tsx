@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Bot, Briefcase, ListTree, Loader2, Scale } from "lucide-react";
+import { Bot, Briefcase, Check, ListTree, Loader2, Scale } from "lucide-react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -44,7 +44,7 @@ const SCORING_STRICTNESS_OPTIONS: { id: AiScoringStrictness; label: string }[] =
 function scoringStrictnessSelectedClasses(id: AiScoringStrictness): string {
   switch (id) {
     case "free":
-      return "border-border bg-muted text-foreground shadow-sm ring-1 ring-border dark:border-white/35 dark:bg-white/[0.12] dark:text-white dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12)] dark:ring-white/25";
+      return "border-brand/45 bg-brand/12 text-foreground ring-1 ring-brand/30 dark:border-brand/50 dark:bg-brand/15 dark:text-white dark:ring-brand/25";
     case "low":
       return "border-emerald-600/45 bg-emerald-500/12 text-emerald-950 ring-1 ring-emerald-600/30 dark:border-emerald-500/50 dark:bg-emerald-500/15 dark:text-white dark:ring-emerald-500/25";
     case "medium":
@@ -55,7 +55,7 @@ function scoringStrictnessSelectedClasses(id: AiScoringStrictness): string {
 }
 
 function policyOpenSelectedClasses(): string {
-  return "border-border bg-muted text-foreground shadow-sm ring-1 ring-border dark:border-white/30 dark:bg-white/[0.08] dark:text-zinc-100 dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)] dark:ring-white/20";
+  return "border-brand/35 bg-brand/8 text-foreground shadow-sm ring-1 ring-brand/25 dark:border-brand/45 dark:bg-brand/12 dark:text-white dark:ring-brand/20";
 }
 
 function policyUnselectedClasses(): string {
@@ -69,7 +69,7 @@ function SelectedBadge({ variant }: { variant: "brand" | "neutral" }) {
       className={cn(
         "pointer-events-none absolute right-2.5 top-2.5 z-10 h-2 w-2 rounded-full sm:right-3 sm:top-3",
         variant === "brand"
-          ? "bg-indigo-500 ring-2 ring-indigo-500/35 dark:bg-indigo-400 dark:ring-indigo-400/30"
+          ? "bg-brand ring-2 ring-brand/35 dark:bg-brand dark:ring-brand/30"
           : "bg-foreground/35 ring-2 ring-foreground/15 dark:bg-zinc-300/90 dark:ring-white/10",
       )}
     />
@@ -130,6 +130,12 @@ export function AiPromptSettingsForm() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (savedAt == null) return;
+    const id = window.setTimeout(() => setSavedAt(null), 3200);
+    return () => window.clearTimeout(id);
+  }, [savedAt]);
 
   const toggleChannel = (id: string) => {
     setChannelIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -200,8 +206,8 @@ export function AiPromptSettingsForm() {
 
   if (loading) {
     return (
-      <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/30 px-6 py-14 text-sm text-muted-foreground dark:border-white/5 dark:bg-white/[0.02]">
-        <Loader2 className="size-5 animate-spin shrink-0 text-indigo-400" aria-hidden />
+      <div className="flex items-center gap-3 rounded-md border border-border bg-muted/30 px-6 py-14 text-sm text-muted-foreground dark:border-white/5 dark:bg-white/[0.02]">
+        <Loader2 className="size-5 animate-spin shrink-0 text-brand" aria-hidden />
         Carregando configurações...
       </div>
     );
@@ -210,10 +216,10 @@ export function AiPromptSettingsForm() {
   return (
     <div className="space-y-6">
       <Card className="border-border bg-card shadow-xl overflow-hidden dark:border-white/5 dark:bg-white/[0.02]">
-        <CardHeader className="space-y-2 pb-4 border-b border-border dark:border-white/5">
+        <CardHeader className="space-y-2 border-b border-border pb-4 dark:border-white/5">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-500/10 ring-1 ring-indigo-500/20">
-              <Scale className="size-4 text-indigo-400" aria-hidden />
+            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-brand/10 ring-1 ring-brand/20">
+              <Scale className="size-4 text-brand dark:text-brand" aria-hidden />
             </div>
             <div>
               <CardTitle className="text-lg font-bold text-foreground dark:text-white">Exigência nas notas</CardTitle>
@@ -223,7 +229,7 @@ export function AiPromptSettingsForm() {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="pt-6">
+        <CardContent className="space-y-6 pt-6">
           <div className="flex flex-nowrap gap-2">
             {SCORING_STRICTNESS_OPTIONS.map((opt) => {
               const selected = scoringStrictness === opt.id;
@@ -233,7 +239,7 @@ export function AiPromptSettingsForm() {
                   type="button"
                   onClick={() => setScoringStrictness(opt.id)}
                   className={cn(
-                    "relative flex min-h-12 flex-1 items-center justify-center rounded-xl border px-2 py-2.5 text-center transition-all sm:min-h-[3.25rem] sm:px-3 sm:py-3",
+                    "relative flex min-h-12 flex-1 items-center justify-center rounded-md border px-2 py-2.5 text-center transition-all sm:min-h-[3.25rem] sm:px-3 sm:py-3",
                     selected
                       ? scoringStrictnessSelectedClasses(opt.id)
                       : policyUnselectedClasses(),
@@ -251,10 +257,10 @@ export function AiPromptSettingsForm() {
       </Card>
 
       <Card className="border-border bg-card shadow-xl overflow-hidden dark:border-white/5 dark:bg-white/[0.02]">
-        <CardHeader className="space-y-2 pb-4 border-b border-border dark:border-white/5">
+        <CardHeader className="space-y-2 border-b border-border pb-4 dark:border-white/5">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-500/10 ring-1 ring-indigo-500/20">
-              <Bot className="size-4 text-indigo-400" aria-hidden />
+            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-brand/10 ring-1 ring-brand/20">
+              <Bot className="size-4 text-brand dark:text-brand" aria-hidden />
             </div>
             <div>
               <CardTitle className="text-lg font-bold text-foreground dark:text-white">Diretrizes da IA</CardTitle>
@@ -278,7 +284,7 @@ export function AiPromptSettingsForm() {
               value={guidelines}
               onChange={(e) => setGuidelines(e.target.value)}
               placeholder="Ex.: priorize tom consultivo, foco em clínicas, evitar termos em inglês..."
-              className="min-h-[180px] rounded-xl border-input bg-background text-foreground placeholder:text-muted-foreground focus-visible:border-indigo-500/50 focus-visible:ring-indigo-500/20 dark:border-white/10 dark:bg-white/5 dark:text-zinc-100 dark:placeholder:text-zinc-600"
+              className="min-h-[180px] rounded-md border-input bg-background text-foreground placeholder:text-muted-foreground focus-visible:border-brand/50 focus-visible:ring-brand/20 dark:border-white/10 dark:bg-white/5 dark:text-zinc-100 dark:placeholder:text-zinc-600"
             />
             <p className="text-xs text-muted-foreground">
               {guidelines.length}/{MAX_GUIDELINES_LENGTH} caracteres.
@@ -288,10 +294,10 @@ export function AiPromptSettingsForm() {
       </Card>
 
       <Card className="border-border bg-card shadow-xl overflow-hidden dark:border-white/5 dark:bg-white/[0.02]">
-        <CardHeader className="space-y-2 pb-4 border-b border-border dark:border-white/5">
+        <CardHeader className="space-y-2 border-b border-border pb-4 dark:border-white/5">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-500/10 ring-1 ring-indigo-500/20">
-              <ListTree className="size-4 text-indigo-400" aria-hidden />
+            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-brand/10 ring-1 ring-brand/20">
+              <ListTree className="size-4 text-brand dark:text-brand" aria-hidden />
             </div>
             <div>
               <CardTitle className="text-lg font-bold text-foreground dark:text-white">Canais digitais recomendados</CardTitle>
@@ -312,7 +318,7 @@ export function AiPromptSettingsForm() {
                 type="button"
                 onClick={() => setChannelPolicy("open")}
                 className={cn(
-                  "relative rounded-xl border px-4 py-3 text-left text-sm font-semibold transition-all",
+                  "relative rounded-md border px-4 py-3 text-left text-sm font-semibold transition-all",
                   channelPolicy === "open" && "pr-[3.35rem] sm:pr-[3.85rem]",
                   channelPolicy === "open" ? policyOpenSelectedClasses() : policyUnselectedClasses(),
                 )}
@@ -329,10 +335,10 @@ export function AiPromptSettingsForm() {
                 type="button"
                 onClick={() => setChannelPolicy("restricted")}
                 className={cn(
-                  "relative rounded-xl border px-4 py-3 text-left text-sm font-semibold transition-all",
+                  "relative rounded-md border px-4 py-3 text-left text-sm font-semibold transition-all",
                   channelPolicy === "restricted" && "pr-[3.35rem] sm:pr-[3.85rem]",
                   channelPolicy === "restricted"
-                    ? "border-indigo-600/45 bg-indigo-500/12 text-indigo-950 ring-1 ring-indigo-600/30 dark:border-indigo-500/50 dark:bg-indigo-500/15 dark:text-white dark:ring-indigo-500/25"
+                    ? "border-brand/45 bg-brand/12 text-foreground ring-1 ring-brand/30 dark:border-brand/50 dark:bg-brand/15 dark:text-white dark:ring-brand/25"
                     : policyUnselectedClasses(),
                 )}
               >
@@ -348,7 +354,7 @@ export function AiPromptSettingsForm() {
           </div>
 
           {channelPolicy === "open" ? (
-            <div className="space-y-2 rounded-xl border border-border bg-muted/15 px-3 py-3 dark:border-white/10 dark:bg-white/[0.02]">
+            <div className="space-y-2 rounded-md border border-border bg-muted/15 px-3 py-3 dark:border-white/10 dark:bg-white/[0.02]">
               <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                 Quantidade no modo livre
               </Label>
@@ -362,7 +368,7 @@ export function AiPromptSettingsForm() {
                   setOpenChannelCount(sanitizeAiOpenRecommendedChannelCount(Number(v)))
                 }
               >
-                <SelectTrigger className="h-10 w-full max-w-[240px] rounded-xl border-input bg-background text-foreground dark:border-white/10 dark:bg-white/5 dark:text-zinc-100">
+                <SelectTrigger className="w-full max-w-[240px]">
                   <SelectValue placeholder="Quantidade" />
                 </SelectTrigger>
                 <SelectContent>
@@ -390,16 +396,16 @@ export function AiPromptSettingsForm() {
                 <label
                   key={opt.id}
                   className={cn(
-                    "flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-2.5 transition-colors",
+                    "flex cursor-pointer items-start gap-3 rounded-md border px-3 py-2.5 transition-colors",
                     channelPolicy === "restricted" && channelIds.includes(opt.id)
-                      ? "border-indigo-500/40 bg-indigo-500/10"
+                      ? "border-brand/40 bg-brand/10 ring-1 ring-brand/20"
                       : "border-border bg-muted/20 dark:border-white/10 dark:bg-white/[0.02]",
                     channelPolicy !== "restricted" && "cursor-not-allowed opacity-50",
                   )}
                 >
                   <input
                     type="checkbox"
-                    className="mt-1 size-4 shrink-0 rounded border-input bg-background text-indigo-600 focus:ring-indigo-500/30 dark:border-white/20 dark:bg-zinc-900 dark:text-indigo-500"
+                    className="mt-1 size-4 shrink-0 rounded border-input bg-background text-brand focus:ring-brand/30 dark:border-white/20 dark:bg-zinc-900 dark:text-brand"
                     checked={channelIds.includes(opt.id)}
                     disabled={channelPolicy !== "restricted"}
                     onChange={() => toggleChannel(opt.id)}
@@ -413,10 +419,10 @@ export function AiPromptSettingsForm() {
       </Card>
 
       <Card className="border-border bg-card shadow-xl overflow-hidden dark:border-white/5 dark:bg-white/[0.02]">
-        <CardHeader className="space-y-2 pb-4 border-b border-border dark:border-white/5">
+        <CardHeader className="space-y-2 border-b border-border pb-4 dark:border-white/5">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-500/10 ring-1 ring-indigo-500/20">
-              <Briefcase className="size-4 text-indigo-400" aria-hidden />
+            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-brand/10 ring-1 ring-brand/20">
+              <Briefcase className="size-4 text-brand dark:text-brand" aria-hidden />
             </div>
             <div>
               <CardTitle className="text-lg font-bold text-foreground dark:text-white">Serviços da agência (foco)</CardTitle>
@@ -438,7 +444,7 @@ export function AiPromptSettingsForm() {
                 type="button"
                 onClick={() => setServicesPolicy("open")}
                 className={cn(
-                  "relative rounded-xl border px-4 py-3 text-left text-sm font-semibold transition-all",
+                  "relative rounded-md border px-4 py-3 text-left text-sm font-semibold transition-all",
                   servicesPolicy === "open" && "pr-[3.35rem] sm:pr-[3.85rem]",
                   servicesPolicy === "open" ? policyOpenSelectedClasses() : policyUnselectedClasses(),
                 )}
@@ -455,10 +461,10 @@ export function AiPromptSettingsForm() {
                 type="button"
                 onClick={() => setServicesPolicy("restricted")}
                 className={cn(
-                  "relative rounded-xl border px-4 py-3 text-left text-sm font-semibold transition-all",
+                  "relative rounded-md border px-4 py-3 text-left text-sm font-semibold transition-all",
                   servicesPolicy === "restricted" && "pr-[3.35rem] sm:pr-[3.85rem]",
                   servicesPolicy === "restricted"
-                    ? "border-emerald-600/45 bg-emerald-500/12 text-emerald-950 ring-1 ring-emerald-600/30 dark:border-emerald-500/50 dark:bg-emerald-500/15 dark:text-white dark:ring-emerald-500/25"
+                    ? "border-brand/45 bg-brand/12 text-foreground ring-1 ring-brand/30 dark:border-brand/50 dark:bg-brand/15 dark:text-white dark:ring-brand/25"
                     : policyUnselectedClasses(),
                 )}
               >
@@ -487,16 +493,16 @@ export function AiPromptSettingsForm() {
                 <label
                   key={opt.id}
                   className={cn(
-                    "flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-2.5 transition-colors",
+                    "flex cursor-pointer items-start gap-3 rounded-md border px-3 py-2.5 transition-colors",
                     servicesPolicy === "restricted" && serviceIds.includes(opt.id)
-                      ? "border-emerald-500/40 bg-emerald-500/10"
+                      ? "border-brand/40 bg-brand/10 ring-1 ring-brand/20"
                       : "border-border bg-muted/20 dark:border-white/10 dark:bg-white/[0.02]",
                     servicesPolicy !== "restricted" && "cursor-not-allowed opacity-50",
                   )}
                 >
                   <input
                     type="checkbox"
-                    className="mt-1 size-4 shrink-0 rounded border-input bg-background text-emerald-600 focus:ring-emerald-500/30 dark:border-white/20 dark:bg-zinc-900 dark:text-emerald-500"
+                    className="mt-1 size-4 shrink-0 rounded border-input bg-background text-brand focus:ring-brand/30 dark:border-white/20 dark:bg-zinc-900 dark:text-brand"
                     checked={serviceIds.includes(opt.id)}
                     disabled={servicesPolicy !== "restricted"}
                     onChange={() => toggleService(opt.id)}
@@ -509,16 +515,16 @@ export function AiPromptSettingsForm() {
             <div className="space-y-2 pt-1">
               <label
                 className={cn(
-                  "flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-2.5 transition-colors",
+                  "flex cursor-pointer items-start gap-3 rounded-md border px-3 py-2.5 transition-colors",
                   servicesPolicy === "restricted" && servicesOthersEnabled
-                    ? "border-emerald-500/40 bg-emerald-500/10"
+                    ? "border-brand/40 bg-brand/10 ring-1 ring-brand/20"
                     : "border-border bg-muted/20 dark:border-white/10 dark:bg-white/[0.02]",
                   servicesPolicy !== "restricted" && "cursor-not-allowed opacity-50",
                 )}
               >
                 <input
                   type="checkbox"
-                  className="mt-1 size-4 shrink-0 rounded border-input bg-background text-emerald-600 focus:ring-emerald-500/30 dark:border-white/20 dark:bg-zinc-900 dark:text-emerald-500"
+                  className="mt-1 size-4 shrink-0 rounded border-input bg-background text-brand focus:ring-brand/30 dark:border-white/20 dark:bg-zinc-900 dark:text-brand"
                   checked={servicesOthersEnabled}
                   disabled={servicesPolicy !== "restricted"}
                   onChange={(e) => {
@@ -544,7 +550,7 @@ export function AiPromptSettingsForm() {
                     placeholder={
                       "Um item por linha (ou separados por vírgula):\nAutomação comercial no WhatsApp\nCriação de agente de IA"
                     }
-                    className="min-h-[120px] rounded-xl border-input bg-background text-foreground placeholder:text-muted-foreground focus-visible:border-emerald-500/50 focus-visible:ring-emerald-500/20 dark:border-white/10 dark:bg-white/5 dark:text-zinc-100 dark:placeholder:text-zinc-600"
+                    className="min-h-[120px] rounded-md border-input bg-background text-foreground placeholder:text-muted-foreground focus-visible:border-brand/50 focus-visible:ring-brand/20 dark:border-white/10 dark:bg-white/5 dark:text-zinc-100 dark:placeholder:text-zinc-600"
                   />
                   <p className="text-xs text-muted-foreground">
                     Até {MAX_CUSTOM_SERVICE_LABELS} itens, até {MAX_CUSTOM_SERVICE_LABEL_LEN} caracteres
@@ -558,29 +564,39 @@ export function AiPromptSettingsForm() {
       </Card>
 
       {error ? (
-        <p className="rounded-lg border border-red-500/35 bg-red-500/10 px-3 py-2 text-sm text-red-800 dark:text-red-300">
+        <p className="rounded-md border border-red-500/35 bg-red-500/10 px-3 py-2 text-sm text-red-800 dark:text-red-300">
           {error}
         </p>
       ) : null}
-      {savedAt && !error ? (
-        <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">Configurações de IA salvas.</p>
-      ) : null}
-
-      <Button
-        type="button"
-        onClick={() => void handleSave()}
-        disabled={saving}
-        className="gap-2 rounded-xl bg-indigo-600 font-bold text-white shadow-lg shadow-indigo-500/20 hover:bg-indigo-500"
-      >
-        {saving ? (
-          <>
-            <Loader2 className="size-4 animate-spin shrink-0" aria-hidden />
-            Salvando...
-          </>
-        ) : (
-          "Salvar configurações de IA"
-        )}
-      </Button>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <Button
+          type="button"
+          variant="cta"
+          size="lg"
+          onClick={() => void handleSave()}
+          disabled={saving}
+          className="gap-2"
+        >
+          {saving ? (
+            <>
+              <Loader2 className="size-4 animate-spin shrink-0" aria-hidden />
+              Salvando...
+            </>
+          ) : (
+            "Salvar configurações de IA"
+          )}
+        </Button>
+        {savedAt && !error ? (
+          <span
+            className="inline-flex max-w-full items-center gap-1.5 text-xs text-muted-foreground motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
+            role="status"
+            aria-live="polite"
+          >
+            <Check className="size-3.5 shrink-0 opacity-50 text-emerald-700 dark:text-emerald-500/80" aria-hidden />
+            Configurações salvas.
+          </span>
+        ) : null}
+      </div>
     </div>
   );
 }

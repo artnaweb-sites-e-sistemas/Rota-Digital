@@ -69,10 +69,10 @@ export function CardSpotlight({ className, children, ...props }: CardSpotlightPr
           background: `
             radial-gradient(
               650px circle at ${spotlight.x}px ${spotlight.y}px,
-              rgba(99, 102, 241, 0.15),
-              rgba(168, 85, 247, 0.05) 25%,
-              rgba(56, 189, 248, 0.02) 50%,
-              transparent 80%
+              rgba(142, 125, 77, 0.16),
+              rgba(196, 178, 122, 0.07) 28%,
+              rgba(92, 82, 53, 0.04) 52%,
+              transparent 82%
             )
           `,
         }}

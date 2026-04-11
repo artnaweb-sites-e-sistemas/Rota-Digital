@@ -3,11 +3,10 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useTheme } from "next-themes";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
 import { getUserUiTheme, saveUserUiTheme } from "@/lib/user-settings";
 import type { UserUiTheme } from "@/types/user-settings";
-import { Loader2, Monitor, Moon, Sun } from "lucide-react";
+import { Check, Loader2, Monitor, Moon, Sun } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const OPTIONS: { id: UserUiTheme; label: string; icon: typeof Sun }[] = [
@@ -18,21 +17,24 @@ const OPTIONS: { id: UserUiTheme; label: string; icon: typeof Sun }[] = [
 
 function ThemeChip({
   active,
+  disabled,
   onClick,
   children,
 }: {
   active: boolean;
+  disabled?: boolean;
   onClick: () => void;
   children: ReactNode;
 }) {
   return (
     <button
       type="button"
+      disabled={disabled}
       onClick={onClick}
       className={cn(
-        "relative flex flex-1 flex-col items-center gap-1.5 rounded-xl border px-3 py-3 text-center transition-all sm:flex-row sm:justify-start sm:text-left",
+        "relative flex flex-1 flex-col items-center gap-1.5 rounded-md border px-3 py-3 text-center transition-all sm:flex-row sm:justify-start sm:text-left disabled:pointer-events-none disabled:opacity-60",
         active
-          ? "border-indigo-600/45 bg-indigo-500/12 text-indigo-950 ring-1 ring-indigo-600/30 dark:border-indigo-500/50 dark:bg-indigo-500/15 dark:text-white dark:ring-indigo-500/25"
+          ? "border-brand/45 bg-brand/12 text-foreground ring-1 ring-brand/30 dark:border-brand/50 dark:bg-brand/15 dark:text-white dark:ring-brand/25"
           : "border-border bg-background text-foreground hover:border-input hover:bg-muted dark:border-white/10 dark:bg-white/[0.03] dark:text-zinc-400 dark:hover:border-white/15 dark:hover:bg-white/[0.06] dark:hover:text-zinc-200",
       )}
     >
@@ -73,25 +75,27 @@ export function AppearanceSettingsForm() {
     void load();
   }, [load]);
 
-  const apply = (mode: UserUiTheme) => {
+  useEffect(() => {
+    if (savedAt == null) return;
+    const id = window.setTimeout(() => setSavedAt(null), 3200);
+    return () => window.clearTimeout(id);
+  }, [savedAt]);
+
+  const selectTheme = async (mode: UserUiTheme) => {
+    if (loading || saving) return;
+    if (mode === preference && !error) return;
     setPreference(mode);
     setTheme(mode);
     setError(null);
     setSavedAt(null);
-  };
-
-  const handleSave = async () => {
     if (!user) return;
     setSaving(true);
-    setError(null);
     try {
-      await saveUserUiTheme(user.uid, preference);
-      setTheme(preference);
+      await saveUserUiTheme(user.uid, mode);
       setSavedAt(Date.now());
     } catch (e) {
       console.error(e);
-      setSavedAt(null);
-      setError("Não foi possível salvar. Tente de novo.");
+      setError("Não foi possível salvar. Escolha outra vez.");
     } finally {
       setSaving(false);
     }
@@ -101,14 +105,14 @@ export function AppearanceSettingsForm() {
     <Card className="border-border bg-card shadow-xl overflow-hidden dark:border-white/5 dark:bg-white/[0.02]">
       <CardHeader className="space-y-2 border-b border-border pb-4 dark:border-white/5">
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-500/10 ring-1 ring-indigo-500/20">
-            <Sun className="size-4 text-indigo-600 dark:text-indigo-400" aria-hidden />
+          <div className="flex h-9 w-9 items-center justify-center rounded-md bg-brand/10 ring-1 ring-brand/20">
+            <Sun className="size-4 text-brand dark:text-brand" aria-hidden />
           </div>
           <div>
             <CardTitle className="text-lg font-bold text-foreground dark:text-white">Aparência</CardTitle>
             <CardDescription className="text-sm text-muted-foreground leading-relaxed">
-              Modo claro ou escuro no painel. O link público do relatório também pode ser alternado pelo
-              cliente.
+              Modo claro ou escuro no painel; a escolha guarda-se automaticamente. O link público do relatório
+              também pode ser alternado pelo cliente.
             </CardDescription>
           </div>
         </div>
@@ -116,7 +120,7 @@ export function AppearanceSettingsForm() {
       <CardContent className="space-y-6 pt-6">
         {loading ? (
           <div className="flex items-center gap-3 py-10 text-sm text-muted-foreground">
-            <Loader2 className="size-5 animate-spin shrink-0 text-indigo-400" aria-hidden />
+            <Loader2 className="size-5 animate-spin shrink-0 text-brand" aria-hidden />
             Carregando…
           </div>
         ) : (
@@ -126,8 +130,13 @@ export function AppearanceSettingsForm() {
                 const Icon = opt.icon;
                 const active = preference === opt.id;
                 return (
-                  <ThemeChip key={opt.id} active={active} onClick={() => apply(opt.id)}>
-                    <Icon className="size-4 shrink-0 text-indigo-600 dark:text-indigo-400" aria-hidden />
+                  <ThemeChip
+                    key={opt.id}
+                    active={active}
+                    disabled={saving}
+                    onClick={() => void selectTheme(opt.id)}
+                  >
+                    <Icon className="size-4 shrink-0 text-brand dark:text-brand" aria-hidden />
                     <div className="min-w-0">
                       <p className="text-sm font-semibold">{opt.label}</p>
                     </div>
@@ -136,28 +145,30 @@ export function AppearanceSettingsForm() {
               })}
             </div>
             {error ? (
-              <p className="rounded-lg border border-red-500/35 bg-red-500/10 px-3 py-2 text-sm text-red-800 dark:text-red-300">
+              <p className="rounded-md border border-red-500/35 bg-red-500/10 px-3 py-2 text-sm text-red-800 dark:text-red-300">
                 {error}
               </p>
             ) : null}
-            {savedAt && !error ? (
-              <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">Preferência salva.</p>
+            {saving ? (
+              <p
+                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"
+                role="status"
+                aria-live="polite"
+              >
+                <Loader2 className="size-3.5 shrink-0 animate-spin text-brand" aria-hidden />
+                A guardar…
+              </p>
             ) : null}
-            <Button
-              type="button"
-              className="w-full gap-2 rounded-xl bg-indigo-600 font-bold text-white shadow-lg shadow-indigo-500/20 hover:bg-indigo-500 sm:w-auto"
-              onClick={() => void handleSave()}
-              disabled={saving}
-            >
-              {saving ? (
-                <>
-                  <Loader2 className="size-4 animate-spin shrink-0" aria-hidden />
-                  Salvando…
-                </>
-              ) : (
-                "Salvar aparência"
-              )}
-            </Button>
+            {savedAt && !error && !saving ? (
+              <span
+                className="inline-flex max-w-full items-center gap-1.5 text-xs text-muted-foreground motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
+                role="status"
+                aria-live="polite"
+              >
+                <Check className="size-3.5 shrink-0 opacity-50 text-emerald-700 dark:text-emerald-500/80" aria-hidden />
+                Preferência salva.
+              </span>
+            ) : null}
           </>
         )}
       </CardContent>

@@ -26,7 +26,7 @@ import { LinkButton } from "@/components/ui/link-button";
 import { cn } from "@/lib/utils";
 
 const STATUS_BADGE_SURFACE: Record<LeadStatus, string> = {
-  "Em Contato":
+  "Novo Lead":
     "bg-muted/90 text-muted-foreground dark:bg-zinc-800/90 dark:text-zinc-300",
   Convertido:
     "bg-emerald-500/12 text-emerald-950 dark:bg-emerald-500/18 dark:text-emerald-100",
@@ -159,10 +159,10 @@ export default function LeadDetailPage() {
       </div>
 
       {/* AI Route Generation */}
-      <Card className="border border-indigo-500/25 bg-gradient-to-br from-indigo-500/8 to-card dark:from-indigo-950/60 dark:to-zinc-900 dark:border-indigo-800/40">
+      <Card className="border border-brand/25 bg-gradient-to-br from-brand/10 to-card dark:from-brand/15 dark:to-zinc-900 dark:border-brand/35">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-foreground">
-            <Sparkles size={20} className="text-indigo-600 dark:text-indigo-400" />
+            <Sparkles size={20} className="text-brand dark:text-brand" />
             Rota Digital com IA
           </CardTitle>
         </CardHeader>
@@ -171,7 +171,7 @@ export default function LeadDetailPage() {
             <div className="space-y-3">
               <p className="text-sm text-foreground/90">
                 Já existe uma Rota Digital gerada para este lead em{" "}
-                <span className="font-medium text-indigo-700 dark:text-indigo-400">
+                <span className="font-medium text-brand dark:text-brand">
                   {new Date(existingReport.createdAt).toLocaleDateString("pt-BR")}
                 </span>
                 .
@@ -198,7 +198,7 @@ export default function LeadDetailPage() {
                       href={`/r/${existingReport.publicSlug}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-indigo-700 underline-offset-2 hover:underline dark:text-indigo-400"
+                      className="text-brand underline-offset-2 hover:underline dark:text-brand"
                     >
                       abrir página pública
                     </Link>

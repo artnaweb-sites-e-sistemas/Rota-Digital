@@ -35,7 +35,7 @@ export function ReportSiteAvatar({ report, size = "md", className }: Props) {
       className={cn(
         "flex shrink-0 items-center justify-center overflow-hidden rounded-md",
         BOX[size],
-        !showImg && "bg-violet-500/15 text-violet-600 dark:text-violet-400",
+        !showImg && "bg-brand/15 text-brand dark:text-brand",
         className,
         showImg && "bg-white p-1 dark:bg-zinc-100",
       )}

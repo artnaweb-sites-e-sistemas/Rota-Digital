@@ -68,28 +68,29 @@ import type { UserReportCtaSettings } from "@/types/user-settings";
 import { PublicThemeToggle } from "@/components/public-theme-toggle";
 
 const PRIORITY_COLORS: Record<string, string> = {
-  Alta: "border border-red-500/35 bg-red-500/15 text-red-900 dark:bg-red-500/25 dark:text-red-200 dark:border-red-400/45",
+  Alta:
+    "border border-[color:var(--rota-sev-a-border)]/35 bg-[color:var(--rota-sev-a-bar)]/15 text-[color:var(--rota-sev-a-fg)] dark:bg-[color:var(--rota-sev-a-bar)]/22 dark:text-[color:var(--rota-sev-a-fg-dark)] dark:border-[color:var(--rota-sev-a-border)]/45",
   Média:
-    "border border-amber-500/35 bg-amber-500/12 text-amber-900 dark:bg-amber-500/20 dark:text-amber-200 dark:border-amber-400/40",
+    "border border-[color:var(--rota-sev-b-border)]/35 bg-[color:var(--rota-sev-b-bar)]/12 text-[color:var(--rota-sev-b-fg)] dark:bg-[color:var(--rota-sev-b-bar)]/18 dark:text-[color:var(--rota-sev-b-fg-dark)] dark:border-[color:var(--rota-sev-b-border)]/42",
   Baixa:
-    "border border-emerald-500/35 bg-emerald-500/12 text-emerald-900 dark:bg-emerald-500/20 dark:text-emerald-200 dark:border-emerald-400/40",
+    "border border-[color:var(--rota-sev-c-border)]/35 bg-[color:var(--rota-sev-c-bar)]/12 text-[color:var(--rota-sev-c-fg)] dark:bg-[color:var(--rota-sev-c-bar)]/18 dark:text-[color:var(--rota-sev-c-fg-dark)] dark:border-[color:var(--rota-sev-c-border)]/42",
 };
 
 /** Fundo opaco na aba de prioridade (só mobile) — evita “vazado” sobre o BorderGlow e o fundo da página. */
 const CHANNEL_PRIORITY_TAB_MOBILE_SURFACE: Record<string, string> = {
   Alta:
-    "max-md:!bg-red-950/95 max-md:dark:!bg-red-950/92 max-md:!text-red-100 max-md:dark:!text-red-200",
+    "max-md:!bg-[oklch(0.22_0.045_38_/_0.96)] max-md:dark:!bg-[oklch(0.2_0.04_38_/_0.94)] max-md:!text-[color:var(--rota-sev-a-fg-dark)] max-md:dark:!text-[color:var(--rota-sev-a-fg-dark)]",
   Média:
-    "max-md:!bg-amber-950/94 max-md:dark:!bg-amber-950/90 max-md:!text-amber-100 max-md:dark:!text-amber-200",
+    "max-md:!bg-[oklch(0.24_0.035_78_/_0.95)] max-md:dark:!bg-[oklch(0.22_0.03_78_/_0.92)] max-md:!text-[color:var(--rota-sev-b-fg)] max-md:dark:!text-[color:var(--rota-sev-b-fg-dark)]",
   Baixa:
-    "max-md:!bg-emerald-950/94 max-md:dark:!bg-emerald-950/90 max-md:!text-emerald-100 max-md:dark:!text-emerald-200",
+    "max-md:!bg-[oklch(0.22_0.04_152_/_0.95)] max-md:dark:!bg-[oklch(0.2_0.035_152_/_0.92)] max-md:!text-[color:var(--rota-sev-c-fg)] max-md:dark:!text-[color:var(--rota-sev-c-fg-dark)]",
 };
 
-/** Borda do BorderGlow em repouso (antes do hover), alinhada à prioridade. */
-const PRIORITY_FRAME_BORDER: Record<string, string> = {
-  Alta: "border-red-500/35",
-  Média: "border-yellow-500/35",
-  Baixa: "border-green-500/35",
+/** Borda 1px do BorderGlow em repouso (inline — evita conflito com `border-border` do componente). */
+const PRIORITY_RESTING_BORDER: Record<string, string> = {
+  Alta: "color-mix(in oklch, var(--rota-sev-a-border) 58%, transparent)",
+  Média: "color-mix(in oklch, var(--rota-sev-b-border) 58%, transparent)",
+  Baixa: "color-mix(in oklch, var(--rota-sev-c-border) 58%, transparent)",
 };
 
 /** Rótulo do badge de prioridade nos cards de canal. */
@@ -103,11 +104,11 @@ function channelPriorityBadgeLabel(priority: string): string {
 /** Caixa do ícone nas ações do card de canal — harmoniza com a prioridade. */
 const CHANNEL_ACTION_ICON_SHELL: Record<string, string> = {
   Alta:
-    "border-red-500/35 bg-red-500/10 text-red-700 ring-red-500/25 dark:text-red-400 dark:ring-red-500/20",
+    "border-[color:var(--rota-sev-a-border)]/35 bg-[color:var(--rota-sev-a-bar)]/10 text-[color:var(--rota-sev-a-fg)] ring-[color:var(--rota-sev-a-border)]/25 dark:text-[color:var(--rota-sev-a-fg-dark)] dark:ring-[color:var(--rota-sev-a-border)]/20",
   Média:
-    "border-amber-500/35 bg-amber-500/12 text-amber-950 ring-amber-500/25 dark:text-amber-400 dark:ring-amber-500/20",
+    "border-[color:var(--rota-sev-b-border)]/35 bg-[color:var(--rota-sev-b-bar)]/12 text-[color:var(--rota-sev-b-fg)] ring-[color:var(--rota-sev-b-border)]/25 dark:text-[color:var(--rota-sev-b-fg-dark)] dark:ring-[color:var(--rota-sev-b-border)]/20",
   Baixa:
-    "border-emerald-500/35 bg-emerald-500/10 text-emerald-900 ring-emerald-500/25 dark:text-emerald-400 dark:ring-emerald-500/20",
+    "border-[color:var(--rota-sev-c-border)]/35 bg-[color:var(--rota-sev-c-bar)]/10 text-[color:var(--rota-sev-c-fg)] ring-[color:var(--rota-sev-c-border)]/25 dark:text-[color:var(--rota-sev-c-fg-dark)] dark:ring-[color:var(--rota-sev-c-border)]/20",
 };
 
 /** Mesmo visual da pill “WEBSITE” / “Instagram” nas evidências — rótulo em caixa alta (sutil). */
@@ -129,8 +130,9 @@ function SectionHeaderIcon({
     <div
       className={cn(
         "flex h-6 w-6 shrink-0 items-center justify-center rounded-md border",
-        tone === "indigo" && "border-indigo-500/30 bg-indigo-500/10 text-indigo-700 dark:text-indigo-400",
-        tone === "yellow" && "border-yellow-500/35 bg-yellow-500/10 text-yellow-800 dark:text-yellow-400",
+        tone === "indigo" && "border-brand/30 bg-brand/10 text-brand dark:text-brand",
+        tone === "yellow" &&
+          "border-[color:var(--rota-sev-b-border)]/35 bg-[color:var(--rota-sev-b-bar)]/10 text-[color:var(--rota-sev-b-fg)] dark:text-[color:var(--rota-sev-b-fg-dark)]",
         tone === "purple" && "border-purple-500/35 bg-purple-500/10 text-purple-800 dark:text-purple-400",
         tone === "neutral" && "border-border bg-muted text-muted-foreground",
       )}
@@ -177,11 +179,11 @@ const ROTA_CARD_SUBTITLE =
 type RotaHeaderIconTone = "indigo" | "yellow" | "purple" | "green" | "red" | "blue";
 
 const ROTA_HEADER_ICON_SHELL: Record<RotaHeaderIconTone, string> = {
-  indigo: "border-indigo-400/35 bg-indigo-500/10",
-  yellow: "border-yellow-500/35 bg-yellow-500/10",
+  indigo: "border-brand/35 bg-brand/10",
+  yellow: "border-[color:var(--rota-sev-b-border)]/35 bg-[color:var(--rota-sev-b-bar)]/10",
   purple: "border-purple-500/35 bg-purple-500/10",
-  green: "border-emerald-500/35 bg-emerald-500/10",
-  red: "border-red-500/35 bg-red-500/10",
+  green: "border-[color:var(--rota-sev-c-border)]/35 bg-[color:var(--rota-sev-c-bar)]/10",
+  red: "border-[color:var(--rota-sev-a-border)]/35 bg-[color:var(--rota-sev-a-bar)]/10",
   blue: "border-blue-400/35 bg-blue-500/10",
 };
 
@@ -199,9 +201,24 @@ function RotaHeaderIcon({ tone, children }: { tone: RotaHeaderIconTone; children
 }
 
 const MATURITY_CONFIG = {
-  Iniciante: { color: "text-orange-800 dark:text-orange-400", bar: "bg-orange-500", range: "0.0-3.9" },
-  Intermediário: { color: "text-amber-900 dark:text-yellow-400", bar: "bg-yellow-500", range: "4.0-6.9" },
-  Avançado: { color: "text-emerald-800 dark:text-green-400", bar: "bg-green-500", range: "7.0-10.0" },
+  Iniciante: {
+    scoreText: "text-[color:var(--rota-sev-a-fg)] dark:text-[color:var(--rota-sev-a-fg-dark)]",
+    bar: "bg-[color:var(--rota-sev-a-bar)]",
+    badgeBorder: "border-[color:var(--rota-sev-a-border)]/35",
+    range: "0.0-3.9",
+  },
+  Intermediário: {
+    scoreText: "text-[color:var(--rota-sev-b-fg)] dark:text-[color:var(--rota-sev-b-fg-dark)]",
+    bar: "bg-[color:var(--rota-sev-b-bar)]",
+    badgeBorder: "border-[color:var(--rota-sev-b-border)]/35",
+    range: "4.0-6.9",
+  },
+  Avançado: {
+    scoreText: "text-[color:var(--rota-sev-c-fg)] dark:text-[color:var(--rota-sev-c-fg-dark)]",
+    bar: "bg-[color:var(--rota-sev-c-bar)]",
+    badgeBorder: "border-[color:var(--rota-sev-c-border)]/35",
+    range: "7.0-10.0",
+  },
 };
 
 /** Quebras “manuais” antes de frases que costumam ser recomendações (melhor escaneabilidade). */
@@ -544,20 +561,18 @@ function MaturityGauge({ score, level }: { score: number; level: string }) {
   return (
     <div className="space-y-2.5">
       <div className="flex items-end justify-between gap-2">
-        <span className={`text-4xl font-bold tabular-nums ${config.color}`}>
+        <span className={cn("text-4xl font-bold tabular-nums", config.scoreText)}>
           {normalized.toFixed(1)}
         </span>
         <span className="pb-1 text-sm text-muted-foreground">/10</span>
       </div>
       <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
         <div
-          className={`h-full rounded-full transition-all duration-1000 ${config.bar}`}
+          className={cn("h-full rounded-full transition-all duration-1000", config.bar)}
           style={{ width: `${normalized * 10}%` }}
         />
       </div>
-      <Badge
-        className={`w-fit border ${config.color} bg-transparent ${config.bar.replace("bg-", "border-")}/30`}
-      >
+      <Badge className={cn("w-fit border bg-transparent text-sm font-semibold", config.scoreText, config.badgeBorder)}>
         {level}
       </Badge>
     </div>
@@ -566,38 +581,39 @@ function MaturityGauge({ score, level }: { score: number; level: string }) {
 
 function getScoreBadgeClass(score: number): string {
   if (score < 4) {
-    return "border-red-600/40 bg-red-500/12 text-red-950 dark:bg-red-500/20 dark:text-red-200 dark:border-red-400/45";
+    return "border-[color:var(--rota-sev-a-border)]/40 bg-[color:var(--rota-sev-a-bar)]/12 text-[color:var(--rota-sev-a-fg)] dark:bg-[color:var(--rota-sev-a-bar)]/18 dark:text-[color:var(--rota-sev-a-fg-dark)] dark:border-[color:var(--rota-sev-a-border)]/45";
   }
   if (score < 7) {
-    return "border-amber-600/40 bg-amber-500/12 text-amber-950 dark:bg-yellow-500/20 dark:text-yellow-200 dark:border-yellow-400/45";
+    return "border-[color:var(--rota-sev-b-border)]/40 bg-[color:var(--rota-sev-b-bar)]/12 text-[color:var(--rota-sev-b-fg)] dark:bg-[color:var(--rota-sev-b-bar)]/18 dark:text-[color:var(--rota-sev-b-fg-dark)] dark:border-[color:var(--rota-sev-b-border)]/45";
   }
-  return "border-emerald-600/40 bg-emerald-500/12 text-emerald-950 dark:bg-green-500/20 dark:text-green-200 dark:border-green-400/45";
+  return "border-[color:var(--rota-sev-c-border)]/40 bg-[color:var(--rota-sev-c-bar)]/12 text-[color:var(--rota-sev-c-fg)] dark:bg-[color:var(--rota-sev-c-bar)]/18 dark:text-[color:var(--rota-sev-c-fg-dark)] dark:border-[color:var(--rota-sev-c-border)]/45";
 }
 
-/** BorderGlow do tópico: mesmas faixas do badge (< 4 vermelho, < 7 amarelo, senão verde). */
+/** BorderGlow do tópico: mesmas faixas do badge (< 4 terracota, < 7 ouro-oliva, senão floresta). */
 function getDiagnosticTopicGlow(score: number): {
   glowColor: string;
   colors: string[];
-  frameClass: string;
+  restingBorderColor: string;
 } {
   if (score < 4) {
     return {
-      glowColor: "0 72 58",
-      colors: ["#f87171", "#fb7185", "#fca5a5"],
-      frameClass: "border-red-500/35",
+      /** H S L para `buildBoxShadow` — matiz terracota (~24°) */
+      glowColor: "24 58 48",
+      colors: ["#b85c52", "#9e4a42", "#d48072"],
+      restingBorderColor: "color-mix(in oklch, var(--rota-sev-a-border) 58%, transparent)",
     };
   }
   if (score < 7) {
     return {
-      glowColor: "48 92 60",
-      colors: ["#facc15", "#f59e0b", "#fde68a"],
-      frameClass: "border-yellow-500/35",
+      glowColor: "72 52 52",
+      colors: ["#c4a85a", "#a88f4a", "#e0cc88"],
+      restingBorderColor: "color-mix(in oklch, var(--rota-sev-b-border) 58%, transparent)",
     };
   }
   return {
-    glowColor: "142 55 52",
-    colors: ["#4ade80", "#34d399", "#86efac"],
-    frameClass: "border-green-500/35",
+    glowColor: "148 42 44",
+    colors: ["#5a7a64", "#4d6856", "#7a9a84"],
+    restingBorderColor: "color-mix(in oklch, var(--rota-sev-c-border) 58%, transparent)",
   };
 }
 
@@ -1040,7 +1056,7 @@ function getDiagnosticTopicPillVisual(topic: string): {
   const k = normalizeTopicKey(topic);
 
   if (k.includes("posicionamento")) {
-    return { Icon: Compass, iconClass: "text-violet-700 dark:text-violet-400" };
+    return { Icon: Compass, iconClass: "text-brand dark:text-brand" };
   }
   if (k.includes("identidade") && k.includes("visual")) {
     return { Icon: Palette, iconClass: "text-pink-700 dark:text-pink-400" };
@@ -1052,20 +1068,20 @@ function getDiagnosticTopicPillVisual(topic: string): {
     return { Icon: Globe, iconClass: "text-sky-800 dark:text-sky-400" };
   }
   if (k.includes("clareza") && k.includes("proposta")) {
-    return { Icon: Lightbulb, iconClass: "text-amber-800 dark:text-amber-400" };
+    return { Icon: Lightbulb, iconClass: "text-[color:var(--rota-sev-b-fg)] dark:text-[color:var(--rota-sev-b-fg-dark)]" };
   }
   if (k.includes("consistencia") && k.includes("comunicacao")) {
-    return { Icon: MessageSquare, iconClass: "text-emerald-800 dark:text-emerald-400" };
+    return { Icon: MessageSquare, iconClass: "text-[color:var(--rota-sev-c-fg)] dark:text-[color:var(--rota-sev-c-fg-dark)]" };
   }
 
   if (k.includes("identidade")) {
     return { Icon: Palette, iconClass: "text-pink-700 dark:text-pink-400" };
   }
   if (k.includes("clareza")) {
-    return { Icon: Lightbulb, iconClass: "text-amber-800 dark:text-amber-400" };
+    return { Icon: Lightbulb, iconClass: "text-[color:var(--rota-sev-b-fg)] dark:text-[color:var(--rota-sev-b-fg-dark)]" };
   }
   if (k.includes("consistencia")) {
-    return { Icon: MessageSquare, iconClass: "text-emerald-800 dark:text-emerald-400" };
+    return { Icon: MessageSquare, iconClass: "text-[color:var(--rota-sev-c-fg)] dark:text-[color:var(--rota-sev-c-fg-dark)]" };
   }
   if (k.includes("presenca")) {
     return { Icon: Globe, iconClass: "text-sky-800 dark:text-sky-400" };
@@ -1199,21 +1215,21 @@ function TopicEvidence({
 function ChannelCard({ channel }: { channel: DigitalChannel }) {
   const glowByPriority: Record<string, { glowColor: string; colors: string[] }> = {
     Alta: {
-      glowColor: "0 72 58",
-      colors: ["#f87171", "#fb7185", "#fca5a5"],
+      glowColor: "24 58 48",
+      colors: ["#b85c52", "#9e4a42", "#d48072"],
     },
     Média: {
-      glowColor: "48 92 60",
-      colors: ["#facc15", "#f59e0b", "#fde68a"],
+      glowColor: "72 52 52",
+      colors: ["#c4a85a", "#a88f4a", "#e0cc88"],
     },
     Baixa: {
-      glowColor: "142 55 52",
-      colors: ["#4ade80", "#34d399", "#86efac"],
+      glowColor: "148 42 44",
+      colors: ["#5a7a64", "#4d6856", "#7a9a84"],
     },
   };
   const glow = glowByPriority[channel.priority] || glowByPriority.Média;
-  const idleBorder =
-    PRIORITY_FRAME_BORDER[channel.priority] || PRIORITY_FRAME_BORDER.Média;
+  const restingBorder =
+    PRIORITY_RESTING_BORDER[channel.priority] || PRIORITY_RESTING_BORDER.Média;
   const priorityBadgeCls = PRIORITY_COLORS[channel.priority] || PRIORITY_COLORS.Média;
   const priorityTabMobileSurface =
     CHANNEL_PRIORITY_TAB_MOBILE_SURFACE[channel.priority] ||
@@ -1247,10 +1263,8 @@ function ChannelCard({ channel }: { channel: DigitalChannel }) {
         colors={glow.colors}
         fillOpacity={0.35}
         contentInset={2}
-        className={cn(
-          "relative z-10 rounded-lg md:overflow-hidden max-md:overflow-visible",
-          idleBorder,
-        )}
+        restingBorderColor={restingBorder}
+        className={cn("relative z-10 rounded-lg md:overflow-hidden max-md:overflow-visible")}
       >
         <div className="overflow-visible rounded-lg bg-card space-y-3 px-5 py-5 sm:px-7 sm:py-5 dark:bg-card">
           <div className="flex items-start justify-between gap-2 pb-1">
@@ -1545,7 +1559,7 @@ export function RotaDigitalReportView({
                 Gerado para{" "}
                 <Link
                   href={`/dashboard/leads/${report.leadId}`}
-                  className="text-indigo-600 hover:underline dark:text-indigo-400"
+                  className="text-brand hover:underline"
                 >
                   {report.leadCompany}
                 </Link>
@@ -1562,11 +1576,12 @@ export function RotaDigitalReportView({
           <div className="flex flex-wrap items-center gap-2.5">
             <Button
               type="button"
+              variant="ctaMotion"
               onClick={() => {
                 setReanalyzeOpen(true);
                 setReanalyzeError(null);
               }}
-              className="relative overflow-hidden gap-2 border-none bg-gradient-to-r from-violet-600 via-indigo-500 to-cyan-500 bg-[length:200%_100%] animate-[gradient-move_3s_ease_infinite] text-white shadow-lg transition hover:brightness-110 no-print"
+              className="gap-2 no-print"
             >
               <Bot size={16} />
               Reanalise
@@ -1652,11 +1667,11 @@ export function RotaDigitalReportView({
       ) : null}
 
       {isDashboard && report.publicSlug && origin ? (
-        <Card className={cn("no-print border-indigo-500/25 bg-indigo-500/[0.08] dark:border-indigo-800/50 dark:bg-indigo-950/30", ROTA_REPORT_CARD_BOX)}>
+        <Card className={cn("no-print border-brand/25 bg-brand/[0.08] dark:border-brand/35 dark:bg-brand/15", ROTA_REPORT_CARD_BOX)}>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-3 text-base text-foreground">
               <RotaHeaderIcon tone="indigo">
-                <Link2 size={18} className="text-indigo-400" />
+                <Link2 size={18} className="text-brand" />
               </RotaHeaderIcon>
               Página pública para o lead
             </CardTitle>
@@ -1765,7 +1780,7 @@ export function RotaDigitalReportView({
       <div className="grid min-w-0 grid-cols-1 gap-5 md:grid-cols-12">
         <Card
           className={cn(
-            "min-w-0 overflow-visible border-indigo-500/20 bg-gradient-to-b from-indigo-500/[0.03] to-transparent print-white md:col-span-8",
+            "min-w-0 overflow-visible border-brand/20 bg-gradient-to-b from-brand/[0.04] to-transparent print-white md:col-span-8",
             ROTA_REPORT_CARD_BOX,
           )}
         >
@@ -1797,8 +1812,8 @@ export function RotaDigitalReportView({
               <div
                 className={
                   isWebsiteLogo
-                    ? "rounded-2xl bg-gradient-to-tr from-indigo-500/25 to-purple-500/25 p-1.5 ring-1 ring-white/10"
-                    : "rounded-full bg-gradient-to-tr from-indigo-500/25 to-purple-500/25 p-1.5 ring-1 ring-white/10"
+                    ? "rounded-2xl bg-gradient-to-tr from-brand/20 to-brand/35 p-1.5 ring-1 ring-white/10"
+                    : "rounded-full bg-gradient-to-tr from-brand/20 to-brand/35 p-1.5 ring-1 ring-white/10"
                 }
               >
                 <EvidenceImage
@@ -1831,14 +1846,14 @@ export function RotaDigitalReportView({
         {/* Maturidade Digital - Destaque */}
         <Card
           className={cn(
-            "relative flex flex-col overflow-hidden border-indigo-500/20 bg-gradient-to-b from-indigo-500/[0.03] to-transparent md:col-span-5",
+            "relative flex flex-col overflow-hidden border-brand/20 bg-gradient-to-b from-brand/[0.04] to-transparent md:col-span-5",
             ROTA_REPORT_CARD_BOX,
           )}
         >
           <CardHeader className="pb-4">
             <div className="flex items-center gap-2.5">
-              <div className="flex h-6 w-6 items-center justify-center rounded-md border border-indigo-500/30 bg-indigo-500/10">
-                <Target size={14} className="text-indigo-700 dark:text-indigo-400" />
+              <div className="flex h-6 w-6 items-center justify-center rounded-md border border-brand/30 bg-brand/10">
+                <Target size={14} className="text-brand dark:text-brand" />
               </div>
               <CardTitle className="text-xs font-semibold uppercase tracking-wider text-foreground/78 dark:text-muted-foreground">
                 Maturidade Digital
@@ -1857,7 +1872,7 @@ export function RotaDigitalReportView({
                 <div
                   className={cn(
                     "h-full rounded-full transition-all duration-1000",
-                    MATURITY_CONFIG[report.digitalMaturityLevel]?.bar || "bg-indigo-500",
+                    MATURITY_CONFIG[report.digitalMaturityLevel]?.bar || "bg-brand",
                   )}
                   style={{ width: `${report.digitalMaturityScore * 10}%` }}
                 />
@@ -1866,7 +1881,7 @@ export function RotaDigitalReportView({
                 <Badge
                   className={cn(
                     "border-none px-0 text-sm font-semibold bg-transparent",
-                    MATURITY_CONFIG[report.digitalMaturityLevel]?.color || "text-indigo-800 dark:text-indigo-400",
+                    MATURITY_CONFIG[report.digitalMaturityLevel]?.scoreText || "text-brand dark:text-brand",
                   )}
                 >
                   Nível {report.digitalMaturityLevel}
@@ -1882,22 +1897,22 @@ export function RotaDigitalReportView({
         {/* Prazo estimado — fundo em destaque + CTA para apoio / especialista */}
         <Card
           className={cn(
-            "relative flex flex-col overflow-hidden border-blue-500/20 bg-gradient-to-b from-blue-500/[0.06] to-transparent md:col-span-3 print-white",
+            "relative flex flex-col overflow-hidden border-brand/25 bg-gradient-to-b from-brand/[0.08] to-transparent md:col-span-3 print-white",
             ROTA_REPORT_CARD_BOX,
           )}
         >
           <div
-            className="pointer-events-none absolute -right-8 -top-10 h-36 w-36 rounded-full bg-blue-500/[0.14] blur-3xl"
+            className="pointer-events-none absolute -right-8 -top-10 h-36 w-36 rounded-full bg-brand/[0.16] blur-3xl"
             aria-hidden
           />
           <div
-            className="pointer-events-none absolute -bottom-12 -left-10 h-28 w-28 rounded-full bg-sky-400/10 blur-2xl"
+            className="pointer-events-none absolute -bottom-12 -left-10 h-28 w-28 rounded-full bg-brand/10 blur-2xl"
             aria-hidden
           />
           <CardHeader className="relative pb-4">
             <div className="flex items-center gap-2.5">
-              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-blue-500/30 bg-blue-500/10">
-                <Calendar size={14} className="text-blue-700 dark:text-blue-400" aria-hidden />
+              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-brand/35 bg-brand/10">
+                <Calendar size={14} className="text-brand dark:text-brand" aria-hidden />
               </div>
               <CardTitle className="text-xs font-semibold uppercase tracking-wider text-foreground/78 dark:text-muted-foreground print:text-foreground">
                 Prazo estimado
@@ -1907,18 +1922,18 @@ export function RotaDigitalReportView({
           <CardContent className="relative flex flex-1 flex-col justify-between gap-4">
             <div className="space-y-2.5">
               <div className="flex items-baseline gap-1.5">
-                <span className="text-5xl font-bold tracking-tight tabular-nums text-blue-800 dark:text-blue-400">
+                <span className="text-5xl font-bold tracking-tight tabular-nums text-brand dark:text-brand">
                   {report.estimatedTimelineMonths}
                 </span>
                 <span className="text-lg font-medium text-muted-foreground print:text-muted-foreground">meses</span>
               </div>
-              <p className="border-l-2 border-blue-500/45 pl-2.5 text-[11px] leading-snug text-foreground/90 antialiased print:border-l-blue-900/40 print:text-zinc-800 dark:border-blue-400/40">
+              <p className="border-l-2 border-brand/45 pl-2.5 text-[11px] leading-snug text-foreground/90 antialiased print:border-l-brand/50 print:text-zinc-800 dark:border-brand/40">
                 Tempo previsto para{" "}
-                <span className="font-semibold text-blue-900 dark:text-blue-100 print:text-blue-900">
+                <span className="font-semibold text-brand dark:text-brand print:text-zinc-900">
                   colocar este plano em prática
                 </span>
                 {" "}no seu negócio, em{" "}
-                <span className="font-semibold text-blue-900 dark:text-blue-100 print:text-blue-900">meses corridos</span>.
+                <span className="font-semibold text-brand dark:text-brand print:text-zinc-900">meses corridos</span>.
                 <span className="text-muted-foreground print:text-muted-foreground">
                   {" "}Serve para você entender o caminho, planejar o investimento e avançar com mais segurança.
                 </span>
@@ -1938,7 +1953,7 @@ export function RotaDigitalReportView({
                   : "Falar com um especialista da Rota Digital para colocar o plano do relatório em prática"
               }
               className={cn(
-                buttonVariants({ variant: "ctaMotion", size: "lg" }),
+                buttonVariants({ variant: "ctaMotionGreen", size: "lg" }),
                 "no-print relative h-10 min-h-10 w-full justify-center gap-2 overflow-hidden px-4 text-center text-sm leading-snug sm:px-5",
               )}
             >
@@ -1962,7 +1977,7 @@ export function RotaDigitalReportView({
           <CardHeader className="pb-6">
             <div className="flex items-center gap-2.5">
               <div className="flex h-6 w-6 items-center justify-center rounded-md border border-border bg-muted">
-                <Sparkles size={14} className="text-indigo-700 dark:text-indigo-400" />
+                <Sparkles size={14} className="text-brand dark:text-brand" />
               </div>
               <CardTitle className="text-xs font-semibold uppercase tracking-wider text-foreground/78 dark:text-muted-foreground">
                 Canais Recomendados
@@ -1986,7 +2001,7 @@ export function RotaDigitalReportView({
                     <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
                       <div className="flex min-w-0 items-center gap-2">
                         {i === 0 ? (
-                          <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-400 shadow-[0_0_10px_rgba(129,140,248,0.75)]" />
+                          <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand shadow-[0_0_10px_rgba(142,125,77,0.65)]" />
                         ) : (
                           <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground" />
                         )}
@@ -2006,7 +2021,7 @@ export function RotaDigitalReportView({
                   </div>
                   {i === 0 ? (
                     <span
-                      className="absolute right-4 top-0 z-0 inline-flex -translate-y-[calc(100%-6px)] shrink-0 items-center rounded-t-md rounded-b-none border-x border-t border-indigo-600/40 border-b-0 bg-indigo-500/15 px-2 pb-2 pt-0.5 text-[9px] font-bold uppercase tracking-wider text-indigo-950 dark:border-indigo-400/45 dark:bg-indigo-500/20 dark:text-indigo-200 print:border-indigo-900/40 print:bg-indigo-100 print:text-indigo-950"
+                      className="absolute right-4 top-0 z-0 inline-flex -translate-y-[calc(100%-6px)] shrink-0 items-center rounded-t-md rounded-b-none border-x border-t border-border/70 border-b-0 bg-transparent px-2 pb-2 pt-0.5 text-[9px] font-bold uppercase tracking-wider text-muted-foreground dark:border-white/12 dark:bg-transparent dark:text-zinc-400 print:border-border print:bg-transparent print:text-foreground"
                       aria-hidden
                     >
                       Principal
@@ -2084,10 +2099,8 @@ export function RotaDigitalReportView({
                 colors={topicGlow.colors}
                 fillOpacity={0.35}
                 contentInset={2}
-                className={cn(
-                  "overflow-hidden rounded-xl print-white",
-                  topicGlow.frameClass,
-                )}
+                restingBorderColor={topicGlow.restingBorderColor}
+                className="overflow-hidden rounded-xl print-white ring-1 ring-foreground/10"
               >
                 <div className="rounded-[10px] bg-card p-6 sm:p-7">
                   <div className="grid gap-5 md:grid-cols-[360px_minmax(0,1fr)] md:items-start md:gap-6">
@@ -2151,9 +2164,9 @@ export function RotaDigitalReportView({
                         target="_blank"
                         rel="noopener noreferrer"
                         title={briefWebsiteHref}
-                        className="inline-flex items-center gap-2 rounded-lg border border-border bg-muted px-3 py-2.5 text-sm font-medium text-sky-400 transition-colors hover:border-border hover:bg-muted/90 hover:text-sky-600 dark:hover:text-sky-300"
+                        className="inline-flex items-center gap-2 rounded-lg border border-brand/25 bg-brand/[0.07] px-3 py-2.5 text-sm font-medium text-brand shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] transition-colors hover:border-brand/40 hover:bg-brand/[0.12] hover:text-brand dark:border-brand/30 dark:bg-brand/[0.1] dark:shadow-none dark:hover:border-brand/45 dark:hover:bg-brand/[0.16]"
                       >
-                        <ExternalLink size={14} className="shrink-0 opacity-90" />
+                        <ExternalLink size={14} className="shrink-0 opacity-90" aria-hidden />
                         <span className="min-w-0 truncate">Website</span>
                       </a>
                     ) : null}
@@ -2163,10 +2176,10 @@ export function RotaDigitalReportView({
                         target="_blank"
                         rel="noopener noreferrer"
                         title={briefInstagramHref}
-                        className="inline-flex items-center gap-2 rounded-lg border border-border bg-muted px-3 py-2.5 text-sm font-medium text-pink-400 transition-colors hover:border-border hover:bg-muted/90 hover:text-pink-600 dark:hover:text-pink-300"
+                        className="inline-flex items-center gap-2 rounded-lg border border-brand/25 bg-brand/[0.07] px-3 py-2.5 text-sm font-medium text-brand shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] transition-colors hover:border-brand/40 hover:bg-brand/[0.12] hover:text-brand dark:border-brand/30 dark:bg-brand/[0.1] dark:shadow-none dark:hover:border-brand/45 dark:hover:bg-brand/[0.16]"
                       >
-                        <InstagramBrandGlyph className="size-3.5 shrink-0 opacity-90" />
-                        <span className="min-w-0 truncate text-foreground">Instagram</span>
+                        <InstagramBrandGlyph className="size-3.5 shrink-0 opacity-90" aria-hidden />
+                        <span className="min-w-0 truncate">Instagram</span>
                       </a>
                     ) : null}
                   </div>
@@ -2235,7 +2248,7 @@ export function RotaDigitalReportView({
                     contentInset={2}
                     className={cn("overflow-hidden rounded-lg border-0 print-white")}
                   >
-                    <div className="rounded-[8px] bg-card p-5 sm:p-6">
+                    <div className="rounded-[8px] border border-border bg-card p-5 shadow-sm sm:p-6 dark:border-white/12 print:border-zinc-300">
                       <div className={cn("mb-5", TOPIC_PILL_CLASS)}>
                         <Globe className="size-3.5 shrink-0 stroke-[1.75] text-sky-400" aria-hidden />
                         <span className={TOPIC_PILL_LABEL_NEXT_TO_ICON}>Website</span>
@@ -2263,7 +2276,7 @@ export function RotaDigitalReportView({
                     contentInset={2}
                     className={cn("overflow-hidden rounded-lg border-0 print-white")}
                   >
-                    <div className="rounded-[8px] bg-card p-5 sm:p-6">
+                    <div className="rounded-[8px] border border-border bg-card p-5 shadow-sm sm:p-6 dark:border-white/12 print:border-zinc-300">
                       <div className={cn("mb-5", TOPIC_PILL_CLASS)}>
                         <InstagramBrandGlyph className="size-3.5 text-[#f472b6]" aria-hidden />
                         <span className={TOPIC_PILL_LABEL_NEXT_TO_ICON}>Instagram</span>
@@ -2295,30 +2308,34 @@ export function RotaDigitalReportView({
       <div className="grid min-w-0 grid-cols-1 gap-5 md:grid-cols-3 md:items-stretch [--rota-swot-surface:var(--card)] dark:[--rota-swot-surface:#09090b]">
         <BorderGlow
           edgeSensitivity={30}
-          glowColor="142 55 52"
+          glowColor="148 42 44"
           backgroundColor="var(--rota-swot-surface)"
           borderRadius={12}
           glowRadius={28}
           glowIntensity={0.8}
           coneSpread={25}
           animated={false}
-          colors={["#4ade80", "#34d399", "#86efac"]}
+          colors={["#5a7a64", "#4d6856", "#7a9a84"]}
           fillOpacity={1}
           contentInset={2}
           disableBorderGlowOnMobile
-          className="h-full min-h-0 min-w-0 overflow-hidden rounded-xl border-green-500/20 ring-1 ring-foreground/10 print-white"
+          restingBorderColor={PRIORITY_RESTING_BORDER.Baixa}
+          className="h-full min-h-0 min-w-0 overflow-hidden rounded-xl ring-1 ring-foreground/10 print-white"
         >
           <Card
             className={cn(
-              "relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden border border-green-500/20 bg-gradient-to-b from-green-500/[0.06] to-transparent text-foreground shadow-none ring-0 rounded-[10px] print-white",
+              "relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden border border-[color:var(--rota-sev-c-border)]/22 bg-gradient-to-b from-[color:var(--rota-sev-c-bar)]/[0.08] to-transparent text-foreground shadow-none ring-0 rounded-[10px] print-white",
               ROTA_SWOT_CARD_BOX,
             )}
           >
             <CardHeader className="flex flex-row items-center gap-2.5 pb-2 sm:gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-500/10 ring-1 ring-green-500/20">
-                <TrendingUp size={18} className="text-green-400" />
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[color:var(--rota-sev-c-bar)]/12 ring-1 ring-[color:var(--rota-sev-c-border)]/25">
+                <TrendingUp
+                  size={18}
+                  className="text-[color:var(--rota-sev-c-fg)] dark:text-[color:var(--rota-sev-c-fg-dark)]"
+                />
               </div>
-              <CardTitle className="text-sm font-bold uppercase tracking-wider text-green-400">
+              <CardTitle className="text-sm font-bold uppercase tracking-wider text-[color:var(--rota-sev-c-fg)] dark:text-[color:var(--rota-sev-c-fg-dark)]">
                 Forças
               </CardTitle>
             </CardHeader>
@@ -2330,10 +2347,10 @@ export function RotaDigitalReportView({
                     className={cn(
                       "relative flex items-center gap-3 py-3.5 text-sm leading-relaxed text-foreground/90 sm:py-4",
                       i > 0 &&
-                        "before:pointer-events-none before:absolute before:left-0 before:right-[8%] before:top-0 before:h-px before:rounded-full before:bg-gradient-to-r before:from-green-500/45 before:via-emerald-500/25 before:to-transparent before:content-[''] dark:before:from-green-400/35 dark:before:via-emerald-400/18 print:before:hidden",
+                        "before:pointer-events-none before:absolute before:left-0 before:right-[8%] before:top-0 before:h-px before:rounded-full before:bg-gradient-to-r before:from-[color:var(--rota-sev-c-border)]/45 before:via-[color:var(--rota-sev-c-bar)]/28 before:to-transparent before:content-[''] dark:before:from-[color:var(--rota-sev-c-border)]/38 dark:before:via-[color:var(--rota-sev-c-bar)]/22 print:before:hidden",
                     )}
                   >
-                    <CheckCircle2 size={16} className="shrink-0 text-green-500/60" />
+                    <CheckCircle2 size={16} className="shrink-0 text-[color:var(--rota-sev-c-border)]/70" />
                     <span>{s}</span>
                   </li>
                 ))}
@@ -2344,30 +2361,34 @@ export function RotaDigitalReportView({
 
         <BorderGlow
           edgeSensitivity={30}
-          glowColor="0 72 58"
+          glowColor="24 58 48"
           backgroundColor="var(--rota-swot-surface)"
           borderRadius={12}
           glowRadius={28}
           glowIntensity={0.8}
           coneSpread={25}
           animated={false}
-          colors={["#f87171", "#fb7185", "#fca5a5"]}
+          colors={["#b85c52", "#9e4a42", "#d48072"]}
           fillOpacity={1}
           contentInset={2}
           disableBorderGlowOnMobile
-          className="h-full min-h-0 min-w-0 overflow-hidden rounded-xl border-red-500/20 ring-1 ring-foreground/10 print-white"
+          restingBorderColor={PRIORITY_RESTING_BORDER.Alta}
+          className="h-full min-h-0 min-w-0 overflow-hidden rounded-xl ring-1 ring-foreground/10 print-white"
         >
           <Card
             className={cn(
-              "relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden border border-red-500/20 bg-gradient-to-b from-red-500/[0.06] to-transparent text-foreground shadow-none ring-0 rounded-[10px] print-white",
+              "relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden border border-[color:var(--rota-sev-a-border)]/22 bg-gradient-to-b from-[color:var(--rota-sev-a-bar)]/[0.07] to-transparent text-foreground shadow-none ring-0 rounded-[10px] print-white",
               ROTA_SWOT_CARD_BOX,
             )}
           >
             <CardHeader className="flex flex-row items-center gap-2.5 pb-2 sm:gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-500/10 ring-1 ring-red-500/20">
-                <TrendingDown size={18} className="text-red-400" />
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[color:var(--rota-sev-a-bar)]/12 ring-1 ring-[color:var(--rota-sev-a-border)]/25">
+                <TrendingDown
+                  size={18}
+                  className="text-[color:var(--rota-sev-a-fg)] dark:text-[color:var(--rota-sev-a-fg-dark)]"
+                />
               </div>
-              <CardTitle className="text-sm font-bold uppercase tracking-wider text-red-400">
+              <CardTitle className="text-sm font-bold uppercase tracking-wider text-[color:var(--rota-sev-a-fg)] dark:text-[color:var(--rota-sev-a-fg-dark)]">
                 Fraquezas
               </CardTitle>
             </CardHeader>
@@ -2379,10 +2400,10 @@ export function RotaDigitalReportView({
                     className={cn(
                       "relative flex items-center gap-3 py-3.5 text-sm leading-relaxed text-foreground/90 sm:py-4",
                       i > 0 &&
-                        "before:pointer-events-none before:absolute before:left-0 before:right-[8%] before:top-0 before:h-px before:rounded-full before:bg-gradient-to-r before:from-red-500/45 before:via-rose-500/25 before:to-transparent before:content-[''] dark:before:from-red-400/35 dark:before:via-rose-400/18 print:before:hidden",
+                        "before:pointer-events-none before:absolute before:left-0 before:right-[8%] before:top-0 before:h-px before:rounded-full before:bg-gradient-to-r before:from-[color:var(--rota-sev-a-border)]/45 before:via-[color:var(--rota-sev-a-bar)]/28 before:to-transparent before:content-[''] dark:before:from-[color:var(--rota-sev-a-border)]/38 dark:before:via-[color:var(--rota-sev-a-bar)]/22 print:before:hidden",
                     )}
                   >
-                    <AlertCircle size={16} className="shrink-0 text-red-500/60" />
+                    <AlertCircle size={16} className="shrink-0 text-[color:var(--rota-sev-a-border)]/65" />
                     <span>{w}</span>
                   </li>
                 ))}
@@ -2393,30 +2414,34 @@ export function RotaDigitalReportView({
 
         <BorderGlow
           edgeSensitivity={30}
-          glowColor="210 78 58"
+          glowColor="72 52 52"
           backgroundColor="var(--rota-swot-surface)"
           borderRadius={12}
           glowRadius={28}
           glowIntensity={0.8}
           coneSpread={25}
           animated={false}
-          colors={["#38bdf8", "#6366f1", "#7dd3fc"]}
+          colors={["#c4a85a", "#a88f4a", "#e0cc88"]}
           fillOpacity={1}
           contentInset={2}
           disableBorderGlowOnMobile
-          className="h-full min-h-0 min-w-0 overflow-hidden rounded-xl border-blue-500/20 ring-1 ring-foreground/10 print-white"
+          restingBorderColor={PRIORITY_RESTING_BORDER.Média}
+          className="h-full min-h-0 min-w-0 overflow-hidden rounded-xl ring-1 ring-foreground/10 print-white"
         >
           <Card
             className={cn(
-              "relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden border border-blue-500/20 bg-gradient-to-b from-blue-500/[0.06] to-transparent text-foreground shadow-none ring-0 rounded-[10px] print-white",
+              "relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden border border-[color:var(--rota-sev-b-border)]/22 bg-gradient-to-b from-[color:var(--rota-sev-b-bar)]/[0.08] to-transparent text-foreground shadow-none ring-0 rounded-[10px] print-white",
               ROTA_SWOT_CARD_BOX,
             )}
           >
             <CardHeader className="flex flex-row items-center gap-2.5 pb-2 sm:gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10 ring-1 ring-blue-500/20">
-                <Target size={18} className="text-blue-400" />
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[color:var(--rota-sev-b-bar)]/12 ring-1 ring-[color:var(--rota-sev-b-border)]/25">
+                <Target
+                  size={18}
+                  className="text-[color:var(--rota-sev-b-fg)] dark:text-[color:var(--rota-sev-b-fg-dark)]"
+                />
               </div>
-              <CardTitle className="text-sm font-bold uppercase tracking-wider text-blue-400">
+              <CardTitle className="text-sm font-bold uppercase tracking-wider text-[color:var(--rota-sev-b-fg)] dark:text-[color:var(--rota-sev-b-fg-dark)]">
                 Oportunidades
               </CardTitle>
             </CardHeader>
@@ -2428,10 +2453,10 @@ export function RotaDigitalReportView({
                     className={cn(
                       "relative flex items-center gap-3 py-3.5 text-sm leading-relaxed text-foreground/90 sm:py-4",
                       i > 0 &&
-                        "before:pointer-events-none before:absolute before:left-0 before:right-[8%] before:top-0 before:h-px before:rounded-full before:bg-gradient-to-r before:from-blue-500/45 before:via-sky-500/25 before:to-transparent before:content-[''] dark:before:from-blue-400/35 dark:before:via-sky-400/18 print:before:hidden",
+                        "before:pointer-events-none before:absolute before:left-0 before:right-[8%] before:top-0 before:h-px before:rounded-full before:bg-gradient-to-r before:from-[color:var(--rota-sev-b-border)]/45 before:via-[color:var(--rota-sev-b-bar)]/28 before:to-transparent before:content-[''] dark:before:from-[color:var(--rota-sev-b-border)]/38 dark:before:via-[color:var(--rota-sev-b-bar)]/22 print:before:hidden",
                     )}
                   >
-                    <Star size={16} className="shrink-0 text-blue-500/60" />
+                    <Star size={16} className="shrink-0 text-[color:var(--rota-sev-b-border)]/68" />
                     <span>{o}</span>
                   </li>
                 ))}
@@ -2465,20 +2490,20 @@ export function RotaDigitalReportView({
         </CardContent>
       </Card>
 
-      {/* Quick Wins & Long Term */}
+      {/* Quick wins / longo prazo: apoio à leitura — contraste melhor que muted/50, sem competir com Próximos passos (spotlight + linhas com marca). */}
       <div className="grid min-w-0 grid-cols-1 gap-5 md:grid-cols-2">
         <Card
           className={cn(
-            "min-w-0 overflow-visible border-yellow-500/10 bg-muted/50 print-white",
+            "min-w-0 overflow-visible border border-border bg-card/95 shadow-sm ring-1 ring-foreground/[0.04] print-white dark:bg-zinc-900/55 dark:ring-white/[0.06]",
             ROTA_REPORT_CARD_BOX,
           )}
         >
           <CardHeader className="pb-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-yellow-500/10 ring-1 ring-yellow-500/20">
-                <Zap size={18} className="text-yellow-800 dark:text-yellow-400" />
+              <div className="flex h-8 w-8 items-center justify-center rounded-md border border-brand/25 bg-brand/[0.09] dark:border-brand/30 dark:bg-brand/15">
+                <Zap size={18} className="text-brand dark:text-brand" aria-hidden />
               </div>
-              <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground/78 dark:text-muted-foreground">
+              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-foreground dark:text-zinc-200">
                 O que fazer primeiro
               </CardTitle>
             </div>
@@ -2489,12 +2514,12 @@ export function RotaDigitalReportView({
                 <li
                   key={i}
                   className={cn(
-                    "relative flex items-center gap-4 py-3.5 text-sm leading-relaxed text-foreground/90 sm:py-4",
+                    "relative flex items-center gap-4 py-3.5 text-[14px] leading-relaxed text-foreground sm:py-4 dark:text-zinc-200/95",
                     i > 0 &&
-                      "before:pointer-events-none before:absolute before:left-0 before:right-[8%] before:top-0 before:h-px before:rounded-full before:bg-gradient-to-r before:from-yellow-500/45 before:via-amber-500/25 before:to-transparent before:content-[''] dark:before:from-yellow-400/35 dark:before:via-amber-400/18 print:before:hidden",
+                      "before:pointer-events-none before:absolute before:left-0 before:right-[8%] before:top-0 before:h-px before:rounded-full before:bg-gradient-to-r before:from-border before:via-border/70 before:to-transparent before:content-[''] dark:before:from-white/22 dark:before:via-white/12 print:before:hidden",
                   )}
                 >
-                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-yellow-500/10 text-[11px] font-bold text-yellow-900 ring-1 ring-yellow-600/25 dark:text-yellow-500/90 dark:ring-yellow-500/20">
+                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-border bg-background text-[11px] font-semibold tabular-nums text-foreground/90 ring-1 ring-border/80 dark:border-white/12 dark:bg-zinc-950/80 dark:text-zinc-300 dark:ring-white/10">
                     {i + 1}
                   </div>
                   <span>{win}</span>
@@ -2506,16 +2531,16 @@ export function RotaDigitalReportView({
 
         <Card
           className={cn(
-            "min-w-0 overflow-visible border-purple-500/10 bg-muted/50 print-white",
+            "min-w-0 overflow-visible border border-border bg-card/95 shadow-sm ring-1 ring-foreground/[0.04] print-white dark:bg-zinc-900/55 dark:ring-white/[0.06]",
             ROTA_REPORT_CARD_BOX,
           )}
         >
           <CardHeader className="pb-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-500/10 ring-1 ring-purple-500/20">
-                <Target size={18} className="text-purple-800 dark:text-purple-400" />
+              <div className="flex h-8 w-8 items-center justify-center rounded-md border border-brand/25 bg-brand/[0.09] dark:border-brand/30 dark:bg-brand/15">
+                <Target size={18} className="text-brand dark:text-brand" aria-hidden />
               </div>
-              <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground/78 dark:text-muted-foreground">
+              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-foreground dark:text-zinc-200">
                 Ações de Longo Prazo
               </CardTitle>
             </div>
@@ -2526,12 +2551,12 @@ export function RotaDigitalReportView({
                 <li
                   key={i}
                   className={cn(
-                    "relative flex items-center gap-4 py-3.5 text-sm leading-relaxed text-foreground/90 sm:py-4",
+                    "relative flex items-center gap-4 py-3.5 text-[14px] leading-relaxed text-foreground sm:py-4 dark:text-zinc-200/95",
                     i > 0 &&
-                      "before:pointer-events-none before:absolute before:left-0 before:right-[8%] before:top-0 before:h-px before:rounded-full before:bg-gradient-to-r before:from-purple-500/45 before:via-fuchsia-500/25 before:to-transparent before:content-[''] dark:before:from-purple-400/38 dark:before:via-fuchsia-400/18 print:before:hidden",
+                      "before:pointer-events-none before:absolute before:absolute before:left-0 before:right-[8%] before:top-0 before:h-px before:rounded-full before:bg-gradient-to-r before:from-border before:via-border/70 before:to-transparent before:content-[''] dark:before:from-white/22 dark:before:via-white/12 print:before:hidden",
                   )}
                 >
-                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-purple-500/10 text-[11px] font-bold text-purple-900 ring-1 ring-purple-600/25 dark:text-purple-500/90 dark:ring-purple-500/20">
+                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-border bg-background text-[11px] font-semibold tabular-nums text-foreground/90 ring-1 ring-border/80 dark:border-white/12 dark:bg-zinc-950/80 dark:text-zinc-300 dark:ring-white/10">
                     {i + 1}
                   </div>
                   <span>{action}</span>
@@ -2564,10 +2589,10 @@ export function RotaDigitalReportView({
               {report.nextSteps.map((step, i) => (
                 <div
                   key={i}
-                  className="flex min-w-0 w-full items-center gap-4 rounded-xl border border-border/90 bg-card/75 p-4 transition-colors hover:border-indigo-500/40"
+                  className="flex min-w-0 w-full items-center gap-4 rounded-xl border border-border/90 bg-card/75 p-4 transition-colors hover:border-brand/40"
                 >
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-indigo-500/40 bg-indigo-500/10">
-                    <span className="text-[11px] font-bold text-indigo-800 dark:text-indigo-300">{i + 1}</span>
+                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-brand/40 bg-brand/10">
+                    <span className="text-[11px] font-bold text-brand dark:text-brand">{i + 1}</span>
                   </div>
                   <p className="min-w-0 flex-1 text-[14.5px] leading-relaxed text-foreground">{step}</p>
                 </div>
@@ -2598,7 +2623,7 @@ export function RotaDigitalReportView({
                   : "Agendar reunião estratégica para validar prioridades e cronograma"
               }
               className={cn(
-                buttonVariants({ variant: "ctaMotion", size: "lg" }),
+                buttonVariants({ variant: "ctaMotionGreen", size: "lg" }),
                 "no-print box-border h-10 min-h-10 items-center justify-center gap-2 overflow-hidden px-4 md:px-5",
                 /* Largura total: telemóvel e tablet até md; a partir de md o botão volta ao tamanho do conteúdo. */
                 "flex w-full min-w-0 max-w-full md:inline-flex md:w-auto md:max-w-none md:shrink-0",

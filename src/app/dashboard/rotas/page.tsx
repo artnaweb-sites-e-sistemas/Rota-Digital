@@ -201,7 +201,7 @@ export default function RotasPage() {
               value={maturityFilter}
               onValueChange={(v) => setMaturityFilter(v as MaturityFilter)}
             >
-              <SelectTrigger className="h-10 w-full border-input bg-background text-foreground sm:w-[13.75rem] dark:border-zinc-800 dark:bg-zinc-900/80 dark:text-zinc-100">
+              <SelectTrigger className="w-full sm:w-[13.75rem]">
                 <SelectValue>{maturityFilterLabel(maturityFilter)}</SelectValue>
               </SelectTrigger>
               <SelectContent>
@@ -289,7 +289,7 @@ export default function RotasPage() {
                   </div>
                   <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden dark:bg-zinc-800">
                     <div
-                      className="h-full bg-indigo-500 rounded-full"
+                      className="h-full bg-brand rounded-full"
                       style={{ width: `${report.digitalMaturityScore * 10}%` }}
                     />
                   </div>
@@ -305,7 +305,7 @@ export default function RotasPage() {
                   <div className="flex items-center gap-1">
                     <Link
                       href={`/dashboard/rotas/${report.id}`}
-                      className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-lg px-2 text-sm font-medium text-indigo-700 transition-colors hover:bg-indigo-500/10 hover:text-indigo-800 dark:text-indigo-400 dark:hover:bg-indigo-950/50 dark:hover:text-indigo-300"
+                      className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-lg px-2 text-sm font-medium text-brand transition-colors hover:bg-brand/10 hover:text-brand dark:text-brand dark:hover:bg-brand/15 dark:hover:text-brand"
                     >
                       <ExternalLink size={13} />
                       Visualizar

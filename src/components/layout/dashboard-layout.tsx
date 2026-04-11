@@ -83,7 +83,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       "group flex items-center rounded-md transition-all duration-200",
       iconOnly ? "justify-center px-2 py-2.5" : "gap-3 px-3.5 py-2.5",
       active
-        ? "bg-indigo-500/12 text-foreground shadow-sm ring-1 ring-indigo-500/25 dark:bg-white/10 dark:text-white dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)] dark:ring-white/10"
+        ? "bg-sidebar-primary/12 text-foreground shadow-sm ring-1 ring-sidebar-primary/25 dark:bg-white/10 dark:text-white dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)] dark:ring-white/10"
         : "text-muted-foreground hover:bg-muted hover:text-foreground dark:text-zinc-400 dark:hover:bg-white/5 dark:hover:text-zinc-100",
     );
 
@@ -105,7 +105,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           >
             {!mainCollapsed ? (
               <div className="flex min-w-0 flex-1 items-center">
-                <span className="truncate text-lg font-bold tracking-tight text-foreground dark:text-white">
+                <span className="truncate font-heading text-lg font-bold tracking-tight text-foreground dark:text-white">
                   Rota Digital
                 </span>
               </div>
@@ -145,18 +145,11 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                     className={cn(
                       "size-5 shrink-0 transition-colors",
                       isActive
-                        ? "text-indigo-600 dark:text-indigo-400"
+                        ? "text-sidebar-primary dark:text-sidebar-primary"
                         : "group-hover:text-foreground dark:group-hover:text-zinc-300",
                     )}
                   />
-                  {!mainCollapsed ? (
-                    <>
-                      <span className="font-medium text-[14px]">{item.name}</span>
-                      {isActive ? (
-                        <div className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.35)] dark:shadow-[0_0_8px_rgba(99,102,241,0.6)]" />
-                      ) : null}
-                    </>
-                  ) : null}
+                  {!mainCollapsed ? <span className="font-medium text-[14px]">{item.name}</span> : null}
                 </Link>
               );
             })}
@@ -171,19 +164,12 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                 className={cn(
                   "size-5 shrink-0 transition-colors",
                   settingsSection
-                    ? "text-indigo-600 dark:text-indigo-400"
+                    ? "text-sidebar-primary dark:text-sidebar-primary"
                     : "group-hover:text-foreground dark:group-hover:text-zinc-300",
                 )}
                 aria-hidden
               />
-              {!mainCollapsed ? (
-                <>
-                  <span className="font-medium text-[14px]">Configurações</span>
-                  {settingsSection ? (
-                    <div className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.35)] dark:shadow-[0_0_8px_rgba(99,102,241,0.6)]" />
-                  ) : null}
-                </>
-              ) : null}
+              {!mainCollapsed ? <span className="font-medium text-[14px]">Configurações</span> : null}
             </Link>
           </nav>
         </div>
@@ -194,24 +180,18 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             mainCollapsed && "px-2",
           )}
         >
-          <div
-            className={cn(
-              "mb-3 rounded-md bg-muted py-3 text-sm ring-1 ring-border dark:bg-white/5 dark:ring-white/5",
-              mainCollapsed ? "flex justify-center px-0" : "flex items-center gap-3 px-3",
-            )}
-            title={mainCollapsed ? (user.email ?? undefined) : undefined}
-            aria-label={mainCollapsed ? `Conta: ${user.email ?? "utilizador"}` : undefined}
-          >
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-zinc-600 to-zinc-700 text-sm font-bold text-white shadow-inner dark:from-zinc-700 dark:to-zinc-800">
-              {user.email?.charAt(0).toUpperCase() || "U"}
-            </div>
-            {!mainCollapsed ? (
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-xs font-semibold text-foreground dark:text-zinc-200">{user.email}</p>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Plano Pro</p>
+          {!mainCollapsed ? (
+            <div className="mb-3 rounded-md bg-muted px-3 py-3 font-sans ring-1 ring-border dark:bg-white/5 dark:ring-white/5">
+              <div className="min-w-0 space-y-1">
+                <p className="truncate text-[14px] font-medium leading-snug tracking-tight text-foreground dark:text-zinc-100">
+                  {user.email}
+                </p>
+                <p className="font-heading text-[10px] font-semibold uppercase tracking-widest text-muted-foreground dark:text-zinc-500">
+                  Plano Pro
+                </p>
               </div>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
           <button
             type="button"
             onClick={handleLogout}
@@ -232,8 +212,12 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       {settingsSection ? (
         <aside className="flex max-h-full min-h-0 w-[13.5rem] shrink-0 flex-col overflow-y-auto border-r border-sidebar-border bg-sidebar/90 text-sidebar-foreground backdrop-blur-xl dark:border-white/5 dark:bg-zinc-950/70">
           <div className="border-b border-sidebar-border px-4 py-5 dark:border-white/5">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Configurações</p>
-            <p className="mt-1 text-sm font-semibold text-foreground dark:text-zinc-200">Sua conta</p>
+            <p className="font-heading text-[10px] font-semibold uppercase tracking-widest text-muted-foreground dark:text-zinc-500">
+              Configurações
+            </p>
+            <p className="mt-1 font-heading text-sm font-semibold tracking-tight text-foreground dark:text-zinc-100">
+              Sua conta
+            </p>
           </div>
           <nav className="flex-1 space-y-1 p-3">
             {settingsSubItems.map((sub) => {
@@ -245,7 +229,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                   className={cn(
                     "flex items-center gap-2 rounded-md px-3 py-2.5 text-[13px] font-medium transition-colors",
                     subActive
-                      ? "bg-indigo-500/15 text-foreground ring-1 ring-indigo-500/25 dark:text-white"
+                      ? "bg-sidebar-primary/15 text-foreground ring-1 ring-sidebar-primary/25 dark:text-white"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground dark:text-zinc-500 dark:hover:bg-white/5 dark:hover:text-zinc-200",
                   )}
                 >

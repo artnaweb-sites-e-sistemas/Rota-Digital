@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 import type { Lead } from "@/types/lead";
 import type { RotaDigitalReport } from "@/types/report";
 import { ReportSiteAvatar } from "@/components/report-site-avatar";
+import { LinkButton } from "@/components/ui/link-button";
 
 function formatInt(n: number) {
   return n.toLocaleString("pt-BR");
@@ -146,7 +147,7 @@ function WeeklyLeadsChart({ data, loading }: { data: DayBucket[]; loading: boole
                   title={`${d.label}: ${d.count} lead(s)`}
                 >
                   <div
-                    className="mx-auto w-full max-w-10 rounded-t-md bg-violet-500/85 shadow-sm dark:bg-violet-500/70"
+                    className="mx-auto w-full max-w-10 rounded-t-md bg-brand/85 shadow-sm dark:bg-brand/70"
                     style={{ height: barPx }}
                   />
                 </div>
@@ -219,7 +220,7 @@ export default function DashboardPage() {
         description:
           reportCount === 0 ? "Nenhum relatório gerado ainda" : "Relatórios gerados na sua conta",
         icon: Sparkles,
-        color: "text-violet-500",
+        color: "text-brand",
         href: "/dashboard/rotas",
       },
       {
@@ -259,7 +260,7 @@ export default function DashboardPage() {
           <Link
             key={i}
             href={stat.href}
-            className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:focus-visible:ring-offset-zinc-950"
+            className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:focus-visible:ring-offset-zinc-950"
           >
             <Card className="h-full overflow-visible border border-border bg-card shadow-lg transition-all duration-300 hover:bg-muted/40 dark:border-white/5 dark:bg-white/[0.02] dark:hover:bg-white/[0.04]">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -320,13 +321,10 @@ export default function DashboardPage() {
             ) : latestReports.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-border bg-muted/30 px-4 py-10 text-center dark:border-white/10 dark:bg-white/[0.02]">
                 <p className="text-sm font-medium text-muted-foreground">Nenhuma rota gerada ainda.</p>
-                <Link
-                  href="/dashboard/rotas/new"
-                  className="mt-4 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white transition-all hover:bg-indigo-500 hover:scale-105 active:scale-95 shadow-lg shadow-indigo-500/20"
-                >
+                <LinkButton href="/dashboard/rotas/new" className="mt-4 gap-2">
                   <Plus className="size-4 shrink-0" aria-hidden />
                   Gerar primeira rota
-                </Link>
+                </LinkButton>
               </div>
             ) : (
               <div className="space-y-2">
@@ -338,8 +336,8 @@ export default function DashboardPage() {
                         className="group flex items-center gap-4 rounded-xl border border-transparent px-3 py-3 transition-all hover:border-border hover:bg-muted/60 dark:hover:border-white/5 dark:hover:bg-white/5"
                       >
                         <div className="relative">
-                          <div className="absolute -inset-1 rounded-full bg-indigo-500/20 opacity-0 blur-sm transition-opacity group-hover:opacity-100" />
-                          <ReportSiteAvatar report={r} className="relative ring-1 ring-border transition-all group-hover:ring-indigo-500/30 dark:ring-white/10" />
+                          <div className="absolute -inset-1 rounded-full bg-brand/20 opacity-0 blur-sm transition-opacity group-hover:opacity-100" />
+                          <ReportSiteAvatar report={r} className="relative ring-1 ring-border transition-all group-hover:ring-brand/30 dark:ring-white/10" />
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="truncate font-bold text-foreground transition-colors group-hover:text-primary">{r.leadCompany}</p>

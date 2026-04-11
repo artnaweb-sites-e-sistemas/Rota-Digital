@@ -3,9 +3,10 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { Lead, LEAD_STATUSES, type LeadStatus } from "@/types/lead";
+import { Lead, LEAD_STATUSES, normalizeLeadStatus, type LeadStatus } from "@/types/lead";
 import { getLeads, createLead, updateLead, deleteLead } from "@/lib/leads";
 import { deleteReportsByLead } from "@/lib/reports";
+import { buildWhatsAppHref, maskWhatsappBRDisplay, onlyDigitsPhone } from "@/lib/report-cta";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -20,13 +21,18 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import {
   Building2,
   ChevronLeft,
   ChevronRight,
-  Kanban,
   Loader2,
   Mail,
   MoreHorizontal,
@@ -37,19 +43,20 @@ import {
   Users,
 } from "lucide-react";
 import Link from "next/link";
+import { WhatsAppIcon } from "@/components/icons/whatsapp-icon";
 // import { toast } from "sonner"; // If not available, we can use a simple alert or just implement without it
 
 const PAGE_SIZE = 10;
 
 const STATUS_DOT: Record<LeadStatus, string> = {
-  "Em Contato": "bg-zinc-500 dark:bg-zinc-400",
+  "Novo Lead": "bg-zinc-500 dark:bg-zinc-400",
   Convertido: "bg-emerald-600 dark:bg-emerald-400",
   Perdido: "bg-red-600 dark:bg-red-400",
 };
 
 /** Fundo + texto legíveis no claro e no escuro */
 const STATUS_BADGE_SURFACE: Record<LeadStatus, string> = {
-  "Em Contato":
+  "Novo Lead":
     "bg-muted/90 text-muted-foreground ring-1 ring-border dark:bg-zinc-800/90 dark:text-zinc-300 dark:ring-zinc-600/40",
   Convertido:
     "bg-emerald-500/12 text-emerald-950 ring-1 ring-emerald-600/28 dark:bg-emerald-500/18 dark:text-emerald-100 dark:ring-emerald-400/30",
@@ -86,6 +93,11 @@ function formatPhoneBr(value: string): string {
   return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
 }
 
+/** Dígitos nacionais ou já com 55; remove zeros de tronco (ex.: 011…) para wa.me com +55. */
+function leadPhoneDigitsForWhatsApp(raw: string): string {
+  return onlyDigitsPhone(raw).replace(/^0+/, "");
+}
+
 /** Busca instantânea: qualquer termo deve aparecer em nome, empresa, e-mail ou telefone (trecho ou início de palavra). */
 /** `?status=` na URL (ex.: vindo do dashboard). */
 function statusFromQueryParam(raw: string | null): LeadStatus | null {
@@ -96,7 +108,10 @@ function statusFromQueryParam(raw: string | null): LeadStatus | null {
   } catch {
     return null;
   }
-  return ALL_STATUSES.includes(decoded as LeadStatus) ? (decoded as LeadStatus) : null;
+  if (ALL_STATUSES.includes(decoded as LeadStatus)) return decoded as LeadStatus;
+  const fromLegacy = normalizeLeadStatus(decoded);
+  if (decoded === "Em Contato" || decoded === "Novo" || decoded === "Qualificado") return fromLegacy;
+  return null;
 }
 
 function leadMatchesSearch(lead: Lead, rawQuery: string): boolean {
@@ -111,6 +126,36 @@ function leadMatchesSearch(lead: Lead, rawQuery: string): boolean {
       field.split(/[\s@._\-/+]+/).some((word) => word.length > 0 && word.startsWith(term)),
     );
   });
+}
+
+function LeadTablePhoneCell({ phone }: { phone: string | undefined }) {
+  const trimmed = phone?.trim() ?? "";
+  if (!trimmed) {
+    return <span className="block truncate text-sm text-muted-foreground">Sem telefone</span>;
+  }
+  const waDigits = leadPhoneDigitsForWhatsApp(trimmed);
+  const waHref = buildWhatsAppHref(waDigits);
+  const displayPlus55 = maskWhatsappBRDisplay(waDigits);
+  return (
+    <div className="inline-flex min-w-0 max-w-full items-center gap-2">
+      <span className="min-w-0 truncate text-sm text-muted-foreground" title={displayPlus55}>
+        {displayPlus55 || trimmed}
+      </span>
+      {waHref ? (
+        <a
+          href={waHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex size-[22px] shrink-0 items-center justify-center rounded-md border border-[#25D366]/20 bg-[#25D366]/5 text-[#25D366]/80 transition-colors hover:border-[#25D366]/35 hover:bg-[#25D366]/10 hover:text-[#25D366] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#25D366]/30 focus-visible:ring-offset-1 focus-visible:ring-offset-background dark:border-[#25D366]/15 dark:bg-[#25D366]/10 dark:hover:border-[#25D366]/28 dark:hover:bg-[#25D366]/12"
+          aria-label={`Abrir WhatsApp ${displayPlus55}`}
+          title="Abrir no WhatsApp"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <WhatsAppIcon className="size-3" aria-hidden />
+        </a>
+      ) : null}
+    </div>
+  );
 }
 
 function LeadsPageContent() {
@@ -131,7 +176,7 @@ function LeadsPageContent() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [company, setCompany] = useState("");
-  const [status, setStatus] = useState<LeadStatus>("Em Contato");
+  const [status, setStatus] = useState<LeadStatus>("Novo Lead");
 
   const fetchLeads = useCallback(async () => {
     if (!user) return;
@@ -195,7 +240,7 @@ function LeadsPageContent() {
       setEmail("");
       setPhone("");
       setCompany("");
-      setStatus("Em Contato");
+      setStatus("Novo Lead");
     }
     setSaveError(null);
     setIsDialogOpen(true);
@@ -254,8 +299,9 @@ function LeadsPageContent() {
           <h1 className="text-4xl font-extrabold tracking-tight text-foreground">Leads</h1>
           <p className="mt-1 text-muted-foreground">Gerencie seus contatos e oportunidades de negócio.</p>
         </div>
-        <Button onClick={() => openForm()} className="rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-6 py-6 shadow-lg shadow-indigo-500/20 transition-all hover:scale-[1.02] active:scale-[0.98] gap-2">
-          <Plus size={20} /> Novo Lead
+        <Button variant="cta" size="lg" onClick={() => openForm()} className="gap-2">
+          <Plus className="size-4 shrink-0" aria-hidden />
+          Novo Lead
         </Button>
       </div>
 
@@ -269,8 +315,8 @@ function LeadsPageContent() {
         >
           <div className="relative border-b border-white/5 px-6 pb-6 pt-7 pr-14 sm:px-8 sm:pb-7 sm:pt-8 sm:pr-16">
             <div className="flex gap-4 sm:gap-5">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-indigo-500/12 ring-1 ring-indigo-500/25 sm:h-14 sm:w-14">
-                <UserRound className="size-6 text-indigo-400 sm:size-7" aria-hidden />
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand/12 ring-1 ring-brand/25 sm:h-14 sm:w-14">
+                <UserRound className="size-6 text-brand sm:size-7" aria-hidden />
               </div>
               <DialogHeader className="flex-1 text-left">
                 <DialogTitle className="text-xl font-bold tracking-tight text-white sm:text-2xl">
@@ -291,7 +337,7 @@ function LeadsPageContent() {
                     id="lead-name"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="h-12 rounded-xl border-white/10 bg-white/[0.04] text-base text-zinc-100 placeholder:text-zinc-600 focus-visible:border-indigo-500/50 focus-visible:ring-indigo-500/20"
+                    className="h-12 rounded-xl border-white/10 bg-white/[0.04] text-base text-zinc-100 placeholder:text-zinc-600 focus-visible:border-brand/50 focus-visible:ring-brand/20"
                     placeholder="Ex.: João Silva"
                     autoComplete="name"
                   />
@@ -304,7 +350,7 @@ function LeadsPageContent() {
                     id="lead-company"
                     value={company}
                     onChange={(e) => setCompany(e.target.value)}
-                    className="h-12 rounded-xl border-white/10 bg-white/[0.04] text-base text-zinc-100 placeholder:text-zinc-600 focus-visible:border-indigo-500/50 focus-visible:ring-indigo-500/20"
+                    className="h-12 rounded-xl border-white/10 bg-white/[0.04] text-base text-zinc-100 placeholder:text-zinc-600 focus-visible:border-brand/50 focus-visible:ring-brand/20"
                     placeholder="Ex.: Tech Solutions"
                     autoComplete="organization"
                   />
@@ -323,7 +369,7 @@ function LeadsPageContent() {
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="h-12 rounded-xl border-white/10 bg-white/[0.04] text-base text-zinc-100 placeholder:text-zinc-600 focus-visible:border-indigo-500/50 focus-visible:ring-indigo-500/20"
+                    className="h-12 rounded-xl border-white/10 bg-white/[0.04] text-base text-zinc-100 placeholder:text-zinc-600 focus-visible:border-brand/50 focus-visible:ring-brand/20"
                     placeholder="nome@empresa.com"
                     autoComplete="email"
                   />
@@ -342,7 +388,7 @@ function LeadsPageContent() {
                       type="tel"
                       value={phone}
                       onChange={(e) => setPhone(formatPhoneBr(e.target.value))}
-                      className="h-12 rounded-xl border-white/10 bg-white/[0.04] pl-10 text-base text-zinc-100 placeholder:text-zinc-600 focus-visible:border-indigo-500/50 focus-visible:ring-indigo-500/20"
+                      className="h-12 rounded-xl border-white/10 bg-white/[0.04] pl-10 text-base text-zinc-100 placeholder:text-zinc-600 focus-visible:border-brand/50 focus-visible:ring-brand/20"
                       placeholder="(11) 99999-9999"
                       autoComplete="tel"
                     />
@@ -364,13 +410,13 @@ function LeadsPageContent() {
                 >
                   <SelectTrigger
                     id="lead-status"
-                    className="h-12 w-full rounded-xl border-white/10 bg-white/[0.04] px-3 text-base text-zinc-100 shadow-none focus:ring-indigo-500/20 focus:border-indigo-500/50"
+                    className="h-12 w-full rounded-md border-white/10 bg-white/[0.04] text-base text-zinc-100 focus-visible:border-brand/50 dark:hover:bg-white/[0.06]"
                   >
                     <SelectValue placeholder="Selecione o status" />
                   </SelectTrigger>
-                  <SelectContent className="rounded-xl border-white/10 bg-zinc-900 text-zinc-100">
+                  <SelectContent sideOffset={8}>
                     {ALL_STATUSES.map((s) => (
-                      <SelectItem key={s} value={s} className="m-1 rounded-lg focus:bg-white/10">
+                      <SelectItem key={s} value={s}>
                         {s}
                       </SelectItem>
                     ))}
@@ -395,17 +441,20 @@ function LeadsPageContent() {
               variant="ghost"
               onClick={() => setIsDialogOpen(false)}
               disabled={isSaving}
-              className="h-11 rounded-xl text-zinc-400 hover:bg-white/5 hover:text-zinc-200 sm:min-w-[7rem]"
+              className="h-10 rounded-md text-zinc-400 hover:bg-white/5 hover:text-zinc-200 sm:min-w-[7rem]"
             >
               Cancelar
             </Button>
             <Button
               type="button"
+              variant="cta"
+              size="lg"
               onClick={() => void handleSave()}
               disabled={isSaving}
-              className="h-11 rounded-xl bg-indigo-600 px-8 font-bold text-white shadow-lg shadow-indigo-500/20 hover:bg-indigo-500 sm:min-w-[10rem]"
+              className="min-w-[10rem] gap-2"
             >
-              {isSaving ? <Loader2 size={18} className="animate-spin" aria-hidden /> : "Salvar lead"}
+              {isSaving ? <Loader2 className="size-4 animate-spin shrink-0" aria-hidden /> : null}
+              {isSaving ? "A guardar…" : "Salvar lead"}
             </Button>
           </div>
         </DialogContent>
@@ -426,7 +475,7 @@ function LeadsPageContent() {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Buscar por nome, empresa, e-mail ou telefone…"
-                  className="h-10 w-full rounded-xl border-input bg-background pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:border-indigo-500/50 focus-visible:ring-indigo-500/20 dark:border-white/10 dark:bg-white/5 dark:text-zinc-100 dark:placeholder:text-zinc-600"
+                  className="h-10 w-full rounded-xl border-input bg-background pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:border-brand/50 focus-visible:ring-brand/20 dark:border-white/10 dark:bg-white/5 dark:text-zinc-100 dark:placeholder:text-zinc-600"
                   aria-label="Buscar leads"
                   autoComplete="off"
                   autoCorrect="off"
@@ -442,17 +491,15 @@ function LeadsPageContent() {
                 }}
               >
                 <SelectTrigger
-                  className="h-10 w-full rounded-xl border-input bg-background px-3 text-sm text-foreground shadow-none focus:border-indigo-500/50 focus:ring-indigo-500/20 data-placeholder:text-muted-foreground sm:w-[13.75rem] sm:shrink-0 dark:border-white/10 dark:bg-white/5 dark:text-zinc-100 dark:data-placeholder:text-zinc-500"
+                  className="w-full font-medium sm:w-[14rem] sm:shrink-0"
                   aria-label="Filtrar por status do funil"
                 >
                   <SelectValue placeholder="Todos os status">{statusFilterLabel(statusFilter)}</SelectValue>
                 </SelectTrigger>
-                <SelectContent className="rounded-xl border-white/10 bg-zinc-900 text-zinc-100">
-                  <SelectItem value={STATUS_FILTER_TODOS} className="m-1 rounded-lg focus:bg-white/10">
-                    Todos os status
-                  </SelectItem>
+                <SelectContent align="start" className="max-h-72">
+                  <SelectItem value={STATUS_FILTER_TODOS}>Todos os status</SelectItem>
                   {ALL_STATUSES.map((s) => (
-                    <SelectItem key={s} value={s} className="m-1 rounded-lg focus:bg-white/10">
+                    <SelectItem key={s} value={s}>
                       {s}
                     </SelectItem>
                   ))}
@@ -538,7 +585,7 @@ function LeadsPageContent() {
                         setSearch("");
                         setStatusFilter(STATUS_FILTER_TODOS);
                       }}
-                      className="mt-3 text-sm font-semibold text-indigo-700 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300"
+                      className="mt-3 text-sm font-semibold text-brand hover:text-brand/90 dark:text-brand dark:hover:text-brand"
                     >
                       Limpar filtros
                     </button>
@@ -553,7 +600,7 @@ function LeadsPageContent() {
                     <TableCell className="py-4 pl-6 pr-3 align-middle">
                       <Link
                         href={`/dashboard/leads/${lead.id}`}
-                        className="block truncate text-base font-bold text-foreground transition-colors hover:text-indigo-600 dark:hover:text-indigo-400"
+                        className="block truncate text-base font-bold text-foreground transition-colors hover:text-brand dark:hover:text-brand"
                       >
                         {lead.name}
                       </Link>
@@ -564,8 +611,8 @@ function LeadsPageContent() {
                     <TableCell className="px-3 py-4 align-middle">
                       <span className="block truncate text-sm font-medium text-foreground/90">{lead.email || "Sem e-mail"}</span>
                     </TableCell>
-                    <TableCell className="px-3 py-4 align-middle">
-                      <span className="block truncate text-sm text-muted-foreground">{lead.phone || "Sem telefone"}</span>
+                    <TableCell className="min-w-0 px-3 py-4 align-middle">
+                      <LeadTablePhoneCell phone={lead.phone} />
                     </TableCell>
                     <TableCell className="px-3 py-4 align-middle">
                       <Badge
@@ -588,18 +635,13 @@ function LeadsPageContent() {
                             <MoreHorizontal className="h-5 w-5" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="bg-zinc-950 border-white/10 text-zinc-300 rounded-xl p-1.5 min-w-[160px] shadow-2xl">
-                          <DropdownMenuItem
-                            className="focus:bg-white/10 focus:text-white rounded-lg cursor-pointer py-2 px-3 gap-2"
-                            onClick={() => window.location.href = `/dashboard/leads/${lead.id}`}
-                          >
+                        <DropdownMenuContent align="end" className="min-w-[168px]">
+                          <DropdownMenuItem onClick={() => (window.location.href = `/dashboard/leads/${lead.id}`)}>
                             Ver Detalhes
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="focus:bg-white/10 focus:text-white rounded-lg cursor-pointer py-2 px-3 gap-2" onClick={() => openForm(lead)}>
-                            Editar Lead
-                          </DropdownMenuItem>
-                          <div className="h-px bg-white/5 my-1" />
-                          <DropdownMenuItem className="text-red-400 focus:bg-red-500/10 focus:text-red-300 rounded-lg cursor-pointer py-2 px-3 gap-2" onClick={() => handleDelete(lead.id)}>
+                          <DropdownMenuItem onClick={() => openForm(lead)}>Editar Lead</DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem variant="destructive" onClick={() => handleDelete(lead.id)}>
                             Excluir
                           </DropdownMenuItem>
                         </DropdownMenuContent>

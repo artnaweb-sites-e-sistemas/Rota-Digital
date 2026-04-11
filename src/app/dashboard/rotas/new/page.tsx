@@ -46,7 +46,7 @@ import { cn } from "@/lib/utils";
 const MAX_AI_GUIDELINES_ROUTE = 3000;
 const FINAL_PROGRESS_MS = 3000;
 const ESTIMATED_PROGRESS_TO_88_MS = 1 * 60 * 1000;
-const LEAD_STATUS_OPTIONS = ["Em Contato", "Convertido", "Perdido"] as const;
+const LEAD_STATUS_OPTIONS = ["Novo Lead", "Convertido", "Perdido"] as const;
 
 const SCORING_OPTIONS: { id: AiScoringStrictness; label: string }[] = [
   { id: "free", label: "Livre" },
@@ -140,7 +140,7 @@ export default function NewRotaPage() {
   const [newLeadCompany, setNewLeadCompany] = useState("");
   const [newLeadEmail, setNewLeadEmail] = useState("");
   const [newLeadPhone, setNewLeadPhone] = useState("");
-  const [newLeadStatus, setNewLeadStatus] = useState<(typeof LEAD_STATUS_OPTIONS)[number]>("Em Contato");
+  const [newLeadStatus, setNewLeadStatus] = useState<(typeof LEAD_STATUS_OPTIONS)[number]>("Novo Lead");
   const [newLeadSaving, setNewLeadSaving] = useState(false);
   const [newLeadError, setNewLeadError] = useState<string | null>(null);
   const [progressOverlayOpen, setProgressOverlayOpen] = useState(false);
@@ -515,7 +515,7 @@ export default function NewRotaPage() {
     setNewLeadCompany("");
     setNewLeadEmail("");
     setNewLeadPhone("");
-    setNewLeadStatus("Em Contato");
+    setNewLeadStatus("Novo Lead");
     setNewLeadError(null);
     setIsLeadDialogOpen(true);
     setLeadSearchOpen(false);
@@ -665,7 +665,7 @@ export default function NewRotaPage() {
                           onClick={openCreateLeadDialog}
                           className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium hover:bg-muted/60"
                         >
-                          <UserPlus className="size-4 text-indigo-500" aria-hidden />
+                          <UserPlus className="size-4 text-brand" aria-hidden />
                           Adicionar novo lead
                         </button>
                       </div>
@@ -809,7 +809,7 @@ export default function NewRotaPage() {
                             className={cn(
                               "rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
                               aiChannelPolicy === "restricted"
-                                ? "border-indigo-500/50 bg-indigo-500/10 text-foreground"
+                                ? "border-brand/50 bg-brand/10 text-foreground"
                                 : "border-border bg-background text-muted-foreground hover:bg-muted/50",
                             )}
                           >
@@ -825,7 +825,7 @@ export default function NewRotaPage() {
                                 setAiOpenChannelCount(sanitizeAiOpenRecommendedChannelCount(Number(v)))
                               }
                             >
-                              <SelectTrigger className="h-8 w-[130px] text-xs">
+                              <SelectTrigger size="sm" className="w-[130px]">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
@@ -953,6 +953,7 @@ export default function NewRotaPage() {
             <Button
               type="button"
               variant="cta"
+              size="lg"
               onClick={handleGenerate}
               disabled={saving || loadingLeads || !leadId || aiSettingsLoading}
               className="gap-2"
@@ -1017,7 +1018,7 @@ export default function NewRotaPage() {
                   if (value) setNewLeadStatus(value as (typeof LEAD_STATUS_OPTIONS)[number]);
                 }}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full rounded-md border-white/10 bg-white/[0.04] text-zinc-100 dark:hover:bg-white/[0.06]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

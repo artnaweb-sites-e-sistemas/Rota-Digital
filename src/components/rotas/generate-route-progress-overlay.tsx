@@ -67,19 +67,19 @@ export function GenerateRouteProgressOverlay({
         aria-hidden
       />
       <div
-        className="relative w-full max-w-[420px] overflow-hidden rounded-2xl border border-white/10 bg-card/95 p-8 shadow-2xl ring-1 ring-indigo-500/25 supports-[backdrop-filter]:bg-card/90"
+        className="relative w-full max-w-[420px] overflow-hidden rounded-2xl border border-white/10 bg-card/95 p-8 shadow-2xl ring-1 ring-brand/25 supports-[backdrop-filter]:bg-card/90"
       >
         <div
-          className="pointer-events-none absolute -right-24 -top-24 h-48 w-48 rounded-full bg-indigo-500/20 blur-3xl"
+          className="pointer-events-none absolute -right-24 -top-24 h-48 w-48 rounded-full bg-brand/20 blur-3xl"
           aria-hidden
         />
         <div
-          className="pointer-events-none absolute -bottom-20 -left-16 h-40 w-40 rounded-full bg-violet-600/15 blur-3xl"
+          className="pointer-events-none absolute -bottom-20 -left-16 h-40 w-40 rounded-full bg-brand/12 blur-3xl"
           aria-hidden
         />
 
         <div className="relative flex flex-col items-center text-center">
-          <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 shadow-lg shadow-indigo-500/30">
+          <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#6b5f3a] to-brand">
             <Sparkles className="h-7 w-7 text-white" strokeWidth={1.75} />
           </div>
 
@@ -107,7 +107,7 @@ export function GenerateRouteProgressOverlay({
             </div>
             <div className="relative h-2.5 overflow-hidden rounded-full bg-muted/80 ring-1 ring-white/5">
               <div
-                className={`relative h-full overflow-hidden rounded-full bg-gradient-to-r from-indigo-600 via-violet-500 to-indigo-500 shadow-[0_0_24px_-2px_rgba(99,102,241,0.55)] ease-out ${
+                className={`relative h-full overflow-hidden rounded-full bg-gradient-to-r from-[#1c1910] via-[#4a422c] to-[#5c5235] shadow-[0_0_24px_-2px_rgba(0,0,0,0.35)] ease-out ${
                   instantBarWidth
                     ? "transition-none"
                     : clamped >= 99
