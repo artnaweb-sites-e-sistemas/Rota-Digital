@@ -1,10 +1,9 @@
 "use client";
 
-import { type CSSProperties, type ElementType, type ReactNode } from "react";
+import { type CSSProperties, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 export type StarBorderProps = {
-  as?: ElementType;
   className?: string;
   contentClassName?: string;
   children?: ReactNode;
@@ -19,7 +18,6 @@ export type StarBorderProps = {
  * Keyframes: `globals.css` (`.rota-star-border-top` / `.rota-star-border-bottom`).
  */
 export default function StarBorder({
-  as: Comp = "div",
   className,
   contentClassName,
   color = "white",
@@ -30,11 +28,10 @@ export default function StarBorder({
   style,
   ...rest
 }: StarBorderProps) {
-  const Component = Comp;
   const bottomColor = accentColor ?? color;
 
   return (
-    <Component
+    <div
       className={cn("relative inline-block w-full max-w-full overflow-hidden rounded-[20px]", className)}
       style={{
         padding: `${thickness}px 0`,
@@ -68,6 +65,6 @@ export default function StarBorder({
       >
         {children}
       </div>
-    </Component>
+    </div>
   );
 }

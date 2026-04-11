@@ -1901,7 +1901,7 @@ export function RotaDigitalReportView({
               </CardTitle>
             </div>
           </CardHeader>
-          <CardContent className="relative flex flex-1 flex-col justify-between gap-5 sm:gap-6">
+          <CardContent className="relative flex flex-1 flex-col justify-between gap-4">
             <div className="space-y-2.5">
               <div className="flex items-baseline gap-1.5">
                 <span className="text-5xl font-bold tracking-tight tabular-nums text-blue-800 dark:text-blue-400">
@@ -1909,7 +1909,7 @@ export function RotaDigitalReportView({
                 </span>
                 <span className="text-lg font-medium text-muted-foreground print:text-muted-foreground">meses</span>
               </div>
-              <p className="mb-4 border-l-2 border-blue-500/45 pl-2.5 text-[11px] leading-snug text-foreground/90 antialiased sm:mb-5 print:border-l-blue-900/40 print:text-zinc-800 dark:border-blue-400/40">
+              <p className="border-l-2 border-blue-500/45 pl-2.5 text-[11px] leading-snug text-foreground/90 antialiased print:border-l-blue-900/40 print:text-zinc-800 dark:border-blue-400/40">
                 Tempo previsto para{" "}
                 <span className="font-semibold text-blue-900 dark:text-blue-100 print:text-blue-900">
                   colocar este plano em prática
@@ -2140,7 +2140,7 @@ export function RotaDigitalReportView({
                 </div>
               </div>
               {briefWebsiteHref || briefInstagramHref ? (
-                <div className="mt-auto flex flex-col gap-2.5 pt-4">
+                <div className="flex flex-col gap-2.5 max-md:mt-0 max-md:pt-0 max-md:pb-6 md:mt-auto md:pt-4 md:pb-0">
                   <div className="flex flex-col gap-2">
                     {briefWebsiteHref ? (
                       <a
