@@ -170,11 +170,7 @@ export default function RotasPage() {
         <div className="rounded-lg border border-border bg-card p-12 text-center dark:border-zinc-800 dark:bg-zinc-900">
           <Sparkles className="mx-auto mb-4 text-muted-foreground" size={32} />
           <p className="text-lg font-medium text-foreground">Nenhum relatório gerado ainda</p>
-          <p className="mx-auto mt-1 mb-6 max-w-md text-sm text-muted-foreground">
-            Clique em <strong className="text-foreground">Gerar Rota</strong>, selecione um lead e preencha
-            site, instagram, serviços e objetivo para a IA gerar o relatório.
-          </p>
-          <LinkButton href="/dashboard/rotas/new" className="gap-2">
+          <LinkButton href="/dashboard/rotas/new" className="mt-6 gap-2">
             <Sparkles size={16} />
             Gerar Rota
           </LinkButton>

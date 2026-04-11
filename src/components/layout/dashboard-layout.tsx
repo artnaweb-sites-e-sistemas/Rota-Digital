@@ -80,7 +80,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 
   const navLinkClass = (active: boolean, iconOnly: boolean) =>
     cn(
-      "group flex items-center rounded-xl transition-all duration-200",
+      "group flex items-center rounded-md transition-all duration-200",
       iconOnly ? "justify-center px-2 py-2.5" : "gap-3 px-3.5 py-2.5",
       active
         ? "bg-indigo-500/12 text-foreground shadow-sm ring-1 ring-indigo-500/25 dark:bg-white/10 dark:text-white dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)] dark:ring-white/10"
@@ -103,21 +103,13 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               mainCollapsed ? "flex-col items-center gap-2 py-3 px-2" : "h-20 items-center justify-between px-4",
             )}
           >
-            <div
-              className={cn(
-                "flex min-w-0 items-center gap-2.5",
-                mainCollapsed ? "flex-col gap-2" : "flex-1",
-              )}
-            >
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-600 shadow-lg shadow-indigo-500/20">
-                <Sparkles size={20} className="text-white" aria-hidden />
-              </div>
-              {!mainCollapsed ? (
+            {!mainCollapsed ? (
+              <div className="flex min-w-0 flex-1 items-center">
                 <span className="truncate text-lg font-bold tracking-tight text-foreground dark:text-white">
                   Rota Digital
                 </span>
-              ) : null}
-            </div>
+              </div>
+            ) : null}
             <button
               type="button"
               onClick={toggleMainSidebar}
@@ -125,7 +117,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               aria-label={mainCollapsed ? "Expandir menu lateral" : "Recolher menu lateral (só ícones)"}
               title={mainCollapsed ? "Expandir menu" : "Recolher para ícones"}
               className={cn(
-                "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground dark:text-zinc-500 dark:hover:bg-white/10 dark:hover:text-zinc-200",
+                "flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground dark:text-zinc-500 dark:hover:bg-white/10 dark:hover:text-zinc-200",
                 mainCollapsed && "order-first",
               )}
             >
@@ -204,13 +196,13 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         >
           <div
             className={cn(
-              "mb-3 rounded-xl bg-muted py-3 text-sm ring-1 ring-border dark:bg-white/5 dark:ring-white/5",
+              "mb-3 rounded-md bg-muted py-3 text-sm ring-1 ring-border dark:bg-white/5 dark:ring-white/5",
               mainCollapsed ? "flex justify-center px-0" : "flex items-center gap-3 px-3",
             )}
             title={mainCollapsed ? (user.email ?? undefined) : undefined}
             aria-label={mainCollapsed ? `Conta: ${user.email ?? "utilizador"}` : undefined}
           >
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-zinc-600 to-zinc-700 text-sm font-bold text-white shadow-inner dark:from-zinc-700 dark:to-zinc-800">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-zinc-600 to-zinc-700 text-sm font-bold text-white shadow-inner dark:from-zinc-700 dark:to-zinc-800">
               {user.email?.charAt(0).toUpperCase() || "U"}
             </div>
             {!mainCollapsed ? (
@@ -226,7 +218,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             title={mainCollapsed ? "Sair" : undefined}
             aria-label={mainCollapsed ? "Sair" : undefined}
             className={cn(
-              "group flex w-full items-center rounded-xl text-muted-foreground transition-all duration-200 hover:bg-red-500/10 hover:text-red-600 dark:text-zinc-400 dark:hover:text-red-400",
+              "group flex w-full items-center rounded-md text-muted-foreground transition-all duration-200 hover:bg-red-500/10 hover:text-red-600 dark:text-zinc-400 dark:hover:text-red-400",
               mainCollapsed ? "justify-center px-2 py-2.5" : "gap-3 px-3.5 py-2.5",
             )}
           >
@@ -251,7 +243,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                   key={sub.href}
                   href={sub.href}
                   className={cn(
-                    "flex items-center gap-2 rounded-lg px-3 py-2.5 text-[13px] font-medium transition-colors",
+                    "flex items-center gap-2 rounded-md px-3 py-2.5 text-[13px] font-medium transition-colors",
                     subActive
                       ? "bg-indigo-500/15 text-foreground ring-1 ring-indigo-500/25 dark:text-white"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground dark:text-zinc-500 dark:hover:bg-white/5 dark:hover:text-zinc-200",
