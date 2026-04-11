@@ -69,6 +69,40 @@ function buildProxyUrl(url: string): string {
   return `/api/image-proxy?url=${encodeURIComponent(url)}`;
 }
 
+/** Timeouts alinhados às rotas (ex.: snapshot IG até 120s no servidor). */
+function resolveEvidenceFetchTimeoutMs(fetchUrl: string): number {
+  const u = fetchUrl.toLowerCase();
+  if (u.includes("/api/website-fullpage-snapshot")) return 130_000;
+  if (u.includes("/api/instagram-profile-snapshot")) return 115_000;
+  if (u.includes("/api/image-proxy")) return 35_000;
+  return 20_000;
+}
+
+function serializeUnknownError(error: unknown): Record<string, string | undefined> {
+  if (error instanceof FirebaseError) {
+    return { kind: "FirebaseError", code: error.code, message: error.message };
+  }
+  if (typeof DOMException !== "undefined" && error instanceof DOMException) {
+    return { kind: "DOMException", name: error.name, message: error.message };
+  }
+  if (error instanceof Error) {
+    return {
+      kind: "Error",
+      name: error.name,
+      message: error.message,
+      stack: error.stack?.slice(0, 500),
+    };
+  }
+  if (error && typeof error === "object") {
+    try {
+      return { kind: "object", json: JSON.stringify(error).slice(0, 500) };
+    } catch {
+      return { kind: "object", message: Object.prototype.toString.call(error) };
+    }
+  }
+  return { kind: typeof error, message: String(error) };
+}
+
 async function uploadImageFromUrl(
   imageUrl: string,
   destinationPath: string
@@ -91,13 +125,14 @@ async function uploadImageFromUrl(
     return null;
   }
   const ctrl = new AbortController();
-  const timeoutMs = imageUrl.includes("/api/instagram-profile-snapshot") ? 45000 : 8000;
+  const timeoutMs = resolveEvidenceFetchTimeoutMs(fetchUrl);
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
     console.info("[IG_DEBUG][evidence-storage] Iniciando upload de evidência.", {
       imageUrl,
       fetchUrl,
       destinationPath,
+      timeoutMs,
     });
     const res = await fetch(fetchUrl, {
       cache: "no-store",
@@ -152,12 +187,22 @@ async function uploadImageFromUrl(
       return null;
     }
     console.info("[IG_DEBUG][evidence-storage] Upload concluído.", { destinationPath });
-    return await getDownloadURL(storageRef);
+    try {
+      return await getDownloadURL(storageRef);
+    } catch (dlErr) {
+      console.error("[IG_DEBUG][evidence-storage] Falha ao obter URL pública após upload.", {
+        destinationPath,
+        ...serializeUnknownError(dlErr),
+      });
+      return null;
+    }
   } catch (error) {
     console.error("[IG_DEBUG][evidence-storage] Erro inesperado no upload.", {
       imageUrl,
+      fetchUrl,
       destinationPath,
-      error: error instanceof Error ? error.message : String(error),
+      timeoutMs,
+      ...serializeUnknownError(error),
     });
     return null;
   } finally {

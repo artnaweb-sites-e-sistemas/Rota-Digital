@@ -2040,7 +2040,9 @@ export function RotaDigitalReportView({
                 <p className="text-[14px] leading-relaxed text-foreground whitespace-pre-line break-words [overflow-wrap:anywhere]">
                   {report.evidences.instagramBioExcerpt?.trim()
                     ? report.evidences.instagramBioExcerpt
-                    : "Bio não disponível na coleta automática."}
+                    : report.evidences.instagramSnapshotUrl
+                      ? "A bio não foi extraída em texto na coleta automática — confira a captura do perfil ao lado para ler a bio e as métricas na imagem."
+                      : "Bio não disponível na coleta automática."}
                 </p>
               </div>
               {briefWebsiteHref || briefInstagramHref ? (

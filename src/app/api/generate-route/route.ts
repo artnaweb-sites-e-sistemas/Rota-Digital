@@ -1499,9 +1499,13 @@ function buildPrompt(body: {
   aiScoringStrictness?: AiScoringStrictness;
   websiteEvidence?: WebsiteEvidence;
   instagramEvidence?: InstagramEvidence;
+  /** Imagem realmente enviada ao modelo (download para Gemini). */
   hasWebsiteScreenshot?: boolean;
   hasInstagramScreenshot?: boolean;
   hasInstagramBioLinkScreenshot?: boolean;
+  /** URL de snapshot gerada para o relatório (o cliente pode ver a imagem mesmo se o download para a IA falhou). */
+  instagramSnapshotForReport?: boolean;
+  websiteSnapshotForReport?: boolean;
 }): string {
   const siteEvidence = body.websiteEvidence;
   const instaEvidence = body.instagramEvidence;
@@ -1556,13 +1560,19 @@ ${aiGuidelinesBlock}${channelsPolicyBlock}${servicesFocusBlock}${scoringStrictne
 - Objetivo: ${objectiveLine}
 
 **Evidências coletadas automaticamente (fonte prioritária)**
-- Captura visual do website antes da análise: ${
-    body.hasWebsiteScreenshot ? "disponível" : "não disponível"
+- Imagem do website enviada ao modelo (visão IA nesta execução): ${
+    body.hasWebsiteScreenshot ? "sim" : "não"
   }
-- Captura visual do Instagram antes da análise: ${
-    body.hasInstagramScreenshot ? "disponível" : "não disponível"
+- Snapshot do site disponível no relatório (URL de captura gerada): ${
+    body.websiteSnapshotForReport ? "sim" : "não"
   }
-- Captura visual do destino do link da bio: ${
+- Imagem do Instagram enviada ao modelo (visão IA nesta execução): ${
+    body.hasInstagramScreenshot ? "sim" : "não"
+  }
+- Snapshot do perfil Instagram disponível no relatório (URL de captura gerada): ${
+    body.instagramSnapshotForReport ? "sim" : "não"
+  }
+- Captura visual do destino do link da bio (enviada ao modelo): ${
     body.hasInstagramBioLinkScreenshot ? "disponível" : "não disponível"
   }
 - Website status: ${siteEvidence?.status ?? "não verificado"}
@@ -1599,13 +1609,13 @@ ${buildReportCopyVoicePromptSection()}
 1.3) Em "websiteResearchNote" e "instagramResearchNote": no máximo 2 parágrafos cada (separar com uma linha em branco \\n\\n no JSON). Texto corrido, um fio de raciocínio; evite sequência de frases telegráficas ou uma frase por linha.
 1.4) Em "instagramResearchNote": sintetize a ideia da bio (ex.: "a bio deixa claro que…"). PROIBIDO transcrever a bio entre aspas ou colar emojis. NÃO comece citando seguidores, posts ou outras métricas (essas já aparecem nas evidências). Fale de posicionamento, clareza, consistência visual, destaques, link na bio e CTA quando fizer sentido com o que foi verificado.
 1.5) Ao comentar o link da bio, use o "destino final verificado". Se ele levar direto para WhatsApp, diga isso claramente. Não invente Linktree, menu com várias opções ou múltiplos destinos se isso não estiver verificado.
-1.6) Use análise VISUAL apenas quando houver captura real do canal.
-1.7) Se "Captura visual do website antes da análise" estiver "não disponível", não faça análise visual do website; escreva explicitamente "não foi possível analisar visualmente o website".
-1.8) Se "Captura visual do Instagram antes da análise" estiver "não disponível", não faça análise visual do Instagram; escreva explicitamente "não foi possível analisar visualmente o Instagram".
+1.6) Descreva paleta, estética do feed e detalhes visuais finos **apenas** quando "Imagem do Instagram enviada ao modelo" = "sim" (ou equivalente para o website). Se só existir snapshot no relatório sem imagem na IA, não invente o visual — remeta à imagem nas evidências.
+1.7) Só diga "não foi possível analisar visualmente o website" se **ambos** estiverem "não": "Imagem do website enviada ao modelo" e "Snapshot do site disponível no relatório". Se o snapshot existir no relatório mas a imagem não tiver sido enviada ao modelo, não negue a existência da captura — diga que a imagem aparece nas evidências e que a análise automática por texto pode estar incompleta.
+1.8) Só diga "não foi possível analisar visualmente o Instagram" se **ambos** estiverem "não": "Imagem do Instagram enviada ao modelo" e "Snapshot do perfil Instagram disponível no relatório". Se o snapshot existir no relatório mas a imagem não tiver sido enviada ao modelo nesta execução, **não** escreva que o perfil não foi acessado: a captura existe para o leitor; explique que bio/métricas em texto podem não ter vindo da API e que vale olhar a imagem nas evidências.
 1.9) Quando houver captura do Instagram (CAPTURA 2), ANALISE A IMAGEM CUIDADOSAMENTE mesmo que ela tenha fundo escuro ou overlay parcial. O perfil do Instagram pode estar visível por trás de um overlay leve. Se conseguir ler qualquer informação (nome do perfil, bio, número de seguidores, posts, avatar, thumbnails do feed), USE essas informações na análise. A CAPTURA 2 é a fonte prioritária.
 1.10) Tente extrair da captura: nome do perfil, quantidade de posts, seguidores, seguindo, texto da bio, link visível na bio, avatar/foto de perfil, estética/cores do feed, tipo de conteúdo visível nos posts.
 1.11) Se algum desses itens específicos não estiver legível na captura, escreva "não legível na captura" apenas para aquele item — não descarte a análise inteira por causa de um overlay parcial.
-1.12) Para Instagram, priorize SEMPRE a CAPTURA 2 como fonte principal. Somente diga "não foi possível analisar visualmente" se a CAPTURA 2 não foi fornecida OU se a imagem estiver totalmente ilegível (completamente preta/branca sem qualquer conteúdo visível).
+1.12) Quando "Imagem do Instagram enviada ao modelo" = "sim", priorize a CAPTURA 2. Quando for "não" mas o snapshot existir no relatório, siga a regra 1.8 (não negue a captura). Só diga "não foi possível analisar visualmente" se **ambos** forem "não" (imagem na IA e snapshot no relatório), ou se a imagem enviada à IA estiver totalmente ilegível (sem conteúdo).
 1.13) NUNCA diga que a captura mostra "tela de login" se houver conteúdo de perfil visível (foto, bio, posts). Um overlay de login por cima de conteúdo de perfil NÃO invalida a análise — extraia o que for possível.
 1.14) Quando a "Captura visual do destino do link da bio" estiver disponível (CAPTURA 3), use essa imagem para avaliar a experiência pós-clique: clareza da proposta, consistência com o Instagram, facilidade de uso e convites para contato na página de destino.
 2) Avalie pontos com nota 0-10: posicionamento, identidade visual, clareza da proposta, consistência da comunicação, funil/CTA, presença digital geral.
@@ -1632,21 +1642,21 @@ Esta é a regra mais importante de todo o relatório. Quebre qualquer outra regr
 PROIBIDO INVENTAR (lista exaustiva):
 - Número de seguidores, posts, seguindo, curtidas ou qualquer métrica numérica.
 - Conteúdo da bio do Instagram. Se "Instagram bio" acima diz "não verificada", o campo "instagramBioExcerpt" DEVE ser "".
-- Cores, paleta, identidade visual, estética do feed — SOMENTE se houver captura visual real.
+- Cores, paleta, identidade visual, estética do feed — SOMENTE se "Imagem do Instagram enviada ao modelo" = "sim" (a existência de snapshot só no relatório não autoriza inventar o visual).
 - Funcionalidades, páginas ou seções do site que não foram verificadas.
 - Comportamento do link da bio. Se "destino final verificado" diz "não verificado", NÃO diga que leva para WhatsApp, Linktree ou qualquer lugar.
 - Tipo de conteúdo dos posts (ex.: "posts com dicas", "fotos de trabalhos"). Só descreva se viu na captura.
-- Qualquer afirmação sobre a aparência visual de um canal sem captura.
+- Qualquer afirmação sobre a aparência visual de um canal sem "Imagem ... enviada ao modelo" = "sim".
 
 QUANDO A CAPTURA FALHOU OU NÃO ESTÁ DISPONÍVEL:
-- Se "Captura visual do Instagram antes da análise" = "não disponível" E "Instagram bio" = "não verificada" E "Instagram seguidores" = "não verificado":
-  -> Escreva explicitamente: "Não foi possível acessar o perfil do Instagram durante a análise automatizada. As informações abaixo são baseadas apenas no que foi possível verificar externamente."
-  -> NÃO descreva o feed, a estética, o tipo de conteúdo ou a qualidade visual do perfil.
-  -> NÃO invente seguidores, bio ou qualquer dado.
-  -> A nota de tópicos relacionados ao Instagram deve refletir essa limitação.
-- Se "Captura visual do website antes da análise" = "não disponível":
+- Use a frase "Não foi possível acessar o perfil do Instagram durante a análise automatizada. As informações abaixo são baseadas apenas no que foi possível verificar externamente." **somente** se TODOS forem verdadeiros: "Imagem do Instagram enviada ao modelo" = "não" **e** "Snapshot do perfil Instagram disponível no relatório" = "não" **e** "Instagram bio" = "não verificada" **e** "Instagram seguidores" = "não verificado".
+- Se "Snapshot do perfil Instagram disponível no relatório" = "sim" (mesmo que "Imagem... modelo" = "não"): **proibido** dizer que o perfil não foi acessado ou que só houve verificação "externa". A captura existe no relatório. Pode dizer, se fizer sentido, que a extração automática de texto (bio, números) não veio completa e que o leitor deve usar a imagem nas evidências.
+  -> NÃO invente seguidores, bio ou qualquer dado que não esteja na captura ou nos campos verificados.
+  -> A nota de tópicos relacionados ao Instagram deve refletir limitações reais, sem contradizer a existência da imagem.
+- Se "Imagem do website enviada ao modelo" = "não" **e** "Snapshot do site disponível no relatório" = "não":
   -> Escreva: "Não foi possível capturar visualmente o site durante a análise."
   -> NÃO descreva cores, layout, hierarquia visual ou design do site.
+- Se o snapshot do site existir no relatório mas a imagem não foi enviada ao modelo: não use a frase acima; oriente a olhar a captura nas evidências.
 
 QUANDO O INSTAGRAM NÃO FOI INFORMADO:
 - Se "Instagram / redes" = "Não informado", isso significa que o lead não tem (ou não forneceu) Instagram.
@@ -1655,7 +1665,8 @@ QUANDO O INSTAGRAM NÃO FOI INFORMADO:
 
 COMO DIFERENCIAR:
 - Instagram informado + dados coletados = use os dados reais.
-- Instagram informado + coleta falhou = diga que não foi possível verificar, NÃO invente.
+- Instagram informado + bio/métricas não verificados mas snapshot no relatório = não diga que o perfil não foi acessado; explique limitação da extração textual e remeta à imagem nas evidências. NÃO invente números nem texto de bio.
+- Instagram informado + sem snapshot e sem dados = diga que não foi possível verificar, NÃO invente.
 - Instagram não informado = comente a ausência como oportunidade de melhoria.
 
 REGRA DE OURO: na dúvida entre afirmar algo e dizer "não verificado", SEMPRE diga "não verificado".
@@ -1844,6 +1855,8 @@ export async function POST(req: NextRequest) {
       hasWebsiteScreenshot: Boolean(websiteImagePart),
       hasInstagramScreenshot: Boolean(instagramImagePart),
       hasInstagramBioLinkScreenshot: Boolean(instagramBioLinkImagePart),
+      instagramSnapshotForReport: Boolean(instagramSnapshotUrl),
+      websiteSnapshotForReport: Boolean(siteHeroSnapshotUrl),
     });
     const generateContentInput = buildGenerateContentInput(prompt, {
       websiteImagePart,

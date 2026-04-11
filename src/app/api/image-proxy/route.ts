@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
   }
 
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 12000);
+  const timer = setTimeout(() => ctrl.abort(), 25_000);
 
   try {
     const upstream = await fetch(target, {
