@@ -7,11 +7,10 @@ import {
   Users,
   List,
   CheckCircle,
-  Clock,
+  XCircle,
   Sparkles,
   Loader2,
   ChevronRight,
-  TrendingUp,
   Plus,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
@@ -24,15 +23,6 @@ import { ReportSiteAvatar } from "@/components/report-site-avatar";
 
 function formatInt(n: number) {
   return n.toLocaleString("pt-BR");
-}
-
-function formatCurrencyBRL(n: number) {
-  return n.toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
 }
 
 function leadsCreatedInMonth(leads: Lead[], year: number, monthIndex: number): number {
@@ -209,14 +199,10 @@ export default function DashboardPage() {
   const stats = useMemo(() => {
     const total = leads.length;
     const convertidos = leads.filter((l) => l.status === "Convertido").length;
-    const emNegociacao = leads.filter((l) => l.status !== "Convertido" && l.status !== "Perdido").length;
+    const perdidos = leads.filter((l) => l.status === "Perdido").length;
     const taxa =
       total > 0 ? Math.round((convertidos / total) * 100) : 0;
-    const totalAiCostBrl = reports.reduce(
-      (sum, r) => sum + Number(r.aiUsage?.totalEstimatedCostBrl || 0),
-      0
-    );
-    const avgAiCostPerReport = reportCount > 0 ? totalAiCostBrl / reportCount : 0;
+    const taxaPerdidos = total > 0 ? Math.round((perdidos / total) * 100) : 0;
 
     return [
       {
@@ -245,21 +231,21 @@ export default function DashboardPage() {
             : `${taxa}% da base com status “Convertido”`,
         icon: CheckCircle,
         color: "text-green-500",
-        href: "/dashboard/leads",
+        href: "/dashboard/leads?status=Convertido",
       },
       {
-        title: "Custo médio por rota",
-        value: formatCurrencyBRL(avgAiCostPerReport),
+        title: "Leads perdidos",
+        value: formatInt(perdidos),
         description:
-          reportCount > 0
-            ? `${formatCurrencyBRL(totalAiCostBrl)} em ${formatInt(reportCount)} rota(s) (estimado)`
-            : "Sem rotas para calcular custo médio",
-        icon: Clock,
-        color: "text-amber-500",
-        href: "/dashboard/rotas",
+          total === 0
+            ? "Cadastre leads para acompanhar o funil"
+            : `${taxaPerdidos}% da base com status “Perdido”`,
+        icon: XCircle,
+        color: "text-red-500",
+        href: "/dashboard/leads?status=Perdido",
       },
     ] as const;
-  }, [leads, reportCount, reports]);
+  }, [leads, reportCount]);
 
   return (
     <div className="space-y-8">
@@ -309,15 +295,8 @@ export default function DashboardPage() {
       <div className="grid gap-6 md:grid-cols-7">
         <Card className="overflow-hidden border border-border bg-card shadow-xl dark:border-white/5 dark:bg-white/[0.02] md:col-span-4">
           <CardHeader className="pb-6">
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-500/10 ring-1 ring-indigo-500/20">
-                <TrendingUp className="size-5 text-indigo-600 dark:text-indigo-400" />
-              </div>
-              <div>
-                <CardTitle className="text-lg font-bold text-foreground">Desempenho semanal</CardTitle>
-                <CardDescription>Acompanhamento de novos leads nos últimos 7 dias</CardDescription>
-              </div>
-            </div>
+            <CardTitle className="text-lg font-bold text-foreground">Desempenho semanal</CardTitle>
+            <CardDescription>Acompanhamento de novos leads nos últimos 7 dias</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
             <div className="px-6 pb-6">
@@ -330,15 +309,8 @@ export default function DashboardPage() {
 
         <Card className="overflow-hidden border border-border bg-card shadow-xl dark:border-white/5 dark:bg-white/[0.02] md:col-span-3">
           <CardHeader className="pb-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-500/10 ring-1 ring-violet-500/20">
-                <Sparkles className="size-5 text-violet-600 dark:text-violet-400" />
-              </div>
-              <div>
-                <CardTitle className="text-lg font-bold text-foreground">Últimas rotas</CardTitle>
-                <CardDescription>Relatórios gerados recentemente</CardDescription>
-              </div>
-            </div>
+            <CardTitle className="text-lg font-bold text-foreground">Últimas rotas</CardTitle>
+            <CardDescription>Relatórios gerados recentemente</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 pt-2">
             {loading ? (

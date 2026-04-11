@@ -8,11 +8,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, ExternalLink, Sparkles, Calendar, Trash2, Search } from "lucide-react";
+import { Loader2, ExternalLink, Sparkles, Calendar, Trash2, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { LinkButton } from "@/components/ui/link-button";
 import { Button } from "@/components/ui/button";
 import { ReportSiteAvatar } from "@/components/report-site-avatar";
+
+const PAGE_SIZE = 10;
 
 const MATURITY_LEVELS = ["Iniciante", "Intermediário", "Avançado"] as const;
 type DigitalMaturityLevel = (typeof MATURITY_LEVELS)[number];
@@ -84,6 +86,7 @@ export default function RotasPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [maturityFilter, setMaturityFilter] = useState<MaturityFilter>(MATURITY_FILTER_TODOS);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const filteredReports = useMemo(() => {
     return reports.filter((r) => {
@@ -94,6 +97,19 @@ export default function RotasPage() {
       return reportMatchesSearch(r, search);
     });
   }, [reports, search, maturityFilter]);
+
+  const pageCount = Math.max(1, Math.ceil(filteredReports.length / PAGE_SIZE));
+  const safePage = Math.min(Math.max(1, currentPage), pageCount);
+  const pageSliceStart = (safePage - 1) * PAGE_SIZE;
+  const paginatedReports = filteredReports.slice(pageSliceStart, pageSliceStart + PAGE_SIZE);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, maturityFilter]);
+
+  useEffect(() => {
+    setCurrentPage((p) => Math.min(Math.max(1, p), pageCount));
+  }, [pageCount]);
 
   const handleDeleteReport = async (report: RotaDigitalReport) => {
     if (!user) return;
@@ -220,14 +236,16 @@ export default function RotasPage() {
                 onClick={() => {
                   setSearch("");
                   setMaturityFilter(MATURITY_FILTER_TODOS);
+                  setCurrentPage(1);
                 }}
               >
                 Limpar filtros
               </Button>
             </div>
           ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filteredReports.map((report) => (
+            <>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {paginatedReports.map((report) => (
             <Card
               key={report.id}
               className="border-border bg-card transition-colors hover:border-primary/20 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
@@ -312,6 +330,46 @@ export default function RotasPage() {
             </Card>
           ))}
         </div>
+              {pageCount > 1 ? (
+                <div className="flex flex-col items-stretch gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between dark:border-zinc-800">
+                  <p className="text-center text-xs text-muted-foreground sm:text-left">
+                    Mostrando{" "}
+                    <span className="font-medium text-foreground/85">
+                      {pageSliceStart + 1}–{Math.min(pageSliceStart + PAGE_SIZE, filteredReports.length)}
+                    </span>{" "}
+                    de{" "}
+                    <span className="font-medium text-foreground/85">{filteredReports.length}</span>
+                  </p>
+                  <div className="flex items-center justify-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={safePage <= 1}
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      className="h-9 gap-1 rounded-xl border-border bg-background dark:border-zinc-700 dark:bg-zinc-900/80 dark:text-zinc-200 dark:hover:bg-zinc-800 disabled:opacity-40"
+                    >
+                      <ChevronLeft className="size-4" aria-hidden />
+                      Anterior
+                    </Button>
+                    <span className="min-w-[5.5rem] text-center text-xs font-medium text-muted-foreground">
+                      {safePage} / {pageCount}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={safePage >= pageCount}
+                      onClick={() => setCurrentPage((p) => Math.min(pageCount, p + 1))}
+                      className="h-9 gap-1 rounded-xl border-border bg-background dark:border-zinc-700 dark:bg-zinc-900/80 dark:text-zinc-200 dark:hover:bg-zinc-800 disabled:opacity-40"
+                    >
+                      Próxima
+                      <ChevronRight className="size-4" aria-hidden />
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+            </>
           )}
         </>
       )}

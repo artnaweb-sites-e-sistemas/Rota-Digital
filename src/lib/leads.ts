@@ -11,7 +11,7 @@ import {
   serverTimestamp
 } from "firebase/firestore";
 import { db } from "./firebase";
-import { Lead } from "@/types/lead";
+import { Lead, normalizeLeadStatus } from "@/types/lead";
 
 const LEADS_COLLECTION = "leads";
 
@@ -24,11 +24,12 @@ function omitUndefined<T extends Record<string, unknown>>(obj: T): Record<string
 export const getLeads = async (userId: string): Promise<Lead[]> => {
   const q = query(collection(db, LEADS_COLLECTION), where("userId", "==", userId));
   const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => {
-    const data = doc.data();
+  return snapshot.docs.map((docSnap) => {
+    const data = docSnap.data();
     return {
-      id: doc.id,
+      id: docSnap.id,
       ...data,
+      status: normalizeLeadStatus(data.status),
       // Handle the serverTimestamp properly if it's null during initial writes, etc.
       createdAt: data.createdAt?.toMillis ? data.createdAt.toMillis() : Date.now(),
       updatedAt: data.updatedAt?.toMillis ? data.updatedAt.toMillis() : Date.now(),
@@ -43,6 +44,7 @@ export const getLead = async (leadId: string): Promise<Lead | null> => {
   return {
     id: snap.id,
     ...data,
+    status: normalizeLeadStatus(data.status),
     createdAt: data.createdAt?.toMillis ? data.createdAt.toMillis() : Date.now(),
     updatedAt: data.updatedAt?.toMillis ? data.updatedAt.toMillis() : Date.now(),
   } as Lead;

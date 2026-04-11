@@ -46,7 +46,7 @@ import { cn } from "@/lib/utils";
 const MAX_AI_GUIDELINES_ROUTE = 3000;
 const FINAL_PROGRESS_MS = 3000;
 const ESTIMATED_PROGRESS_TO_88_MS = 1 * 60 * 1000;
-const LEAD_STATUS_OPTIONS = ["Novo", "Em Contato", "Qualificado", "Convertido", "Perdido"] as const;
+const LEAD_STATUS_OPTIONS = ["Em Contato", "Convertido", "Perdido"] as const;
 
 const SCORING_OPTIONS: { id: AiScoringStrictness; label: string }[] = [
   { id: "free", label: "Livre" },
@@ -140,7 +140,7 @@ export default function NewRotaPage() {
   const [newLeadCompany, setNewLeadCompany] = useState("");
   const [newLeadEmail, setNewLeadEmail] = useState("");
   const [newLeadPhone, setNewLeadPhone] = useState("");
-  const [newLeadStatus, setNewLeadStatus] = useState<(typeof LEAD_STATUS_OPTIONS)[number]>("Novo");
+  const [newLeadStatus, setNewLeadStatus] = useState<(typeof LEAD_STATUS_OPTIONS)[number]>("Em Contato");
   const [newLeadSaving, setNewLeadSaving] = useState(false);
   const [newLeadError, setNewLeadError] = useState<string | null>(null);
   const [progressOverlayOpen, setProgressOverlayOpen] = useState(false);
@@ -515,7 +515,7 @@ export default function NewRotaPage() {
     setNewLeadCompany("");
     setNewLeadEmail("");
     setNewLeadPhone("");
-    setNewLeadStatus("Novo");
+    setNewLeadStatus("Em Contato");
     setNewLeadError(null);
     setIsLeadDialogOpen(true);
     setLeadSearchOpen(false);

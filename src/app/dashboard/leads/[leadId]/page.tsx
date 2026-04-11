@@ -26,13 +26,10 @@ import { LinkButton } from "@/components/ui/link-button";
 import { cn } from "@/lib/utils";
 
 const STATUS_BADGE_SURFACE: Record<LeadStatus, string> = {
-  Novo: "bg-blue-500/12 text-blue-950 dark:bg-blue-500/18 dark:text-blue-100",
   "Em Contato":
-    "bg-amber-500/12 text-amber-950 dark:bg-yellow-500/18 dark:text-yellow-100",
-  Qualificado:
-    "bg-emerald-500/12 text-emerald-950 dark:bg-green-500/18 dark:text-green-100",
+    "bg-muted/90 text-muted-foreground dark:bg-zinc-800/90 dark:text-zinc-300",
   Convertido:
-    "bg-purple-500/12 text-purple-950 dark:bg-purple-500/18 dark:text-purple-100",
+    "bg-emerald-500/12 text-emerald-950 dark:bg-emerald-500/18 dark:text-emerald-100",
   Perdido: "bg-red-500/12 text-red-950 dark:bg-red-500/18 dark:text-red-100",
 };
 

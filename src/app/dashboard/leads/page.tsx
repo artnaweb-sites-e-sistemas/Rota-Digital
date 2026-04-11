@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { Lead, LeadStatus } from "@/types/lead";
+import { Lead, LEAD_STATUSES, type LeadStatus } from "@/types/lead";
 import { getLeads, createLead, updateLead, deleteLead } from "@/lib/leads";
 import { deleteReportsByLead } from "@/lib/reports";
 import { Button } from "@/components/ui/button";
@@ -41,26 +42,21 @@ import Link from "next/link";
 const PAGE_SIZE = 10;
 
 const STATUS_DOT: Record<LeadStatus, string> = {
-  Novo: "bg-blue-600 dark:bg-blue-400",
-  "Em Contato": "bg-amber-600 dark:bg-yellow-400",
-  Qualificado: "bg-emerald-600 dark:bg-green-400",
-  Convertido: "bg-purple-600 dark:bg-purple-400",
+  "Em Contato": "bg-zinc-500 dark:bg-zinc-400",
+  Convertido: "bg-emerald-600 dark:bg-emerald-400",
   Perdido: "bg-red-600 dark:bg-red-400",
 };
 
 /** Fundo + texto legíveis no claro e no escuro */
 const STATUS_BADGE_SURFACE: Record<LeadStatus, string> = {
-  Novo: "bg-blue-500/12 text-blue-950 ring-1 ring-blue-600/28 dark:bg-blue-500/18 dark:text-blue-100 dark:ring-blue-400/30",
   "Em Contato":
-    "bg-amber-500/12 text-amber-950 ring-1 ring-amber-600/28 dark:bg-yellow-500/18 dark:text-yellow-100 dark:ring-yellow-400/30",
-  Qualificado:
-    "bg-emerald-500/12 text-emerald-950 ring-1 ring-emerald-600/28 dark:bg-green-500/18 dark:text-green-100 dark:ring-green-400/30",
+    "bg-muted/90 text-muted-foreground ring-1 ring-border dark:bg-zinc-800/90 dark:text-zinc-300 dark:ring-zinc-600/40",
   Convertido:
-    "bg-purple-500/12 text-purple-950 ring-1 ring-purple-600/28 dark:bg-purple-500/18 dark:text-purple-100 dark:ring-purple-400/30",
+    "bg-emerald-500/12 text-emerald-950 ring-1 ring-emerald-600/28 dark:bg-emerald-500/18 dark:text-emerald-100 dark:ring-emerald-400/30",
   Perdido: "bg-red-500/12 text-red-950 ring-1 ring-red-600/28 dark:bg-red-500/18 dark:text-red-100 dark:ring-red-400/30",
 };
 
-const ALL_STATUSES: LeadStatus[] = ["Novo", "Em Contato", "Qualificado", "Convertido", "Perdido"];
+const ALL_STATUSES: LeadStatus[] = [...LEAD_STATUSES];
 
 /** Valor interno em português (evita exibir “all” no gatilho do select). */
 const STATUS_FILTER_TODOS = "todos" as const;
@@ -91,6 +87,18 @@ function formatPhoneBr(value: string): string {
 }
 
 /** Busca instantânea: qualquer termo deve aparecer em nome, empresa, e-mail ou telefone (trecho ou início de palavra). */
+/** `?status=` na URL (ex.: vindo do dashboard). */
+function statusFromQueryParam(raw: string | null): LeadStatus | null {
+  if (!raw) return null;
+  let decoded = raw;
+  try {
+    decoded = decodeURIComponent(raw);
+  } catch {
+    return null;
+  }
+  return ALL_STATUSES.includes(decoded as LeadStatus) ? (decoded as LeadStatus) : null;
+}
+
 function leadMatchesSearch(lead: Lead, rawQuery: string): boolean {
   const q = normalizeSearchText(rawQuery);
   if (!q) return true;
@@ -105,7 +113,8 @@ function leadMatchesSearch(lead: Lead, rawQuery: string): boolean {
   });
 }
 
-export default function LeadsPage() {
+function LeadsPageContent() {
+  const searchParams = useSearchParams();
   const { user } = useAuth();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [search, setSearch] = useState("");
@@ -122,7 +131,7 @@ export default function LeadsPage() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [company, setCompany] = useState("");
-  const [status, setStatus] = useState<LeadStatus>("Novo");
+  const [status, setStatus] = useState<LeadStatus>("Em Contato");
 
   const fetchLeads = useCallback(async () => {
     if (!user) return;
@@ -140,6 +149,12 @@ export default function LeadsPage() {
   useEffect(() => {
     fetchLeads();
   }, [fetchLeads]);
+
+  const statusQuery = searchParams.get("status");
+  useEffect(() => {
+    const parsed = statusFromQueryParam(statusQuery);
+    if (parsed) setStatusFilter(parsed);
+  }, [statusQuery]);
 
   const filteredLeads = useMemo(
     () =>
@@ -180,7 +195,7 @@ export default function LeadsPage() {
       setEmail("");
       setPhone("");
       setCompany("");
-      setStatus("Novo");
+      setStatus("Em Contato");
     }
     setSaveError(null);
     setIsDialogOpen(true);
@@ -354,21 +369,11 @@ export default function LeadsPage() {
                     <SelectValue placeholder="Selecione o status" />
                   </SelectTrigger>
                   <SelectContent className="rounded-xl border-white/10 bg-zinc-900 text-zinc-100">
-                    <SelectItem value="Novo" className="m-1 rounded-lg focus:bg-white/10">
-                      Novo
-                    </SelectItem>
-                    <SelectItem value="Em Contato" className="m-1 rounded-lg focus:bg-white/10">
-                      Em Contato
-                    </SelectItem>
-                    <SelectItem value="Qualificado" className="m-1 rounded-lg focus:bg-white/10">
-                      Qualificado
-                    </SelectItem>
-                    <SelectItem value="Convertido" className="m-1 rounded-lg focus:bg-white/10">
-                      Convertido
-                    </SelectItem>
-                    <SelectItem value="Perdido" className="m-1 rounded-lg focus:bg-white/10">
-                      Perdido
-                    </SelectItem>
+                    {ALL_STATUSES.map((s) => (
+                      <SelectItem key={s} value={s} className="m-1 rounded-lg focus:bg-white/10">
+                        {s}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -651,5 +656,19 @@ export default function LeadsPage() {
         ) : null}
       </Card>
     </div>
+  );
+}
+
+export default function LeadsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-[50vh] w-full items-center justify-center text-muted-foreground">
+          <Loader2 className="size-8 shrink-0 animate-spin" aria-hidden />
+        </div>
+      }
+    >
+      <LeadsPageContent />
+    </Suspense>
   );
 }
