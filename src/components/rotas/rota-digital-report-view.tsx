@@ -299,6 +299,7 @@ function ReportProseBlocks({
   size = "md",
   firstProminent = true,
   collapseToOneParagraph = false,
+  collapseToTwoParagraphs = false,
 }: {
   text?: string;
   sentencesPerBlock?: 1 | 2;
@@ -307,6 +308,8 @@ function ReportProseBlocks({
   firstProminent?: boolean;
   /** Um único `<p>` (ex.: resumo executivo), sem partir uma frase por parágrafo. */
   collapseToOneParagraph?: boolean;
+  /** Dois `<p>` equilibrados por frases (ex.: resumo executivo com respiro). Ignora `collapseToOneParagraph`. */
+  collapseToTwoParagraphs?: boolean;
 }) {
   const sizeClass =
     size === "lg"
@@ -315,20 +318,48 @@ function ReportProseBlocks({
         ? "text-[13.5px] leading-[1.68]"
         : "text-[14px] sm:text-[14.5px] leading-[1.7]";
 
+  const pClass = cn(
+    sizeClass,
+    "text-pretty antialiased [overflow-wrap:anywhere]",
+  );
+
+  if (collapseToTwoParagraphs) {
+    const single = collapseProseToSingleParagraph(text);
+    if (!single) return null;
+    const sentences = splitIntoSentences(single);
+    if (sentences.length <= 1) {
+      return (
+        <div className="space-y-3.5">
+          <p className={cn(pClass, "text-foreground")}>{single}</p>
+        </div>
+      );
+    }
+    const mid = Math.ceil(sentences.length / 2);
+    const first = sentences.slice(0, mid).join(" ");
+    const second = sentences.slice(mid).join(" ");
+    return (
+      <div className="space-y-3.5">
+        <p className={cn(pClass, "text-foreground")}>{first}</p>
+        <p
+          className={cn(
+            pClass,
+            firstProminent
+              ? "text-foreground/90 dark:text-foreground/85"
+              : "text-foreground",
+          )}
+        >
+          {second}
+        </p>
+      </div>
+    );
+  }
+
   if (collapseToOneParagraph) {
     const single = collapseProseToSingleParagraph(text);
     if (!single) return null;
     return (
       <div className="space-y-3.5">
-        <p
-          className={cn(
-            sizeClass,
-            "text-pretty antialiased [overflow-wrap:anywhere]",
-            "text-foreground",
-          )}
-        >
-          {single}
-        </p>
+        <p className={cn(pClass, "text-foreground")}>{single}</p>
       </div>
     );
   }
@@ -355,7 +386,10 @@ function ReportProseBlocks({
   );
 }
 
-/** Notas Website/Instagram: no máx. 2 parágrafos (só quebras \\n\\n), sem partir por frase. */
+/**
+ * Notas Website/Instagram: até 2 `<p>` — respeita `\\n\\n` quando existir;
+ * texto corrido vira dois blocos equilibrados por frases (como o resumo executivo).
+ */
 function EvidenceResearchNoteProse({
   text,
   size = "md",
@@ -366,31 +400,56 @@ function EvidenceResearchNoteProse({
   if (!text?.trim()) return null;
   let normalized = text.replace(/\r\n/g, "\n").trim();
   normalized = applyReadingHeuristics(normalized);
-  const rawParts = normalized
-    .split(/\n{2,}/)
-    .map((p) => p.replace(/\s+/g, " ").trim())
-    .filter(Boolean);
-  const paragraphs =
-    rawParts.length <= 2 ? rawParts : [rawParts[0], rawParts.slice(1).join(" ")];
-  if (paragraphs.length === 0) return null;
+  const explicitParts = mergeOrphanExplicitParagraphs(
+    normalized
+      .split(/\n{2,}/)
+      .map((p) => p.replace(/\s+/g, " ").trim())
+      .filter(Boolean),
+  );
+  if (explicitParts.length === 0) return null;
+
   const sizeClass =
     size === "sm"
       ? "text-[13.5px] leading-[1.68]"
       : "text-[14px] sm:text-[14.5px] leading-[1.7]";
+  const pClass = cn(
+    sizeClass,
+    "text-pretty antialiased [overflow-wrap:anywhere]",
+  );
+
+  let first: string;
+  let second: string;
+
+  if (explicitParts.length >= 2) {
+    first = explicitParts[0]!;
+    second = explicitParts.slice(1).join(" ");
+  } else {
+    const single = explicitParts[0]!;
+    const sentences = splitIntoSentences(single);
+    if (sentences.length <= 1) {
+      return (
+        <div className="space-y-3.5">
+          <p className={cn(pClass, "text-foreground")}>{single}</p>
+        </div>
+      );
+    }
+    const mid = Math.ceil(sentences.length / 2);
+    first = sentences.slice(0, mid).join(" ");
+    second = sentences.slice(mid).join(" ");
+  }
+
+  if (!second.trim()) {
+    return (
+      <div className="space-y-3.5">
+        <p className={cn(pClass, "text-foreground")}>{first}</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-3.5">
-      {paragraphs.map((block, i) => (
-        <p
-          key={i}
-          className={cn(
-            sizeClass,
-            "text-pretty antialiased [overflow-wrap:anywhere]",
-            i > 0 ? "text-foreground/90 dark:text-foreground/85" : "text-foreground",
-          )}
-        >
-          {block}
-        </p>
-      ))}
+      <p className={cn(pClass, "text-foreground")}>{first}</p>
+      <p className={cn(pClass, "text-foreground/90 dark:text-foreground/85")}>{second}</p>
     </div>
   );
 }
@@ -1166,7 +1225,7 @@ function ChannelCard({ channel }: { channel: DigitalChannel }) {
         animated={false}
         colors={glow.colors}
         fillOpacity={0.35}
-        contentInset={0}
+        contentInset={2}
         className={cn(
           "relative z-10 rounded-lg md:overflow-hidden max-md:overflow-visible",
           idleBorder,
@@ -1687,7 +1746,7 @@ export function RotaDigitalReportView({
             <ReportProseBlocks
               text={report.executiveSummary}
               size="lg"
-              collapseToOneParagraph
+              collapseToTwoParagraphs
             />
           </CardContent>
         </Card>
@@ -2194,106 +2253,151 @@ export function RotaDigitalReportView({
         </Card>
       ) : null}
 
-      {/* SWOT */}
-      <div className="grid min-w-0 grid-cols-1 gap-5 md:grid-cols-3">
-        <Card
-          className={cn(
-            "min-w-0 overflow-visible border-green-500/20 bg-green-500/[0.02] print-white",
-            ROTA_REPORT_CARD_BOX,
-          )}
+      {/* SWOT — moldura com BorderGlow (antes eram só Card, sem hover na borda). */}
+      <div className="grid min-w-0 grid-cols-1 gap-5 md:grid-cols-3 md:items-stretch [--rota-swot-surface:#d4d4d8] dark:[--rota-swot-surface:#09090b]">
+        <BorderGlow
+          edgeSensitivity={30}
+          glowColor="142 55 52"
+          backgroundColor="var(--rota-swot-surface)"
+          borderRadius={12}
+          glowRadius={28}
+          glowIntensity={0.8}
+          coneSpread={25}
+          animated={false}
+          colors={["#4ade80", "#34d399", "#86efac"]}
+          fillOpacity={0.35}
+          contentInset={2}
+          className="h-full min-h-0 min-w-0 overflow-hidden rounded-xl border-green-500/20 ring-1 ring-foreground/10 print-white"
         >
-          <CardHeader className="flex flex-row items-center gap-3 pb-4">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-500/10 ring-1 ring-green-500/20">
-              <TrendingUp size={18} className="text-green-400" />
-            </div>
-            <CardTitle className="text-sm font-bold uppercase tracking-wider text-green-400">
-              Forças
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-0">
-              {report.strengths.map((s, i) => (
-                <li
-                  key={i}
-                  className={cn(
-                    "relative flex items-center gap-3 py-3.5 text-sm leading-relaxed text-foreground/90 sm:py-4",
-                    i > 0 &&
-                      "before:pointer-events-none before:absolute before:left-0 before:right-[8%] before:top-0 before:h-px before:rounded-full before:bg-gradient-to-r before:from-green-500/45 before:via-emerald-500/25 before:to-transparent before:content-[''] dark:before:from-green-400/35 dark:before:via-emerald-400/18 print:before:hidden",
-                  )}
-                >
-                  <CheckCircle2 size={16} className="shrink-0 text-green-500/60" />
-                  <span>{s}</span>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
+          <Card
+            className={cn(
+              "flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-visible border-0 bg-zinc-300 text-foreground shadow-none ring-0 rounded-[10px] dark:bg-zinc-950",
+              ROTA_REPORT_CARD_BOX,
+            )}
+          >
+            <CardHeader className="flex flex-row items-center gap-3 pb-4">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-500/10 ring-1 ring-green-500/20">
+                <TrendingUp size={18} className="text-green-400" />
+              </div>
+              <CardTitle className="text-sm font-bold uppercase tracking-wider text-green-400">
+                Forças
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex min-h-0 flex-1 flex-col">
+              <ul className="space-y-0">
+                {report.strengths.map((s, i) => (
+                  <li
+                    key={i}
+                    className={cn(
+                      "relative flex items-center gap-3 py-3.5 text-sm leading-relaxed text-foreground/90 sm:py-4",
+                      i > 0 &&
+                        "before:pointer-events-none before:absolute before:left-0 before:right-[8%] before:top-0 before:h-px before:rounded-full before:bg-gradient-to-r before:from-green-500/45 before:via-emerald-500/25 before:to-transparent before:content-[''] dark:before:from-green-400/35 dark:before:via-emerald-400/18 print:before:hidden",
+                    )}
+                  >
+                    <CheckCircle2 size={16} className="shrink-0 text-green-500/60" />
+                    <span>{s}</span>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        </BorderGlow>
 
-        <Card
-          className={cn(
-            "min-w-0 overflow-visible border-red-500/20 bg-red-500/[0.02] print-white",
-            ROTA_REPORT_CARD_BOX,
-          )}
+        <BorderGlow
+          edgeSensitivity={30}
+          glowColor="0 72 58"
+          backgroundColor="var(--rota-swot-surface)"
+          borderRadius={12}
+          glowRadius={28}
+          glowIntensity={0.8}
+          coneSpread={25}
+          animated={false}
+          colors={["#f87171", "#fb7185", "#fca5a5"]}
+          fillOpacity={0.35}
+          contentInset={2}
+          className="h-full min-h-0 min-w-0 overflow-hidden rounded-xl border-red-500/20 ring-1 ring-foreground/10 print-white"
         >
-          <CardHeader className="flex flex-row items-center gap-3 pb-4">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-500/10 ring-1 ring-red-500/20">
-              <TrendingDown size={18} className="text-red-400" />
-            </div>
-            <CardTitle className="text-sm font-bold uppercase tracking-wider text-red-400">
-              Fraquezas
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-0">
-              {report.weaknesses.map((w, i) => (
-                <li
-                  key={i}
-                  className={cn(
-                    "relative flex items-center gap-3 py-3.5 text-sm leading-relaxed text-foreground/90 sm:py-4",
-                    i > 0 &&
-                      "before:pointer-events-none before:absolute before:left-0 before:right-[8%] before:top-0 before:h-px before:rounded-full before:bg-gradient-to-r before:from-red-500/45 before:via-rose-500/25 before:to-transparent before:content-[''] dark:before:from-red-400/35 dark:before:via-rose-400/18 print:before:hidden",
-                  )}
-                >
-                  <AlertCircle size={16} className="shrink-0 text-red-500/60" />
-                  <span>{w}</span>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
+          <Card
+            className={cn(
+              "flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-visible border-0 bg-zinc-300 text-foreground shadow-none ring-0 rounded-[10px] dark:bg-zinc-950",
+              ROTA_REPORT_CARD_BOX,
+            )}
+          >
+            <CardHeader className="flex flex-row items-center gap-3 pb-4">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-500/10 ring-1 ring-red-500/20">
+                <TrendingDown size={18} className="text-red-400" />
+              </div>
+              <CardTitle className="text-sm font-bold uppercase tracking-wider text-red-400">
+                Fraquezas
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex min-h-0 flex-1 flex-col">
+              <ul className="space-y-0">
+                {report.weaknesses.map((w, i) => (
+                  <li
+                    key={i}
+                    className={cn(
+                      "relative flex items-center gap-3 py-3.5 text-sm leading-relaxed text-foreground/90 sm:py-4",
+                      i > 0 &&
+                        "before:pointer-events-none before:absolute before:left-0 before:right-[8%] before:top-0 before:h-px before:rounded-full before:bg-gradient-to-r before:from-red-500/45 before:via-rose-500/25 before:to-transparent before:content-[''] dark:before:from-red-400/35 dark:before:via-rose-400/18 print:before:hidden",
+                    )}
+                  >
+                    <AlertCircle size={16} className="shrink-0 text-red-500/60" />
+                    <span>{w}</span>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        </BorderGlow>
 
-        <Card
-          className={cn(
-            "min-w-0 overflow-visible border-blue-500/20 bg-blue-500/[0.02] print-white",
-            ROTA_REPORT_CARD_BOX,
-          )}
+        <BorderGlow
+          edgeSensitivity={30}
+          glowColor="210 78 58"
+          backgroundColor="var(--rota-swot-surface)"
+          borderRadius={12}
+          glowRadius={28}
+          glowIntensity={0.8}
+          coneSpread={25}
+          animated={false}
+          colors={["#38bdf8", "#6366f1", "#7dd3fc"]}
+          fillOpacity={0.35}
+          contentInset={2}
+          className="h-full min-h-0 min-w-0 overflow-hidden rounded-xl border-blue-500/20 ring-1 ring-foreground/10 print-white"
         >
-          <CardHeader className="flex flex-row items-center gap-3 pb-4">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10 ring-1 ring-blue-500/20">
-              <Target size={18} className="text-blue-400" />
-            </div>
-            <CardTitle className="text-sm font-bold uppercase tracking-wider text-blue-400">
-              Oportunidades
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-0">
-              {report.opportunities.map((o, i) => (
-                <li
-                  key={i}
-                  className={cn(
-                    "relative flex items-center gap-3 py-3.5 text-sm leading-relaxed text-foreground/90 sm:py-4",
-                    i > 0 &&
-                      "before:pointer-events-none before:absolute before:left-0 before:right-[8%] before:top-0 before:h-px before:rounded-full before:bg-gradient-to-r before:from-blue-500/45 before:via-sky-500/25 before:to-transparent before:content-[''] dark:before:from-blue-400/35 dark:before:via-sky-400/18 print:before:hidden",
-                  )}
-                >
-                  <Star size={16} className="shrink-0 text-blue-500/60" />
-                  <span>{o}</span>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
+          <Card
+            className={cn(
+              "flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-visible border-0 bg-zinc-300 text-foreground shadow-none ring-0 rounded-[10px] dark:bg-zinc-950",
+              ROTA_REPORT_CARD_BOX,
+            )}
+          >
+            <CardHeader className="flex flex-row items-center gap-3 pb-4">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10 ring-1 ring-blue-500/20">
+                <Target size={18} className="text-blue-400" />
+              </div>
+              <CardTitle className="text-sm font-bold uppercase tracking-wider text-blue-400">
+                Oportunidades
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex min-h-0 flex-1 flex-col">
+              <ul className="space-y-0">
+                {report.opportunities.map((o, i) => (
+                  <li
+                    key={i}
+                    className={cn(
+                      "relative flex items-center gap-3 py-3.5 text-sm leading-relaxed text-foreground/90 sm:py-4",
+                      i > 0 &&
+                        "before:pointer-events-none before:absolute before:left-0 before:right-[8%] before:top-0 before:h-px before:rounded-full before:bg-gradient-to-r before:from-blue-500/45 before:via-sky-500/25 before:to-transparent before:content-[''] dark:before:from-blue-400/35 dark:before:via-sky-400/18 print:before:hidden",
+                    )}
+                  >
+                    <Star size={16} className="shrink-0 text-blue-500/60" />
+                    <span>{o}</span>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        </BorderGlow>
       </div>
 
       {/* Recommended Channels */}

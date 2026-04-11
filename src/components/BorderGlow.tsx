@@ -143,7 +143,11 @@ const BorderGlow: FC<BorderGlowProps> = ({
   const cardRef = useRef<HTMLDivElement>(null);
   const pointerRafRef = useRef<number | null>(null);
   const pointerPendingRef = useRef<{ el: HTMLElement; x: number; y: number } | null>(null);
-  const [finePointer, setFinePointer] = useState(true);
+  /**
+   * Interação “estilo rato”: desliga em UI típica de toque (`hover: none` + `pointer: coarse`).
+   * Não exigir `pointer: fine` — alguns Windows/híbridos reportam coarse e o hover deixa de funcionar.
+   */
+  const [finePointer, setFinePointer] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [cursorAngle, setCursorAngle] = useState(45);
   const [edgeProximity, setEdgeProximity] = useState(0);
@@ -151,8 +155,8 @@ const BorderGlow: FC<BorderGlowProps> = ({
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const mq = window.matchMedia("(hover: hover) and (pointer: fine)");
-    const sync = () => setFinePointer(mq.matches);
+    const mq = window.matchMedia("(hover: none) and (pointer: coarse)");
+    const sync = () => setFinePointer(!mq.matches);
     sync();
     mq.addEventListener("change", sync);
     return () => mq.removeEventListener("change", sync);
@@ -205,6 +209,18 @@ const BorderGlow: FC<BorderGlowProps> = ({
     setCursorAngle(getCursorAngle(pending.el, pending.x, pending.y));
   }, [getEdgeProximity, getCursorAngle]);
 
+  /** Atualiza ângulo/proximidade na hora (enter ou último frame batido). */
+  const applyPointerClient = useCallback(
+    (el: HTMLElement, clientX: number, clientY: number) => {
+      const rect = el.getBoundingClientRect();
+      const x = clientX - rect.left;
+      const y = clientY - rect.top;
+      setEdgeProximity(getEdgeProximity(el, x, y));
+      setCursorAngle(getCursorAngle(el, x, y));
+    },
+    [getEdgeProximity, getCursorAngle],
+  );
+
   const handlePointerMove = useCallback(
     (e: PointerEvent<HTMLDivElement>) => {
       const card = cardRef.current;
@@ -230,7 +246,7 @@ const BorderGlow: FC<BorderGlowProps> = ({
   }, []);
 
   useEffect(() => {
-    if (!animated) return;
+    if (!animated || !finePointer) return;
     const angleStart = 110;
     const angleEnd = 465;
     setSweepActive(true);
@@ -264,7 +280,7 @@ const BorderGlow: FC<BorderGlowProps> = ({
       onUpdate: (v) => setEdgeProximity(v / 100),
       onEnd: () => setSweepActive(false),
     });
-  }, [animated]);
+  }, [animated, finePointer]);
 
   const colorSensitivity = edgeSensitivity + 20;
   const isVisible = isHovered || sweepActive;
@@ -322,16 +338,25 @@ const BorderGlow: FC<BorderGlowProps> = ({
   return (
     <div
       ref={cardRef}
-      onPointerMove={handlePointerMove}
-      onPointerEnter={() => setIsHovered(true)}
-      onPointerLeave={() => setIsHovered(false)}
+      onPointerMove={finePointer ? handlePointerMove : undefined}
+      onPointerEnter={(e) => {
+        if (!finePointer) return;
+        setIsHovered(true);
+        const card = cardRef.current;
+        if (card) applyPointerClient(card, e.clientX, e.clientY);
+      }}
+      onPointerLeave={() => {
+        cancelPointerFrame();
+        if (finePointer) setIsHovered(false);
+      }}
       className={cn(
         "relative isolate flex min-h-0 touch-auto flex-col overflow-visible border border-border dark:border-white/15",
         className,
       )}
       style={{
         borderRadius: `${borderRadius}px`,
-        transform: "translate3d(0, 0, 0.01px)",
+        // Camada extra em cada card pesa o compositor no scroll mobile.
+        transform: finePointer ? "translate3d(0, 0, 0.01px)" : undefined,
         boxShadow: "var(--rota-border-glow-shadow, rgba(0,0,0,0.08) 0 4px 12px)",
       }}
     >
