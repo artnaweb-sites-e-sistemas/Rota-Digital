@@ -141,8 +141,7 @@ Tom por campo:
 - "strengths", "weaknesses", "opportunities", "quickWins", "longTermActions", "nextSteps": itens curtos e objetivos.
 - "recommendedChannels.description": explique de forma comercial simples por que o canal faz sentido.
 - "recommendedChannels.actions": ações práticas e diretas.
-- "diagnosticScores.comment": comentário específico, natural e acionável.
-- Se a nota de um tópico for menor que 10, diga sempre o que falta para chegar a 10/10.
+- "diagnosticScores.comment": comentário específico, natural e acionável. Se a nota for < 10, deixe claro o que falta para 10/10 **no máximo uma vez** no texto (não repita "Para chegar a 10/10" / "Para chegar a 10" em cada parágrafo).
 - Nunca escreva frases vagas como "há espaço para melhorar" ou "há espaço para otimizações técnicas" sem explicar exatamente o que deve ser feito.
 - Em "Identidade Visual", comente harmonia visual, paleta, contraste, hierarquia, espaçamento, alinhamento, legibilidade e coerência entre site e Instagram.
 - Se o texto ficar longo em "diagnosticScores.comment" ou "recommendedChannels.description", divida em 2 parágrafos curtos.

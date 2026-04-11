@@ -1619,7 +1619,7 @@ ${buildReportCopyVoicePromptSection()}
 1.13) NUNCA diga que a captura mostra "tela de login" se houver conteúdo de perfil visível (foto, bio, posts). Um overlay de login por cima de conteúdo de perfil NÃO invalida a análise — extraia o que for possível.
 1.14) Quando a "Captura visual do destino do link da bio" estiver disponível (CAPTURA 3), use essa imagem para avaliar a experiência pós-clique: clareza da proposta, consistência com o Instagram, facilidade de uso e convites para contato na página de destino.
 2) Avalie pontos com nota 0-10: posicionamento, identidade visual, clareza da proposta, consistência da comunicação, funil/CTA, presença digital geral.
-2.1) Em cada item de "diagnosticScores", se a nota for menor que 10, diga sempre o que falta para chegar a 10/10. Seja específico.
+2.1) Em cada item de "diagnosticScores" com nota < 10, diga com critérios concretos o que falta evoluir (sem frases vazias). A orientação para a nota máxima entra **uma única vez** no comentário — ver regra de "diagnosticScores.comment" abaixo.
 2.2) Nunca use frases vagas como "há espaço para melhorar" ou "há espaço para otimizações técnicas" sem explicar exatamente o que deve ser ajustado.
 2.3) Em "Identidade Visual", analise harmonia visual, paleta, contraste, hierarquia, espaçamento, alinhamento, legibilidade e coerência entre site e Instagram.
 3) Faça comentários práticos e acionáveis.
@@ -1632,7 +1632,7 @@ ${buildReportCopyVoicePromptSection()}
 - "strengths", "weaknesses", "opportunities", "quickWins", "longTermActions", "nextSteps": itens curtos, diretos e fáceis de entender. Evite frases longas.
 - "recommendedChannels.description": explique em linguagem comercial simples por que aquele canal faz sentido.
 - "recommendedChannels.actions": ações práticas, em tom de orientação direta.
-- "diagnosticScores.comment": comentário humano, específico e acionável. Se a nota for menor que 10, termine dizendo o que precisa ser feito para chegar a 10/10.
+- "diagnosticScores.comment": comentário humano, específico e acionável. Se a nota for < 10, deixe claro o que falta para chegar a 10/10 **no máximo uma vez** no texto (uma única abertura do tipo "Para chegar a 10/10" ou "O próximo passo" — **não** repita a mesma fórmula em parágrafos seguidos). Se usar 2 parágrafos, o segundo continua o raciocínio (ex.: detalhe técnico ou prioridade) **sem** reabrir com outro "Para chegar a 10…".
 - Quando o texto de "diagnosticScores.comment" ou "recommendedChannels.description" ficar longo, divida em 2 parágrafos curtos.
 - "websiteResearchNote" e "instagramResearchNote": sempre no máximo 2 parágrafos cada, como acima.
 

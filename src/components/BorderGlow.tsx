@@ -32,6 +32,10 @@ export interface BorderGlowProps {
   animated?: boolean;
   colors?: string[];
   fillOpacity?: number;
+  /** Velocidade do brilho “estrela” na borda (≤767px ou toque grosseiro), ex. `4s`. */
+  mobileStarSpeed?: CSSProperties["animationDuration"];
+  /** Espessura relativa do brilho (1 ≈ referência original; 1.5 mais largo). */
+  mobileStarThickness?: number;
 }
 
 function parseHSL(hslStr: string): { h: number; s: number; l: number } {
@@ -139,15 +143,18 @@ const BorderGlow: FC<BorderGlowProps> = ({
   animated = false,
   colors = ["#c084fc", "#f472b6", "#38bdf8"],
   fillOpacity = 0.5,
+  mobileStarSpeed = "4s",
+  mobileStarThickness = 1.5,
 }) => {
   const cardRef = useRef<HTMLDivElement>(null);
   const pointerRafRef = useRef<number | null>(null);
   const pointerPendingRef = useRef<{ el: HTMLElement; x: number; y: number } | null>(null);
-  /**
-   * Interação “estilo rato”: desliga em UI típica de toque (`hover: none` + `pointer: coarse`).
-   * Não exigir `pointer: fine` — alguns Windows/híbridos reportam coarse e o hover deixa de funcionar.
-   */
-  const [finePointer, setFinePointer] = useState(false);
+  const [coarseTouch, setCoarseTouch] = useState(false);
+  /** `md` do Tailwind — emulação Chrome costuma manter `pointer: fine`; largura garante o efeito. */
+  const [narrowViewport, setNarrowViewport] = useState(false);
+  /** Brilho “estrela” na borda (substitui camadas pesadas do hover). */
+  const useMobileStarShimmer = coarseTouch || narrowViewport;
+  const finePointer = !useMobileStarShimmer;
   const [isHovered, setIsHovered] = useState(false);
   const [cursorAngle, setCursorAngle] = useState(45);
   const [edgeProximity, setEdgeProximity] = useState(0);
@@ -155,11 +162,19 @@ const BorderGlow: FC<BorderGlowProps> = ({
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const mq = window.matchMedia("(hover: none) and (pointer: coarse)");
-    const sync = () => setFinePointer(!mq.matches);
+    const mqTouch = window.matchMedia("(hover: none) and (pointer: coarse)");
+    const mqNarrow = window.matchMedia("(max-width: 767px)");
+    const sync = () => {
+      setCoarseTouch(mqTouch.matches);
+      setNarrowViewport(mqNarrow.matches);
+    };
     sync();
-    mq.addEventListener("change", sync);
-    return () => mq.removeEventListener("change", sync);
+    mqTouch.addEventListener("change", sync);
+    mqNarrow.addEventListener("change", sync);
+    return () => {
+      mqTouch.removeEventListener("change", sync);
+      mqNarrow.removeEventListener("change", sync);
+    };
   }, []);
 
   useEffect(() => {
@@ -335,6 +350,11 @@ const BorderGlow: FC<BorderGlowProps> = ({
 
   const innerRadius = Math.max(0, borderRadius - contentInset);
 
+  const starTopColor = colors[0] ?? "#a78bfa";
+  const starBottomColor = colors[1] ?? colors[0] ?? "#38bdf8";
+  const starTh = mobileStarThickness;
+  const starFadePct = Math.min(38, Math.round(14 + starTh * 8));
+
   return (
     <div
       ref={cardRef}
@@ -365,33 +385,59 @@ const BorderGlow: FC<BorderGlowProps> = ({
         style={{ backgroundColor }}
       />
 
-      <div
-        className="pointer-events-none absolute inset-0 z-[1] rounded-[inherit]"
-        style={{
-          border: "1px solid transparent",
-          background: [
-            `linear-gradient(${backgroundColor} 0 100%) padding-box`,
-            "linear-gradient(rgb(255 255 255 / 0%) 0% 100%) border-box",
-            ...borderBg,
-          ].join(", "),
-          opacity: borderOpacity,
-          maskImage: `conic-gradient(from ${angleDeg} at center, black ${coneSpread}%, transparent ${coneSpread + 15}%, transparent ${100 - coneSpread - 15}%, black ${100 - coneSpread}%)`,
-          WebkitMaskImage: `conic-gradient(from ${angleDeg} at center, black ${coneSpread}%, transparent ${coneSpread + 15}%, transparent ${100 - coneSpread - 15}%, black ${100 - coneSpread}%)`,
-          transition: isVisible ? "opacity 0.25s ease-out" : "opacity 0.75s ease-in-out",
-        }}
-      />
+      {useMobileStarShimmer ? (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 z-[2] overflow-hidden rounded-[inherit] print:hidden"
+        >
+          <div
+            className="rota-star-border-bottom pointer-events-none absolute right-[-250%] z-0 h-[55%] w-[320%] rounded-full opacity-90"
+            style={{
+              bottom: `${-11 * starTh}px`,
+              background: `radial-gradient(circle, ${starBottomColor}, transparent ${starFadePct}%)`,
+              animationDuration: mobileStarSpeed,
+            }}
+          />
+          <div
+            className="rota-star-border-top pointer-events-none absolute left-[-250%] z-0 h-[55%] w-[320%] rounded-full opacity-90"
+            style={{
+              top: `${-10 * starTh}px`,
+              background: `radial-gradient(circle, ${starTopColor}, transparent ${starFadePct}%)`,
+              animationDuration: mobileStarSpeed,
+            }}
+          />
+        </div>
+      ) : (
+        <>
+          <div
+            className="pointer-events-none absolute inset-0 z-[1] rounded-[inherit]"
+            style={{
+              border: "1px solid transparent",
+              background: [
+                `linear-gradient(${backgroundColor} 0 100%) padding-box`,
+                "linear-gradient(rgb(255 255 255 / 0%) 0% 100%) border-box",
+                ...borderBg,
+              ].join(", "),
+              opacity: borderOpacity,
+              maskImage: `conic-gradient(from ${angleDeg} at center, black ${coneSpread}%, transparent ${coneSpread + 15}%, transparent ${100 - coneSpread - 15}%, black ${100 - coneSpread}%)`,
+              WebkitMaskImage: `conic-gradient(from ${angleDeg} at center, black ${coneSpread}%, transparent ${coneSpread + 15}%, transparent ${100 - coneSpread - 15}%, black ${100 - coneSpread}%)`,
+              transition: isVisible ? "opacity 0.25s ease-out" : "opacity 0.75s ease-in-out",
+            }}
+          />
 
-      <div className="pointer-events-none absolute inset-0 z-[1] rounded-[inherit]" style={fillMaskStyle} />
+          <div className="pointer-events-none absolute inset-0 z-[1] rounded-[inherit]" style={fillMaskStyle} />
 
-      <span className="pointer-events-none absolute z-[2] rounded-[inherit]" style={outerGlowMaskStyle}>
-        <span
-          className="absolute rounded-[inherit]"
-          style={{
-            inset: `${glowRadius}px`,
-            boxShadow: buildBoxShadow(glowColor, glowIntensity),
-          }}
-        />
-      </span>
+          <span className="pointer-events-none absolute z-[2] rounded-[inherit]" style={outerGlowMaskStyle}>
+            <span
+              className="absolute rounded-[inherit]"
+              style={{
+                inset: `${glowRadius}px`,
+                boxShadow: buildBoxShadow(glowColor, glowIntensity),
+              }}
+            />
+          </span>
+        </>
+      )}
 
       <div
         className="relative z-[3] flex min-h-0 flex-1 flex-col"

@@ -170,6 +170,45 @@
   }
 }
 
+/* BorderGlow mobile: brilho “estrela” nas bordas (radiais em movimento). */
+@keyframes rota-star-movement-bottom {
+  0% {
+    transform: translate(0%, 0%);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-100%, 0%);
+    opacity: 0;
+  }
+}
+
+@keyframes rota-star-movement-top {
+  0% {
+    transform: translate(0%, 0%);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(100%, 0%);
+    opacity: 0;
+  }
+}
+
+.rota-star-border-bottom {
+  animation: rota-star-movement-bottom linear infinite alternate;
+}
+
+.rota-star-border-top {
+  animation: rota-star-movement-top linear infinite alternate;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rota-star-border-bottom,
+  .rota-star-border-top {
+    animation: none;
+    opacity: 0.35;
+  }
+}
+
 /* Brilho suave na barra de progresso (Gerar Rota) */
 @keyframes rd-progress-shine {
   0% {

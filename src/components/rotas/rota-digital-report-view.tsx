@@ -160,7 +160,7 @@ const ROTA_REPORT_CARD_BOX = "py-6 sm:py-7";
 
 /**
  * Capturas full-page no quadro: em repouso mostra o **topo** da página (início do screenshot).
- * Ao passar o mouse, o pan desce até o fim (`EvidenceImage` + hoverScroll).
+ * Com `hoverScroll`: no desktop o pan segue o rato; no touch, um toque alterna o pan (sobe/desce).
  */
 const FULL_PAGE_SNAPSHOT_IDLE_FROM_TOP_RATIO = 0;
 
@@ -204,7 +204,7 @@ const MATURITY_CONFIG = {
 /** Quebras “manuais” antes de frases que costumam ser recomendações (melhor escaneabilidade). */
 function applyReadingHeuristics(text: string): string {
   return text
-    .replace(/\s+(Para (?:chegar a 10\/10|um 10\/10|ficar 10\/10))/gi, "\n\n$1")
+    /* Evitar quebra forçada antes de "Para chegar a 10…" — o prompt já pede uma única abertura; duplicar parágrafos ficava redundante. */
     .replace(/\s+(O que falta(?: para .*?)?10\/10)/gi, "\n\n$1")
     .replace(/\s+(Enquanto )/g, "\n\n$1");
 }
@@ -775,21 +775,31 @@ function EvidenceImage({
   const [scrollOffset, setScrollOffset] = useState(0);
   const [restOffset, setRestOffset] = useState(0);
   const [transitionMs, setTransitionMs] = useState(2200);
-  /** Pan animado só em desktop (mouse); em touch evita travar a rolagem da página. */
-  const [allowHoverPan, setAllowHoverPan] = useState(false);
+  /** Desktop: pan ao passar o rato. Touch: toque alterna o pan (sem capturar scroll da página). */
+  const [finePointerHover, setFinePointerHover] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     const mq = window.matchMedia("(hover: hover) and (pointer: fine)");
-    const sync = () => setAllowHoverPan(mq.matches);
+    const sync = () => setFinePointerHover(mq.matches);
     sync();
     mq.addEventListener("change", sync);
     return () => mq.removeEventListener("change", sync);
   }, []);
 
-  const panInteractive = hoverScroll && allowHoverPan;
+  const panInteractive = hoverScroll;
+  const drivePanWithHover = finePointerHover;
+
+  const panPointerHandlers = drivePanWithHover
+    ? {
+        onMouseEnter: () => setHovered(true),
+        onMouseLeave: () => setHovered(false),
+      }
+    : {
+        onClick: () => setHovered((h) => !h),
+      };
   const resolvedSrc = (() => {
     if (!src) return src;
     try {
@@ -873,9 +883,13 @@ function EvidenceImage({
         return (
           <div
             ref={containerRef}
-            className={`${frameClassName || ""} group relative min-h-0 overflow-hidden`}
-            onMouseEnter={() => setHovered(true)}
-            onMouseLeave={() => setHovered(false)}
+            className={cn(
+              frameClassName,
+              "group relative min-h-0 overflow-hidden",
+              !drivePanWithHover && scrollOffset > 0 && "cursor-pointer",
+            )}
+            data-pan-active={hovered ? "true" : undefined}
+            {...panPointerHandlers}
           >
             <img
               key={`${resolvedSrc || "img"}-cover-scroll`}
@@ -896,8 +910,8 @@ function EvidenceImage({
             />
             {scrollOffset > 0 ? (
               <>
-                <div className="pointer-events-none absolute inset-x-0 top-0 h-8 bg-gradient-to-b from-background/75 dark:from-zinc-950/65 to-transparent opacity-70 transition-opacity duration-300 group-hover:opacity-30" />
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-background/85 dark:from-zinc-950/80 to-transparent opacity-80 transition-opacity duration-300 group-hover:opacity-20" />
+                <div className="pointer-events-none absolute inset-x-0 top-0 h-8 bg-gradient-to-b from-background/75 dark:from-zinc-950/65 to-transparent opacity-70 transition-opacity duration-300 group-hover:opacity-30 group-data-[pan-active=true]:opacity-30" />
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-background/85 dark:from-zinc-950/80 to-transparent opacity-80 transition-opacity duration-300 group-hover:opacity-20 group-data-[pan-active=true]:opacity-20" />
               </>
             ) : null}
           </div>
@@ -961,9 +975,13 @@ function EvidenceImage({
   return (
     <div
       ref={containerRef}
-      className={`${frameClassName || ""} group relative overflow-hidden`}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      className={cn(
+        frameClassName,
+        "group relative overflow-hidden",
+        !drivePanWithHover && scrollOffset > 0 && "cursor-pointer",
+      )}
+      data-pan-active={hovered ? "true" : undefined}
+      {...panPointerHandlers}
     >
       <img
         key={`${resolvedSrc || "img"}-scroll`}
@@ -984,8 +1002,8 @@ function EvidenceImage({
       />
       {scrollOffset > 0 ? (
         <>
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-8 bg-gradient-to-b from-background/75 dark:from-zinc-950/65 to-transparent opacity-70 transition-opacity duration-300 group-hover:opacity-30" />
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-background/85 dark:from-zinc-950/80 to-transparent opacity-80 transition-opacity duration-300 group-hover:opacity-20" />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-8 bg-gradient-to-b from-background/75 dark:from-zinc-950/65 to-transparent opacity-70 transition-opacity duration-300 group-hover:opacity-30 group-data-[pan-active=true]:opacity-30" />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-background/85 dark:from-zinc-950/80 to-transparent opacity-80 transition-opacity duration-300 group-hover:opacity-20 group-data-[pan-active=true]:opacity-20" />
         </>
       ) : null}
     </div>
@@ -1207,7 +1225,7 @@ function ChannelCard({ channel }: { channel: DigitalChannel }) {
       <Badge
         className={cn(
           "md:hidden",
-          "pointer-events-none absolute right-5 top-0 z-0 inline-flex h-auto min-h-7 -translate-y-[calc(100%-8px)] shrink-0 items-center justify-center gap-1 rounded-t-md rounded-b-none border-x border-t border-b-0 px-2.5 pb-2 pt-1.5 text-[11px] font-medium leading-snug whitespace-nowrap",
+          "pointer-events-none absolute left-5 top-0 z-0 inline-flex h-auto min-h-7 -translate-y-[calc(100%-8px)] shrink-0 items-center justify-center gap-1 rounded-t-md rounded-b-none border-x border-t border-b-0 px-2.5 pb-2 pt-1.5 text-[11px] font-medium leading-snug whitespace-nowrap",
           priorityBadgeCls,
           priorityTabMobileSurface,
         )}
@@ -1232,7 +1250,7 @@ function ChannelCard({ channel }: { channel: DigitalChannel }) {
         )}
       >
         <div className="overflow-visible rounded-lg bg-card space-y-3 px-5 py-5 sm:px-7 sm:py-5 dark:bg-card">
-          <div className="flex items-start justify-between gap-2">
+          <div className="flex items-start justify-between gap-2 pb-1">
             <h4 className="m-0 min-w-0 flex-1 font-normal leading-none" title={channel.name}>
               <span className={TOPIC_PILL_CLASS}>
                 <span className="truncate">{channel.name}</span>
@@ -1463,6 +1481,20 @@ export function RotaDigitalReportView({
   ), report);
   const briefWebsiteHref = hrefForBriefWebsite(report.brief?.websiteUrl);
   const briefInstagramHref = hrefForBriefInstagram(report.brief?.instagramUrl);
+  const reportCreatedAtLine2 = (() => {
+    const d = new Date(report.createdAt);
+    const datePart = d.toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    });
+    const timePart = d.toLocaleTimeString("pt-BR", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+    return `${datePart} às ${timePart}`;
+  })();
 
   return (
     <div
@@ -1869,7 +1901,7 @@ export function RotaDigitalReportView({
               </CardTitle>
             </div>
           </CardHeader>
-          <CardContent className="relative flex flex-1 flex-col justify-between gap-4">
+          <CardContent className="relative flex flex-1 flex-col justify-between gap-5 sm:gap-6">
             <div className="space-y-2.5">
               <div className="flex items-baseline gap-1.5">
                 <span className="text-5xl font-bold tracking-tight tabular-nums text-blue-800 dark:text-blue-400">
@@ -1877,7 +1909,7 @@ export function RotaDigitalReportView({
                 </span>
                 <span className="text-lg font-medium text-muted-foreground print:text-muted-foreground">meses</span>
               </div>
-              <p className="border-l-2 border-blue-500/45 pl-2.5 text-[11px] leading-snug text-foreground/90 antialiased print:border-l-blue-900/40 print:text-zinc-800 dark:border-blue-400/40">
+              <p className="mb-4 border-l-2 border-blue-500/45 pl-2.5 text-[11px] leading-snug text-foreground/90 antialiased sm:mb-5 print:border-l-blue-900/40 print:text-zinc-800 dark:border-blue-400/40">
                 Tempo previsto para{" "}
                 <span className="font-semibold text-blue-900 dark:text-blue-100 print:text-blue-900">
                   colocar este plano em prática
@@ -1924,7 +1956,7 @@ export function RotaDigitalReportView({
             ROTA_REPORT_CARD_BOX,
           )}
         >
-          <CardHeader className="pb-4">
+          <CardHeader className="pb-6">
             <div className="flex items-center gap-2.5">
               <div className="flex h-6 w-6 items-center justify-center rounded-md border border-border bg-muted">
                 <Sparkles size={14} className="text-indigo-700 dark:text-indigo-400" />
@@ -2024,7 +2056,7 @@ export function RotaDigitalReportView({
 
       {sortedDiagnosticScores.length > 0 ? (
         <Card className={cn("border-border bg-card/95 print-white", ROTA_REPORT_CARD_BOX)}>
-          <CardHeader className="pb-4">
+          <CardHeader className="pb-6">
             <div className="flex items-center gap-2.5">
               <SectionHeaderIcon Icon={ClipboardList} tone="indigo" />
               <CardTitle className="text-xs font-semibold uppercase tracking-wider text-foreground/78 dark:text-muted-foreground">
@@ -2058,7 +2090,7 @@ export function RotaDigitalReportView({
                   <div className="grid gap-5 md:grid-cols-[360px_minmax(0,1fr)] md:items-start md:gap-6">
                     <TopicEvidence item={item} report={report} />
                     <div className="space-y-4">
-                      <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center justify-between gap-2 pb-2">
                         <div className="space-y-1.5">
                           <DiagnosticTopicPill topic={item.topic} />
                         </div>
@@ -2079,7 +2111,7 @@ export function RotaDigitalReportView({
 
       {report.evidences ? (
         <Card className={cn("border-border bg-card/95 print-white", ROTA_REPORT_CARD_BOX)}>
-          <CardHeader className="space-y-3 pb-4">
+          <CardHeader className="space-y-3 pb-6">
             <div className="flex items-center gap-2.5">
               <SectionHeaderIcon Icon={Images} tone="indigo" />
               <CardTitle className="text-xs font-semibold uppercase tracking-wider text-foreground/78 dark:text-muted-foreground">
@@ -2093,19 +2125,22 @@ export function RotaDigitalReportView({
             }`}
           >
             <div className="flex h-full min-h-0 flex-col gap-3">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Bio do Instagram</p>
-              <div className="shrink-0 rounded-xl border border-border bg-card p-5">
-                {/* Bio: manter quebras de linha como no Instagram (`\\n` na coleta), sem normalizar em frases. */}
-                <p className="text-[14px] leading-relaxed text-foreground whitespace-pre-line break-words [overflow-wrap:anywhere]">
-                  {report.evidences.instagramBioExcerpt?.trim()
-                    ? report.evidences.instagramBioExcerpt
-                    : report.evidences.instagramSnapshotUrl
-                      ? "A bio não foi extraída em texto na coleta automática — confira a captura do perfil ao lado para ler a bio e as métricas na imagem."
-                      : "Bio não disponível na coleta automática."}
-                </p>
+              {/* Mobile: bio em texto duplica a captura do perfil — só mostrar a partir de md. */}
+              <div className="flex flex-col gap-3 max-md:hidden">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Bio do Instagram</p>
+                <div className="shrink-0 rounded-xl border border-border bg-card p-5">
+                  {/* Bio: manter quebras de linha como no Instagram (`\\n` na coleta), sem normalizar em frases. */}
+                  <p className="text-[14px] leading-relaxed text-foreground whitespace-pre-line break-words [overflow-wrap:anywhere]">
+                    {report.evidences.instagramBioExcerpt?.trim()
+                      ? report.evidences.instagramBioExcerpt
+                      : report.evidences.instagramSnapshotUrl
+                        ? "A bio não foi extraída em texto na coleta automática — confira a captura do perfil ao lado para ler a bio e as métricas na imagem."
+                        : "Bio não disponível na coleta automática."}
+                  </p>
+                </div>
               </div>
               {briefWebsiteHref || briefInstagramHref ? (
-                <div className="mt-auto flex flex-col gap-2.5 border-t border-border pt-4">
+                <div className="mt-auto flex flex-col gap-2.5 pt-4">
                   <div className="flex flex-col gap-2">
                     {briefWebsiteHref ? (
                       <a
@@ -2165,7 +2200,7 @@ export function RotaDigitalReportView({
             </div>
 
             {report.evidences.instagramBioLinkSnapshotUrl ? (
-              <div className="space-y-3">
+              <div className="max-md:hidden space-y-3">
                 <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Destino do link da bio</p>
                 <EvidenceImage
                   src={report.evidences.instagramBioLinkSnapshotUrl}
@@ -2198,7 +2233,7 @@ export function RotaDigitalReportView({
                     className={cn("overflow-hidden rounded-lg border-0 print-white")}
                   >
                     <div className="rounded-[8px] bg-card p-5 sm:p-6">
-                      <div className={cn("mb-3", TOPIC_PILL_CLASS)}>
+                      <div className={cn("mb-5", TOPIC_PILL_CLASS)}>
                         <Globe className="size-3.5 shrink-0 stroke-[1.75] text-sky-400" aria-hidden />
                         <span className={TOPIC_PILL_LABEL_NEXT_TO_ICON}>Website</span>
                       </div>
@@ -2226,7 +2261,7 @@ export function RotaDigitalReportView({
                     className={cn("overflow-hidden rounded-lg border-0 print-white")}
                   >
                     <div className="rounded-[8px] bg-card p-5 sm:p-6">
-                      <div className={cn("mb-3", TOPIC_PILL_CLASS)}>
+                      <div className={cn("mb-5", TOPIC_PILL_CLASS)}>
                         <InstagramBrandGlyph className="size-3.5 text-[#f472b6]" aria-hidden />
                         <span className={TOPIC_PILL_LABEL_NEXT_TO_ICON}>Instagram</span>
                       </div>
@@ -2407,7 +2442,7 @@ export function RotaDigitalReportView({
           ROTA_REPORT_CARD_BOX,
         )}
       >
-        <CardHeader className="pb-4">
+        <CardHeader className="pb-6">
           <div className="flex items-center gap-2.5">
             <SectionHeaderIcon Icon={Sparkles} tone="indigo" />
             <CardTitle className="text-xs font-semibold uppercase tracking-wider text-foreground/78 dark:text-muted-foreground">
@@ -2510,7 +2545,7 @@ export function RotaDigitalReportView({
             "py-0 gap-0",
           )}
         >
-          <CardHeader className="px-4 pb-4 pt-0 sm:px-7 sm:pt-0">
+          <CardHeader className="px-4 pb-6 pt-0 sm:px-7 sm:pb-7 sm:pt-0">
             <div className="flex items-center gap-2.5">
               <SectionHeaderIcon Icon={ArrowRight} tone="indigo" />
               <CardTitle className="text-xs font-semibold uppercase tracking-wider text-foreground/78 dark:text-muted-foreground">
@@ -2518,63 +2553,66 @@ export function RotaDigitalReportView({
               </CardTitle>
             </div>
           </CardHeader>
-          <CardContent className="px-4 sm:px-7">
+          <CardContent className="px-4 pb-0 sm:px-7">
             <div className="space-y-3">
               {report.nextSteps.map((step, i) => (
                 <div
                   key={i}
-                  className="flex items-center gap-4 rounded-xl border border-border/90 bg-card/75 p-4 transition-colors hover:border-indigo-500/40"
+                  className="flex min-w-0 w-full items-center gap-4 rounded-xl border border-border/90 bg-card/75 p-4 transition-colors hover:border-indigo-500/40"
                 >
                   <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-indigo-500/40 bg-indigo-500/10">
                     <span className="text-[11px] font-bold text-indigo-800 dark:text-indigo-300">{i + 1}</span>
                   </div>
-                  <p className="text-[14.5px] leading-relaxed text-foreground">{step}</p>
+                  <p className="min-w-0 flex-1 text-[14.5px] leading-relaxed text-foreground">{step}</p>
                 </div>
               ))}
             </div>
-            <div id="report-chamada-acao" className="scroll-mt-6 mt-6 flex justify-stretch sm:justify-start">
-              <a
-                href={reportCta.bottom.href}
-                {...(reportCta.bottom.openInNewTab ?
-                  { target: "_blank", rel: "noopener noreferrer" }
-                : {})}
-                title={
-                  reportCta.bottom.useWhatsAppIcon
-                    ? "Agendar reunião estratégica (abre o WhatsApp)"
-                    : "Agendar reunião estratégica com a Rota Digital"
-                }
-                aria-label={
-                  reportCta.bottom.useWhatsAppIcon
-                    ? "Agendar reunião estratégica pelo WhatsApp"
-                    : "Agendar reunião estratégica para validar prioridades e cronograma"
-                }
-                className={cn(
-                  buttonVariants({ variant: "ctaMotion", size: "lg" }),
-                  "no-print relative h-10 min-h-10 w-full justify-center gap-2 overflow-hidden px-4 sm:w-auto sm:px-5",
-                )}
-              >
-                {reportCta.bottom.useWhatsAppIcon ? (
-                  <WhatsAppIcon className="size-4 shrink-0" />
-                ) : (
-                  <Calendar className="size-4 shrink-0" aria-hidden />
-                )}
-                {reportCta.bottom.label}
-              </a>
-            </div>
           </CardContent>
+          {/*
+            CTA fora do CardContent: o relatório aplica [&_[data-slot=card-content]]:!px-* ao slot;
+            manter o mesmo alinhamento horizontal (px-5 sm:px-7) e largura total até md (tablets estreitos).
+          */}
+          <div
+            id="report-chamada-acao"
+            className="scroll-mt-6 mt-6 box-border w-full min-w-0 max-w-full shrink-0 px-5 pb-10 pt-0 sm:px-7 sm:pb-8"
+          >
+            <a
+              href={reportCta.bottom.href}
+              {...(reportCta.bottom.openInNewTab ?
+                { target: "_blank", rel: "noopener noreferrer" }
+              : {})}
+              title={
+                reportCta.bottom.useWhatsAppIcon
+                  ? "Agendar reunião estratégica (abre o WhatsApp)"
+                  : "Agendar reunião estratégica com a Rota Digital"
+              }
+              aria-label={
+                reportCta.bottom.useWhatsAppIcon
+                  ? "Agendar reunião estratégica pelo WhatsApp"
+                  : "Agendar reunião estratégica para validar prioridades e cronograma"
+              }
+              className={cn(
+                buttonVariants({ variant: "ctaMotion", size: "lg" }),
+                "no-print box-border h-10 min-h-10 items-center justify-center gap-2 overflow-hidden px-4 md:px-5",
+                /* Largura total: telemóvel e tablet até md; a partir de md o botão volta ao tamanho do conteúdo. */
+                "flex w-full min-w-0 max-w-full md:inline-flex md:w-auto md:max-w-none md:shrink-0",
+              )}
+            >
+              {reportCta.bottom.useWhatsAppIcon ? (
+                <WhatsAppIcon className="size-4 shrink-0" />
+              ) : (
+                <Calendar className="size-4 shrink-0" aria-hidden />
+              )}
+              {reportCta.bottom.label}
+            </a>
+          </div>
         </Card>
       </CardSpotlight>
 
       {/* Footer */}
-      <div className="text-center text-muted-foreground text-xs py-4 no-print">
-        Rota Digital gerada com IA em{" "}
-        {new Date(report.createdAt).toLocaleDateString("pt-BR", {
-          day: "2-digit",
-          month: "long",
-          year: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-        })}
+      <div className="text-center text-muted-foreground text-xs leading-snug py-4 no-print">
+        <span className="block">Rota Digital</span>
+        <span className="mt-1 block">{reportCreatedAtLine2}</span>
       </div>
     </div>
   );
