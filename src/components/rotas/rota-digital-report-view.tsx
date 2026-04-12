@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation";
 import { updateReport } from "@/lib/reports";
 import { getUserReportCtaSettings } from "@/lib/user-settings";
 import { resolveReportCtas } from "@/lib/report-cta";
+import { PublicReportFloatingCta } from "@/components/rotas/public-report-floating-cta";
 import { RotaDigitalReport, DigitalChannel, DiagnosticScore } from "@/types/report";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -2011,7 +2012,10 @@ export function RotaDigitalReportView({
       ) : null}
 
       {sortedDiagnosticScores.length > 0 ? (
-        <Card className={cn(ROTA_REPORT_SURFACE_SECTION, "print-white", ROTA_REPORT_CARD_BOX)}>
+        <Card
+          id="report-section-diagnostico-topicos"
+          className={cn(ROTA_REPORT_SURFACE_SECTION, "print-white", ROTA_REPORT_CARD_BOX)}
+        >
           <CardHeader className="pb-6">
             <div className="flex items-center gap-2.5">
               <SectionHeaderIcon Icon={ClipboardList} tone="indigo" />
@@ -2605,6 +2609,11 @@ export function RotaDigitalReportView({
         <span className="block">Rota Digital</span>
         <span className="mt-1 block">{reportCreatedAtLine2}</span>
       </div>
+
+      <PublicReportFloatingCta
+        bottomCta={reportCta.bottom}
+        storageKey={report.publicSlug?.trim() || report.id}
+      />
     </div>
   );
 }
