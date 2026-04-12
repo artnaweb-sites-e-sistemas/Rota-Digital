@@ -121,16 +121,15 @@ Regra principal de escrita:
 - Se o destino final do link da bio for WhatsApp, diga isso claramente e não invente Linktree com várias opções.
 
 Tom por campo:
-- "executiveSummary": **um único parágrafo corrido** (sem \\n\\n). **Meta: no máximo ~420 caracteres**, 2 a 4 frases: motivo da nota de maturidade de forma objetiva; não repita strengths/diagnosticScores nem liste todos os canais.
+- "executiveSummary": **exatamente 2 parágrafos curtos** com \\n\\n. **Meta: no máximo ~520 caracteres no total**; 1º = leitura do digital; 2º = por que a nota de maturidade faz sentido. Não repita strengths/diagnosticScores nem liste todos os canais.
 - "companyProfile": texto curto, direto e fácil de entender.
 - "strengths", "weaknesses", "opportunities", "quickWins", "longTermActions", "nextSteps": itens curtos e objetivos.
-- "recommendedChannels.description": explique de forma comercial simples por que o canal faz sentido.
+- "recommendedChannels.description": **exatamente 2 parágrafos curtos** com \\n\\n; meta total ~380–560 caracteres; comercial, com detalhe deste caso (evite genérico).
 - "recommendedChannels.actions": ações práticas e diretas.
-- "diagnosticScores.comment": comentário específico, natural e acionável. Se a nota for < 10, deixe claro o que falta para 10/10 **no máximo uma vez** no texto (não repita "Para chegar a 10/10" / "Para chegar a 10" em cada parágrafo).
+- "diagnosticScores.comment": **exatamente 2 parágrafos curtos** com \\n\\n; meta total ~480–720 caracteres. Se a nota for < 10, o que falta para 10/10 **no máximo uma vez** no comentário. Cada tópico: ângulo novo (não repetir o mesmo contraste em todos).
 - Nunca escreva frases vagas como "há espaço para melhorar" ou "há espaço para otimizações técnicas" sem explicar exatamente o que deve ser feito.
 - Em "Identidade Visual", comente harmonia visual, paleta, contraste, hierarquia, espaçamento, alinhamento, legibilidade e coerência entre site e Instagram.
-- Se o texto ficar longo em "diagnosticScores.comment" ou "recommendedChannels.description", divida em 2 parágrafos curtos.
-- "websiteResearchNote" e "instagramResearchNote": no máximo 2 parágrafos cada (\\n\\n), texto corrido; em Instagram não comece com seguidores/posts e não transcreva a bio entre aspas — sintetize.
+- "websiteResearchNote" e "instagramResearchNote": **exatamente 2 parágrafos curtos cada** (\\n\\n); meta total ~520–780 caracteres por campo; em Instagram não comece com seguidores/posts e não transcreva a bio entre aspas — sintetize.
 
 Observação do usuário:
 ${observation}
@@ -140,7 +139,7 @@ ${JSON.stringify(report, null, 2)}
 
 Retorne SOMENTE um JSON válido com os campos atualizados:
 {
-  "executiveSummary": "string — 1 parágrafo corrido, sem \\n\\n; preferencialmente ≤420 caracteres",
+  "executiveSummary": "string — exatamente 2 parágrafos com \\n\\n; preferencialmente ≤520 caracteres no total",
   "companyProfile": "string",
   "digitalMaturityLevel": "Iniciante" | "Intermediário" | "Avançado",
   "digitalMaturityScore": number (0 a 10),
@@ -167,7 +166,7 @@ Retorne SOMENTE um JSON válido com os campos atualizados:
   "websiteResearchNote": "string",
   "instagramResearchNote": "string",
   "instagramBioExcerpt": "string",
-  "researchNotes": "string (bloco Website (nota X/10): até 2 parágrafos internos \\n\\n; linha em branco; bloco Instagram (nota X/10): idem)",
+  "researchNotes": "string (Website (nota X/10): até 2 parágrafos internos \\n\\n; linha em branco; Instagram (nota X/10): idem)",
   "proposalPageHtml": "string"
 }`;
 

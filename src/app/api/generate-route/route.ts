@@ -606,7 +606,7 @@ function normalizeResearchNotesText(text: string): string {
     .trim();
 }
 
-/** Normaliza o corpo das notas de pesquisa: até 2 parágrafos (\n\n), texto corrido dentro de cada um. */
+/** Normaliza o corpo das notas de pesquisa: até 2 parágrafos (\\n\\n); excesso vira continuação do 2º. */
 function normalizeAiResearchBody(text: unknown): string {
   if (typeof text !== "string") return "";
   const stripped = normalizeResearchNotesText(text)
@@ -1613,7 +1613,7 @@ ${buildReportCopyVoicePromptSection()}
 1) Analise alinhamento entre posicionamento atual e o objetivo (informado ou inferido).
 1.1) Se o site estiver vazio, quebrado, em placeholder (ex.: "hello world") ou sem conteúdo útil, deixe isso explícito e reduza as notas relacionadas a website.
 1.2) Se o Instagram estiver vazio/sem consistência, deixe explícito e ajuste as notas.
-1.3) Em "websiteResearchNote" e "instagramResearchNote": no máximo 2 parágrafos cada (separar com uma linha em branco \\n\\n no JSON). Texto corrido, um fio de raciocínio; evite sequência de frases telegráficas ou uma frase por linha.
+1.3) Em "websiteResearchNote" e "instagramResearchNote": **exatamente 2 parágrafos curtos cada**, separados por \\n\\n no JSON. Meta **total ~520–780 caracteres** por campo (soma dos dois): parágrafo 1 = fatos verificáveis e leitura do cenário; parágrafo 2 = conclusão prática. **Proibido** terceiro parágrafo ou texto corrido sem quebra. Seja objetivo — sem enrolação.
 1.4) Em "instagramResearchNote": sintetize a ideia da bio (ex.: "a bio deixa claro que…"). PROIBIDO transcrever a bio entre aspas ou colar emojis. NÃO comece citando seguidores, posts ou outras métricas (essas já aparecem nas evidências). Fale de posicionamento, clareza, consistência visual, destaques, link na bio e CTA quando fizer sentido com o que foi verificado.
 1.5) Ao comentar o link da bio, use o "destino final verificado". Se ele levar direto para WhatsApp, diga isso claramente. Não invente Linktree, menu com várias opções ou múltiplos destinos se isso não estiver verificado.
 1.6) Descreva paleta, estética do feed e detalhes visuais finos **apenas** quando "Imagem do Instagram enviada ao modelo" = "sim" (ou equivalente para o website). Se só existir snapshot no relatório sem imagem na IA, não invente o visual — remeta à imagem nas evidências.
@@ -1636,14 +1636,13 @@ ${buildReportCopyVoicePromptSection()}
 4.1) No texto visível de "proposalPageHtml" (títulos, parágrafos, botões), aplique a **Voz do relatório**: linguagem natural, sem siglas nem jargão de agência.
 
 **Tom obrigatório por campo**
-- "executiveSummary": **um único parágrafo corrido** (proibido usar \\n\\n ou quebrar em blocos como vários parágrafos). **Meta: no máximo ~420 caracteres** (com espaços), em **2 a 4 frases curtas**: (1) uma leitura objetiva do que a empresa já mostra no digital e (2) por que a nota de maturidade faz sentido. **Não** repita listas de canais, forças ou tópicos do diagnóstico — isso vai em outros campos. Tom humano, direto, não acadêmico.
+- "executiveSummary": **exatamente 2 parágrafos curtos**, separados por \\n\\n (proibido terceiro parágrafo). **Meta: no máximo ~520 caracteres no total** (soma dos dois): 1º = leitura objetiva do que a empresa já mostra no digital; 2º = por que a nota de maturidade faz sentido. Frases curtas. **Não** repita listas de canais, forças ou tópicos do diagnóstico — isso vai em outros campos.
 - "companyProfile": texto curto e claro sobre o que a empresa aparenta vender, para quem e com qual proposta.
 - "strengths", "weaknesses", "opportunities", "quickWins", "longTermActions", "nextSteps": itens curtos, diretos e fáceis de entender. Evite frases longas.
-- "recommendedChannels.description": explique em linguagem comercial simples por que aquele canal faz sentido.
+- "recommendedChannels.description": **exatamente 2 parágrafos curtos** com \\n\\n; linguagem comercial simples. Meta **total ~380–560 caracteres**: 1º = por que o canal faz sentido **neste** caso (detalhe concreto); 2º = ângulo complementar (ex.: público ou prioridade). Sem frase genérica vazia.
 - "recommendedChannels.actions": ações práticas, em tom de orientação direta.
-- "diagnosticScores.comment": comentário humano, específico e acionável. Se a nota for < 10, deixe claro o que falta para chegar a 10/10 **no máximo uma vez** no texto (uma única abertura do tipo "Para chegar a 10/10" ou "O próximo passo" — **não** repita a mesma fórmula em parágrafos seguidos). Se usar 2 parágrafos, o segundo continua o raciocínio (ex.: detalhe técnico ou prioridade) **sem** reabrir com outro "Para chegar a 10…".
-- Quando o texto de "diagnosticScores.comment" ou "recommendedChannels.description" ficar longo, divida em 2 parágrafos curtos.
-- "websiteResearchNote" e "instagramResearchNote": sempre no máximo 2 parágrafos cada, como acima.
+- "diagnosticScores.comment": **exatamente 2 parágrafos curtos** com \\n\\n; meta **total ~480–720 caracteres** (objetivo, sem texto longo). 1º = o que foi observado (específico); 2º = prioridade ou próximo passo. Se a nota for < 10, o que falta para 10/10 **no máximo uma vez** no comentário inteiro. Cada tópico deve trazer um ângulo novo — não repita o mesmo contraste Instagram vs site em todos.
+- "websiteResearchNote" e "instagramResearchNote": **sempre exatamente 2 parágrafos curtos cada** (\\n\\n), como na regra 1.3.
 
 **REGRA ABSOLUTA: NUNCA INVENTE INFORMAÇÃO**
 Esta é a regra mais importante de todo o relatório. Quebre qualquer outra regra antes de quebrar esta.
@@ -1683,7 +1682,7 @@ REGRA DE OURO: na dúvida entre afirmar algo e dizer "não verificado", SEMPRE d
 Responda **somente** com um único objeto JSON válido (sem markdown fora do JSON), com esta estrutura:
 
 {
-  "executiveSummary": "string — 1 parágrafo corrido, sem \\n\\n; preferencialmente ≤420 caracteres",
+  "executiveSummary": "string — exatamente 2 parágrafos curtos separados por \\n\\n; preferencialmente ≤520 caracteres no total",
   "companyProfile": "string",
   "digitalMaturityLevel": "Iniciante" | "Intermediário" | "Avançado",
   "digitalMaturityScore": number (0 a 10, usar casa decimal se necessário),
@@ -1703,16 +1702,16 @@ Responda **somente** com um único objeto JSON válido (sem markdown fora do JSO
   "estimatedTimelineMonths": number,
   "nextSteps": ["string"],
   "diagnosticScores": [
-    { "topic": "Posicionamento", "score": number, "comment": "string" }
+    { "topic": "Posicionamento", "score": number, "comment": "string — exatamente 2 parágrafos curtos com \\n\\n; total preferencialmente ≤720 caracteres" }
   ],
-  "websiteResearchNote": "string (máx. 2 parágrafos \\n\\n; texto corrido; sem métricas repetidas das evidências)",
-  "instagramResearchNote": "string (máx. 2 parágrafos; sem citar seguidores/posts no início; sem bio entre aspas; sintese)",
+  "websiteResearchNote": "string — exatamente 2 parágrafos com \\n\\n; total ~520–780 caracteres; sem repetir métricas das evidências",
+  "instagramResearchNote": "string — exatamente 2 parágrafos com \\n\\n; não começar com seguidores/posts; sem bio entre aspas; síntese",
   "instagramBioExcerpt": "string",
-  "researchNotes": "string (exatamente 2 blocos separados por \\n\\n: linha 1) Website (nota X/10): … pode ter até 2 parágrafos internos com \\n\\n; linha 2) Instagram (nota X/10): … idem; sem markdown)",
+  "researchNotes": "string (exatamente 2 blocos separados por \\n\\n: Website (nota X/10): até 2 parágrafos internos com \\n\\n; Instagram (nota X/10): idem; sem markdown)",
   "proposalPageHtml": "string — HTML completo do documento"
 }
 
-No executiveSummary: um único parágrafo corrido, **sem** quebras duplas (\\n\\n), preferencialmente até ~420 caracteres. Motivo da nota de maturidade em poucas frases, **sem** reenumerar o diagnóstico completo.
+No executiveSummary: **exatamente** 2 parágrafos curtos (\\n\\n entre eles), preferencialmente até ~520 caracteres no total. **Sem** reenumerar o diagnóstico completo.
 Seja específico para "${body.company}".`;
 }
 

@@ -342,7 +342,7 @@ function ReportProseBlocks({
   firstProminent?: boolean;
   /** Um único `<p>` (ex.: resumo executivo), sem partir uma frase por parágrafo. */
   collapseToOneParagraph?: boolean;
-  /** Dois `<p>` equilibrados por frases (ex.: resumo executivo com respiro). Ignora `collapseToOneParagraph`. */
+  /** Dois `<p>`: respeita `\\n\\n` da IA (1º e resto); senão, divide frases ao meio. Ignora `collapseToOneParagraph`. */
   collapseToTwoParagraphs?: boolean;
 }) {
   const sizeClass =
@@ -358,19 +358,46 @@ function ReportProseBlocks({
   );
 
   if (collapseToTwoParagraphs) {
-    const single = collapseProseToSingleParagraph(text);
-    if (!single) return null;
-    const sentences = splitIntoSentences(single);
-    if (sentences.length <= 1) {
+    if (!text?.trim()) return null;
+    let normalized = text.replace(/\r\n/g, "\n").trim();
+    normalized = applyReadingHeuristics(normalized);
+    const explicitParts = mergeOrphanExplicitParagraphs(
+      normalized
+        .split(/\n{2,}/)
+        .map((p) => p.replace(/\s+/g, " ").trim())
+        .filter(Boolean),
+    );
+    if (explicitParts.length === 0) return null;
+
+    let first: string;
+    let second: string;
+
+    if (explicitParts.length >= 2) {
+      first = explicitParts[0]!;
+      second = explicitParts.slice(1).join(" ");
+    } else {
+      const single = explicitParts[0]!;
+      const sentences = splitIntoSentences(single);
+      if (sentences.length <= 1) {
+        return (
+          <div className="space-y-3.5">
+            <p className={cn(pClass, "text-foreground")}>{single}</p>
+          </div>
+        );
+      }
+      const mid = Math.ceil(sentences.length / 2);
+      first = sentences.slice(0, mid).join(" ");
+      second = sentences.slice(mid).join(" ");
+    }
+
+    if (!second.trim()) {
       return (
         <div className="space-y-3.5">
-          <p className={cn(pClass, "text-foreground")}>{single}</p>
+          <p className={cn(pClass, "text-foreground")}>{first}</p>
         </div>
       );
     }
-    const mid = Math.ceil(sentences.length / 2);
-    const first = sentences.slice(0, mid).join(" ");
-    const second = sentences.slice(mid).join(" ");
+
     return (
       <div className="space-y-3.5">
         <p className={cn(pClass, "text-foreground")}>{first}</p>
@@ -420,10 +447,7 @@ function ReportProseBlocks({
   );
 }
 
-/**
- * Notas Website/Instagram: até 2 `<p>` — respeita `\\n\\n` quando existir;
- * texto corrido vira dois blocos equilibrados por frases (como o resumo executivo).
- */
+/** Notas Website/Instagram nas evidências: dois `<p>` (respeita `\\n\\n` ou divide frases). */
 function EvidenceResearchNoteProse({
   text,
   size = "md",
@@ -431,61 +455,7 @@ function EvidenceResearchNoteProse({
   text?: string;
   size?: "sm" | "md";
 }) {
-  if (!text?.trim()) return null;
-  let normalized = text.replace(/\r\n/g, "\n").trim();
-  normalized = applyReadingHeuristics(normalized);
-  const explicitParts = mergeOrphanExplicitParagraphs(
-    normalized
-      .split(/\n{2,}/)
-      .map((p) => p.replace(/\s+/g, " ").trim())
-      .filter(Boolean),
-  );
-  if (explicitParts.length === 0) return null;
-
-  const sizeClass =
-    size === "sm"
-      ? "text-[13.5px] leading-[1.68]"
-      : "text-[14px] sm:text-[14.5px] leading-[1.7]";
-  const pClass = cn(
-    sizeClass,
-    "text-pretty antialiased [overflow-wrap:anywhere]",
-  );
-
-  let first: string;
-  let second: string;
-
-  if (explicitParts.length >= 2) {
-    first = explicitParts[0]!;
-    second = explicitParts.slice(1).join(" ");
-  } else {
-    const single = explicitParts[0]!;
-    const sentences = splitIntoSentences(single);
-    if (sentences.length <= 1) {
-      return (
-        <div className="space-y-3.5">
-          <p className={cn(pClass, "text-foreground")}>{single}</p>
-        </div>
-      );
-    }
-    const mid = Math.ceil(sentences.length / 2);
-    first = sentences.slice(0, mid).join(" ");
-    second = sentences.slice(mid).join(" ");
-  }
-
-  if (!second.trim()) {
-    return (
-      <div className="space-y-3.5">
-        <p className={cn(pClass, "text-foreground")}>{first}</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-3.5">
-      <p className={cn(pClass, "text-foreground")}>{first}</p>
-      <p className={cn(pClass, "text-foreground/90 dark:text-foreground/85")}>{second}</p>
-    </div>
-  );
+  return <ReportProseBlocks text={text} size={size} collapseToTwoParagraphs />;
 }
 
 function withSnapshotParams(src?: string, params?: Record<string, string | number | undefined>): string | undefined {
@@ -1249,7 +1219,7 @@ function ChannelCard({ channel }: { channel: DigitalChannel }) {
     CHANNEL_PRIORITY_TAB_SURFACE[channel.priority] || CHANNEL_PRIORITY_TAB_SURFACE.Média;
   const priorityBadgeLabelText = channelPriorityBadgeLabel(channel.priority);
   return (
-    <div className="relative pt-1">
+    <div className="relative flex h-full min-h-0 flex-col pt-1 md:self-stretch">
       {/*
         Aba fora do BorderGlow (z-0): o glow pinta por cima da borda do frame — o selo fica
         “por trás” da moldura, igual visual mobile/desktop.
@@ -1276,11 +1246,13 @@ function ChannelCard({ channel }: { channel: DigitalChannel }) {
         fillOpacity={0.35}
         contentInset={2}
         restingBorderColor={restingBorder}
-        className={cn("relative z-10 rounded-lg md:overflow-hidden max-md:overflow-visible")}
+        className={cn(
+          "relative z-10 min-h-0 flex-1 rounded-lg md:overflow-hidden max-md:overflow-visible md:h-full md:min-h-0",
+        )}
       >
         <div
           className={cn(
-            "overflow-visible space-y-3 rounded-lg px-5 py-5 sm:px-7 sm:py-5",
+            "flex min-h-0 flex-1 flex-col overflow-visible space-y-3 rounded-lg px-5 py-5 sm:px-7 sm:py-5",
             ROTA_REPORT_SURFACE_GLOW_INNER,
           )}
         >
@@ -1291,7 +1263,7 @@ function ChannelCard({ channel }: { channel: DigitalChannel }) {
               </span>
             </h4>
           </div>
-          <ReportProseBlocks text={channel.description} size="sm" sentencesPerBlock={1} />
+          <ReportProseBlocks text={channel.description} size="sm" collapseToTwoParagraphs />
           {channel.actions.length > 0 && (
             <ul className="space-y-2.5">
               {channel.actions.map((action, i) => (
@@ -2021,7 +1993,7 @@ export function RotaDigitalReportView({
               <ReportProseBlocks
                 text={report.brief?.servicesOffered?.trim() ? report.brief.servicesOffered : "—"}
                 size="sm"
-                sentencesPerBlock={2}
+                collapseToTwoParagraphs
                 firstProminent={false}
               />
             </div>
@@ -2030,7 +2002,7 @@ export function RotaDigitalReportView({
               <ReportProseBlocks
                 text={report.brief?.objective?.trim() ? report.brief.objective : "—"}
                 size="sm"
-                sentencesPerBlock={2}
+                collapseToTwoParagraphs
                 firstProminent={false}
               />
             </div>
@@ -2080,7 +2052,7 @@ export function RotaDigitalReportView({
                           {item.score}/10
                         </Badge>
                       </div>
-                      <ReportProseBlocks text={item.comment} size="md" sentencesPerBlock={1} />
+                      <ReportProseBlocks text={item.comment} size="md" collapseToTwoParagraphs />
                     </div>
                   </div>
                 </div>
@@ -2273,7 +2245,7 @@ export function RotaDigitalReportView({
                           key={i}
                           text={paragraph}
                           size="sm"
-                          sentencesPerBlock={2}
+                          collapseToTwoParagraphs
                           firstProminent={false}
                         />
                       ))}
@@ -2466,7 +2438,7 @@ export function RotaDigitalReportView({
           </div>
         </CardHeader>
         <CardContent className="overflow-visible">
-          <div className="grid grid-cols-1 gap-10 md:grid-cols-2 md:gap-5">
+          <div className="grid grid-cols-1 gap-10 md:auto-rows-fr md:grid-cols-2 md:items-stretch md:gap-5">
             {sortedChannels.map((channel, i) => (
               <ChannelCard key={i} channel={channel} />
             ))}
