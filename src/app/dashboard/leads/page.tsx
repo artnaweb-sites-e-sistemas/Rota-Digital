@@ -47,6 +47,7 @@ import {
   Phone,
   Plus,
   Search,
+  Sparkles,
   Users,
 } from "lucide-react";
 import Link from "next/link";
@@ -135,6 +136,10 @@ const TABLE_EXTERNAL_LINK_CHIP_CLASS =
 const TABLE_PUBLIC_ROUTE_CHIP_CLASS =
   "inline-flex size-[22px] shrink-0 items-center justify-center rounded-md border border-brand/30 bg-brand/10 text-brand transition-colors hover:border-brand/50 hover:bg-brand/18 hover:text-brand focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand/40 focus-visible:ring-offset-1 focus-visible:ring-offset-background dark:border-brand/40 dark:bg-brand/15 dark:text-brand dark:hover:border-brand/50 dark:hover:bg-brand/22";
 
+/** Chip “gerar rota” — tom âmbar, distinto do link externo (ícone Sparkles). */
+const TABLE_CREATE_ROUTE_CHIP_CLASS =
+  "inline-flex size-[22px] shrink-0 items-center justify-center rounded-md border border-amber-500/35 bg-amber-500/10 text-amber-800 transition-colors hover:border-amber-500/55 hover:bg-amber-500/18 hover:text-amber-950 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500/40 focus-visible:ring-offset-1 focus-visible:ring-offset-background dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200 dark:hover:border-amber-300/45 dark:hover:bg-amber-400/16 dark:hover:text-amber-50";
+
 function LeadTableSharedRouteLink({
   lead,
   rowHasRoute,
@@ -144,6 +149,24 @@ function LeadTableSharedRouteLink({
   rowHasRoute: boolean;
   publicSlugByReportId: Map<string, string>;
 }) {
+  const canOpenNewRotaForm =
+    lead.status === "Novo Lead" && !rowHasRoute;
+
+  if (canOpenNewRotaForm) {
+    const href = `/dashboard/rotas/new?leadId=${encodeURIComponent(lead.id)}`;
+    return (
+      <Link
+        href={href}
+        className={TABLE_CREATE_ROUTE_CHIP_CLASS}
+        aria-label={`Gerar rota digital para ${lead.name}`}
+        title="Gerar rota para este lead (abre o formulário com o lead já selecionado)"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <Sparkles className="size-3 shrink-0" aria-hidden />
+      </Link>
+    );
+  }
+
   if (!rowHasRoute || lead.status !== "Rota Gerada" || !lead.reportId) {
     return null;
   }
