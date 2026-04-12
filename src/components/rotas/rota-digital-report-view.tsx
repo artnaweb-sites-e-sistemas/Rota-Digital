@@ -110,9 +110,24 @@ const CHANNEL_ACTION_ICON_SHELL: Record<string, string> = {
     "border-[color:var(--rota-sev-c-border)]/35 bg-[color:var(--rota-sev-c-bar)]/10 text-[color:var(--rota-sev-c-fg)] ring-[color:var(--rota-sev-c-border)]/25 dark:text-[color:var(--rota-sev-c-fg-dark)] dark:ring-[color:var(--rota-sev-c-border)]/20",
 };
 
-/** Pill “WEBSITE” / “Instagram” nas evidências — ouro da marca (alinhado ao resto do UI). */
-const TOPIC_PILL_CLASS =
+/** Pill genérica (diagnóstico / canais sem estilo próprio). */
+const TOPIC_PILL_BRAND =
   "inline-flex max-w-full items-center gap-1.5 rounded-full border border-brand/35 bg-brand/[0.11] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide leading-none text-brand dark:border-brand/45 dark:bg-brand/15 dark:text-brand";
+
+/** Pill “Website” — lavagem azul muito suave + borda discreta (evidências). */
+const TOPIC_PILL_WEBSITE =
+  "inline-flex max-w-full items-center gap-1.5 rounded-full border border-sky-300/50 bg-gradient-to-r from-sky-500/[0.08] via-blue-500/[0.07] to-indigo-500/[0.08] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide leading-none text-foreground dark:border-sky-500/30 dark:from-sky-400/[0.12] dark:via-blue-500/[0.10] dark:to-indigo-500/[0.11]";
+
+/** Pill “Instagram” — lavagem rosa/roxo suave + borda discreta (evidências). */
+const TOPIC_PILL_INSTAGRAM =
+  "inline-flex max-w-full items-center gap-1.5 rounded-full border border-pink-300/45 bg-gradient-to-r from-fuchsia-500/[0.07] via-rose-500/[0.08] to-amber-500/[0.07] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide leading-none text-foreground dark:border-pink-500/28 dark:from-fuchsia-500/[0.11] dark:via-rose-500/[0.10] dark:to-amber-500/[0.09]";
+
+function channelCardPillClass(channelName: string): string {
+  const n = channelName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  if (n.includes("instagram")) return TOPIC_PILL_INSTAGRAM;
+  if (n.includes("website") || n === "site" || n.startsWith("site ")) return TOPIC_PILL_WEBSITE;
+  return TOPIC_PILL_BRAND;
+}
 
 /** Rótulo ao lado de ícone na pill — desce o texto para alinhar ao centro óptico do glifo. */
 const TOPIC_PILL_LABEL_NEXT_TO_ICON = "translate-y-0.5";
@@ -1092,7 +1107,7 @@ function formatDiagnosticTopicPillLabel(topic: string): string {
 function DiagnosticTopicPill({ topic }: { topic: string }) {
   const { Icon, iconClass } = getDiagnosticTopicPillVisual(topic);
   return (
-    <div className={TOPIC_PILL_CLASS}>
+    <div className={TOPIC_PILL_BRAND}>
       <Icon className={cn("size-3.5 shrink-0 stroke-[1.75]", iconClass)} aria-hidden />
       <span className={TOPIC_PILL_LABEL_NEXT_TO_ICON}>{formatDiagnosticTopicPillLabel(topic)}</span>
     </div>
@@ -1259,7 +1274,7 @@ function ChannelCard({ channel }: { channel: DigitalChannel }) {
         >
           <div className="flex items-start gap-2 pb-1">
             <h4 className="m-0 min-w-0 flex-1 font-normal leading-none" title={channel.name}>
-              <span className={TOPIC_PILL_CLASS}>
+              <span className={channelCardPillClass(channel.name)}>
                 <span className="truncate">{channel.name}</span>
               </span>
             </h4>
@@ -2202,8 +2217,8 @@ export function RotaDigitalReportView({
                         ROTA_REPORT_SURFACE_GLOW_INNER,
                       )}
                     >
-                      <div className={cn("mb-5", TOPIC_PILL_CLASS)}>
-                        <Globe className="size-3.5 shrink-0 stroke-[1.75] text-brand" aria-hidden />
+                      <div className={cn("mb-5", TOPIC_PILL_WEBSITE)}>
+                        <Globe className="size-3.5 shrink-0 stroke-[1.75] text-sky-600 dark:text-sky-400" aria-hidden />
                         <span className={TOPIC_PILL_LABEL_NEXT_TO_ICON}>Website</span>
                       </div>
                       <EvidenceResearchNoteProse
@@ -2235,8 +2250,8 @@ export function RotaDigitalReportView({
                         ROTA_REPORT_SURFACE_GLOW_INNER,
                       )}
                     >
-                      <div className={cn("mb-5", TOPIC_PILL_CLASS)}>
-                        <InstagramBrandGlyph className="size-3.5 text-brand" aria-hidden />
+                      <div className={cn("mb-5", TOPIC_PILL_INSTAGRAM)}>
+                        <InstagramBrandGlyph className="size-3.5 text-pink-600 dark:text-pink-400" aria-hidden />
                         <span className={TOPIC_PILL_LABEL_NEXT_TO_ICON}>Instagram</span>
                       </div>
                       <EvidenceResearchNoteProse text={normalizedInstagramNote} size="md" />
