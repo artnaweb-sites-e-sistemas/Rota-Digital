@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Calendar, X } from "lucide-react";
 
@@ -14,8 +14,6 @@ const SCROLL_ROOT_ID = "rota-report-scroll-root";
 const BOTTOM_CTA_ID = "report-chamada-acao";
 /** Card “Diagnóstico por tópico” em `rota-digital-report-view.tsx`. */
 const DIAGNOSTIC_SECTION_ID = "report-section-diagnostico-topicos";
-const STORAGE_PREFIX = "rota-public-floating-cta-dismiss";
-
 /** Fallback se o relatório não tiver bloco de diagnóstico: rolagem mínima (px). */
 const ENGAGE_SCROLL_FALLBACK_PX = 200;
 /** Só faz sentido se a página for claramente rolável. */
@@ -23,44 +21,20 @@ const MIN_SCROLLABLE_GAP_PX = 120;
 
 type BottomCta = ResolvedReportCta["bottom"];
 
-function storageDismissKey(slugOrId: string) {
-  return `${STORAGE_PREFIX}:${slugOrId}`;
-}
-
 /**
  * CTA flutuante no relatório (página pública e pré-visualização no dashboard): aparece quando o scroll
  * chega ao **fim** da seção “Diagnóstico por tópico” (base do card alinha com a borda inferior do main;
  * fallback por rolagem se essa seção não existir),
  * some quando o CTA principal do fim entra na tela (evita duplicar) e pode ser fechado
- * (lembrado na sessão). Animações com spring + AnimatePresence (motion).
+ * (só nesta visita à página; recarregar mostra de novo se as condições se cumprirem). Animações com spring + AnimatePresence (motion).
  */
-export function PublicReportFloatingCta({
-  bottomCta,
-  storageKey,
-}: {
-  bottomCta: BottomCta;
-  storageKey: string;
-}) {
+export function PublicReportFloatingCta({ bottomCta }: { bottomCta: BottomCta }) {
   const [dismissed, setDismissed] = useState(false);
   const [engaged, setEngaged] = useState(false);
   const [bottomCtaVisible, setBottomCtaVisible] = useState(false);
   const scrollRootRef = useRef<HTMLElement | null>(null);
   const reducedMotionPref = useReducedMotion();
   const reduceMotion = reducedMotionPref === true;
-
-  const dismissStorageKey = useMemo(
-    () => storageDismissKey(storageKey.trim() || "default"),
-    [storageKey],
-  );
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      if (sessionStorage.getItem(dismissStorageKey) === "1") setDismissed(true);
-    } catch {
-      /* private mode */
-    }
-  }, [dismissStorageKey]);
 
   const bindScrollRoot = useCallback(() => {
     scrollRootRef.current = document.getElementById(SCROLL_ROOT_ID) as HTMLElement | null;
@@ -130,11 +104,6 @@ export function PublicReportFloatingCta({
 
   const handleDismiss = () => {
     setDismissed(true);
-    try {
-      sessionStorage.setItem(dismissStorageKey, "1");
-    } catch {
-      /* ignore */
-    }
   };
 
   /** Spring suave (entrada/saída); curva ease no modo reduzido — alinhado a padrões de UI motion. */
@@ -166,9 +135,10 @@ export function PublicReportFloatingCta({
           >
             <div
               className={cn(
-                "relative flex flex-col gap-2.5 rounded-2xl border px-3.5 py-3 shadow-2xl backdrop-blur-md",
-                /* Modo claro da página → cartão escuro (destaque). */
-                "border-zinc-700/90 bg-zinc-900/95 text-zinc-50 ring-1 ring-white/10",
+                "relative flex flex-col gap-2.5 rounded-2xl border px-3.5 py-3 backdrop-blur-md",
+                /* Modo claro: zinc escuro + fio dourado discreto (sem “tinta” âmbar no fundo). */
+                "border-zinc-800/90 bg-zinc-950/96 text-zinc-50 ring-1 ring-yellow-400/14",
+                "shadow-[0_22px_48px_-14px_rgba(0,0,0,0.42),inset_0_1px_0_0_rgba(253,230,138,0.11)]",
                 /* Modo escuro da página → cartão claro (destaque). */
                 "dark:border-zinc-200/90 dark:bg-white/95 dark:text-zinc-900 dark:shadow-[0_20px_50px_-12px_rgba(0,0,0,0.45)] dark:ring-1 dark:ring-black/[0.08]",
               )}
@@ -181,7 +151,7 @@ export function PublicReportFloatingCta({
                   "absolute right-2 top-2 inline-flex size-8 items-center justify-center rounded-full",
                   "text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-100",
                   "dark:text-zinc-500 dark:hover:bg-zinc-100 dark:hover:text-zinc-900",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900 dark:focus-visible:ring-offset-white",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 dark:focus-visible:ring-offset-white",
                 )}
                 aria-label="Fechar este convite"
               >

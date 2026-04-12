@@ -2610,10 +2610,7 @@ export function RotaDigitalReportView({
         <span className="mt-1 block">{reportCreatedAtLine2}</span>
       </div>
 
-      <PublicReportFloatingCta
-        bottomCta={reportCta.bottom}
-        storageKey={report.publicSlug?.trim() || report.id}
-      />
+      <PublicReportFloatingCta bottomCta={reportCta.bottom} />
     </div>
   );
 }
