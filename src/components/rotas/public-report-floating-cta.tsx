@@ -28,8 +28,9 @@ function storageDismissKey(slugOrId: string) {
 }
 
 /**
- * CTA flutuante no relatório (página pública e pré-visualização no dashboard): aparece só depois
- * que o scroll passa da seção “Diagnóstico por tópico” (fallback por rolagem se essa seção não existir),
+ * CTA flutuante no relatório (página pública e pré-visualização no dashboard): aparece quando o scroll
+ * chega ao **fim** da seção “Diagnóstico por tópico” (base do card alinha com a borda inferior do main;
+ * fallback por rolagem se essa seção não existir),
  * some quando o CTA principal do fim entra na tela (evita duplicar) e pode ser fechado
  * (lembrado na sessão). Animações com spring + AnimatePresence (motion).
  */
@@ -85,8 +86,9 @@ export function PublicReportFloatingCta({
 
     const rootRect = root.getBoundingClientRect();
     const elRect = diagnosticEl.getBoundingClientRect();
-    const passedDiagnosticSection = elRect.bottom <= rootRect.top + 0.5;
-    setEngaged(passedDiagnosticSection);
+    /** Base do card de diagnóstico atingiu ou passou da borda de baixo da área visível = fim da seção. */
+    const reachedEndOfDiagnosticSection = elRect.bottom <= rootRect.bottom + 0.5;
+    setEngaged(reachedEndOfDiagnosticSection);
   }, [bindScrollRoot]);
 
   useEffect(() => {
@@ -187,7 +189,7 @@ export function PublicReportFloatingCta({
                   Ficou com dúvida sobre os próximos passos?
                 </p>
                 <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground sm:text-[13px]">
-                  Posso explicar como colocar o plano em prática no seu ritmo.
+                  Posso explicar como colocar o plano em prática.
                 </p>
               </div>
 
