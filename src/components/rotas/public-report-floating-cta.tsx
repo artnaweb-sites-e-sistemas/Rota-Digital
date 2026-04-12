@@ -166,8 +166,11 @@ export function PublicReportFloatingCta({
           >
             <div
               className={cn(
-                "relative flex flex-col gap-2.5 rounded-2xl border border-border/90 bg-card/92 px-3.5 py-3 shadow-xl ring-1 ring-foreground/[0.06] backdrop-blur-md",
-                "dark:border-white/12 dark:bg-zinc-950/90 dark:ring-white/[0.08]",
+                "relative flex flex-col gap-2.5 rounded-2xl border px-3.5 py-3 shadow-2xl backdrop-blur-md",
+                /* Modo claro da página → cartão escuro (destaque). */
+                "border-zinc-700/90 bg-zinc-900/95 text-zinc-50 ring-1 ring-white/10",
+                /* Modo escuro da página → cartão claro (destaque). */
+                "dark:border-zinc-200/90 dark:bg-white/95 dark:text-zinc-900 dark:shadow-[0_20px_50px_-12px_rgba(0,0,0,0.45)] dark:ring-1 dark:ring-black/[0.08]",
               )}
             >
               <button
@@ -176,8 +179,9 @@ export function PublicReportFloatingCta({
                 onClick={handleDismiss}
                 className={cn(
                   "absolute right-2 top-2 inline-flex size-8 items-center justify-center rounded-full",
-                  "text-muted-foreground transition-colors hover:bg-muted/80 hover:text-foreground",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50",
+                  "text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-100",
+                  "dark:text-zinc-500 dark:hover:bg-zinc-100 dark:hover:text-zinc-900",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900 dark:focus-visible:ring-offset-white",
                 )}
                 aria-label="Fechar este convite"
               >
@@ -185,10 +189,10 @@ export function PublicReportFloatingCta({
               </button>
 
               <div className="pr-8">
-                <p className="text-[13px] font-medium leading-snug text-foreground sm:text-sm">
+                <p className="text-[13px] font-medium leading-snug text-zinc-50 dark:text-zinc-900 sm:text-sm">
                   Ficou com dúvida sobre os próximos passos?
                 </p>
-                <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground sm:text-[13px]">
+                <p className="mt-0.5 text-[12px] leading-relaxed text-zinc-400 dark:text-zinc-600 sm:text-[13px]">
                   Posso explicar como colocar o plano em prática.
                 </p>
               </div>
