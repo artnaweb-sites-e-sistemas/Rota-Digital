@@ -126,7 +126,7 @@ Tom por campo:
 - "strengths", "weaknesses", "opportunities", "quickWins", "longTermActions", "nextSteps": itens curtos e objetivos.
 - "recommendedChannels.description": **exatamente 2 parágrafos curtos** com \\n\\n; meta total ~380–560 caracteres; comercial, com detalhe deste caso (evite genérico).
 - "recommendedChannels.actions": ações práticas e diretas.
-- "diagnosticScores.comment": **exatamente 2 parágrafos curtos** com \\n\\n; meta total ~480–720 caracteres. Se a nota for < 10, o que falta para 10/10 **no máximo uma vez** no comentário. Cada tópico: ângulo novo (não repetir o mesmo contraste em todos).
+- "diagnosticScores.comment": **exatamente 2 parágrafos curtos** com \\n\\n; meta **total ~240–400 caracteres** (teto rígido ~400); **no máximo 2 frases curtas por parágrafo**; 1º = fato/evidência do tópico; 2º = uma prioridade ou passo claro. Sem clichês nem repetir o mesmo contraste em todos. Se a nota for < 10, o que falta para 10/10 **no máximo uma vez**.
 - Nunca escreva frases vagas como "há espaço para melhorar" ou "há espaço para otimizações técnicas" sem explicar exatamente o que deve ser feito.
 - Em "Identidade Visual", comente harmonia visual, paleta, contraste, hierarquia, espaçamento, alinhamento, legibilidade e coerência entre site e Instagram.
 - "websiteResearchNote" e "instagramResearchNote": **exatamente 2 parágrafos curtos cada** (\\n\\n); meta total ~520–780 caracteres por campo; em Instagram não comece com seguidores/posts e não transcreva a bio entre aspas — sintetize.
@@ -157,7 +157,7 @@ Retorne SOMENTE um JSON válido com os campos atualizados:
     {
       "topic": "string",
       "score": number,
-      "comment": "string",
+      "comment": "string — 2 parágrafos \\n\\n; total ≤400 caracteres; denso e específico",
       "evidenceTitle": "string",
       "evidenceImageUrl": "string",
       "evidenceNote": "string"

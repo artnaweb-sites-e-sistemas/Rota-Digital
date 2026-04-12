@@ -1427,32 +1427,60 @@ function buildDiagnosticImprovementText(
     finalLink.includes("wa.link/");
 
   if (lower.includes("identidade visual")) {
-    return "Para chegar a 10/10, vale ajustar com mais cuidado hierarquia visual, contraste entre blocos, respiro entre seções, alinhamento dos elementos e consistência entre a estética do site e do Instagram.";
+    return "Para 10/10: hierarquia, contraste, respiro e coerência visual entre site e Instagram.";
   }
   if (lower.includes("presença")) {
-    const websitePart = technicalHints.length
-      ? `No site, os principais ajustes técnicos são: ${technicalHints.slice(0, 3).join(", ")}.`
-      : "No site, vale melhorar SEO básico, distribuição de CTAs e pontos de prova social.";
+    const hintStr = technicalHints.slice(0, 2).join(", ");
+    const websitePart = hintStr ? `Site: ${hintStr}.` : "Site: CTAs, SEO básico e prova social.";
     const funnelPart = hasWhatsappLink
-      ? "Também vale amarrar melhor a jornada entre Instagram, site e WhatsApp para a conversão ficar mais fluida."
-      : "Também vale amarrar melhor a jornada entre Instagram e site para a conversão ficar mais fluida.";
-    return `Para chegar a 10/10, ${websitePart} ${funnelPart}`;
+      ? " Ligar Instagram → site → WhatsApp na jornada."
+      : " Ligar Instagram e site na jornada.";
+    return `Para 10/10: ${websitePart}${funnelPart}`.replace(/\s+/g, " ").trim();
   }
   if (lower.includes("funil") || lower.includes("cta")) {
     return hasWhatsappLink
-      ? "Para chegar a 10/10, os CTAs precisam deixar mais claro o próximo passo, reduzir fricção entre conteúdo e WhatsApp e mostrar melhor o que acontece depois do clique."
-      : "Para chegar a 10/10, os CTAs precisam ficar mais claros, mais visíveis e mais conectados com a próxima etapa de conversão.";
+      ? "Para 10/10: CTAs mais claros, menos fricção até o WhatsApp e expectativa pós-clique explícita."
+      : "Para 10/10: CTAs mais claros, visíveis e ligados à próxima etapa de conversão.";
   }
   if (lower.includes("clareza da proposta")) {
-    return "Para chegar a 10/10, a proposta precisa aparecer ainda mais rápido no primeiro bloco, com benefício principal, diferenciais e CTA no mesmo fluxo visual.";
+    return "Para 10/10: benefício e diferencial no primeiro bloco, com CTA no mesmo fluxo visual.";
   }
   if (lower.includes("consist")) {
-    return "Para chegar a 10/10, vale alinhar ainda mais o tom de voz, os gatilhos de confiança, os destaques e a promessa principal entre site e Instagram.";
+    return "Para 10/10: alinhar tom, promessa e destaques entre site e Instagram.";
   }
   if (lower.includes("posicionamento")) {
-    return "Para chegar a 10/10, vale deixar o diferencial principal ainda mais explícito, repetir essa mensagem nos pontos nobres da página e conectar melhor a promessa com a oferta.";
+    return "Para 10/10: diferencial explícito nos pontos nobres e promessa ligada à oferta.";
   }
-  return "Para chegar a 10/10, vale deixar mais claro o que está funcionando, corrigir os pontos de atrito e transformar essa percepção em ação prática no site e no Instagram.";
+  return "Para 10/10: evidenciar o que funciona, corrigir atritos e traduzir em ação no site e no Instagram.";
+}
+
+const DIAGNOSTIC_COMMENT_MAX_CHARS = 430;
+
+/** Garante teto de caracteres sem partir no meio de uma palavra quando possível. */
+function clampDiagnosticComment(raw: string, maxChars: number): string {
+  let s = raw.replace(/\r\n/g, "\n").trim();
+  if (s.length <= maxChars) return s;
+  const paras = s
+    .split(/\n{2,}/)
+    .map((p) => p.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+  if (paras.length >= 2) {
+    const first = paras[0]!;
+    let second = paras.slice(1).join(" ");
+    const sep = "\n\n";
+    const maxSecond = maxChars - first.length - sep.length;
+    if (maxSecond >= 28) {
+      if (second.length > maxSecond) {
+        second = second.slice(0, maxSecond).replace(/\s+\S*$/, "").trim();
+        if (second && !/[.!?…]$/.test(second)) second += "…";
+      }
+      const out = `${first}${sep}${second}`;
+      if (out.length <= maxChars) return out;
+    }
+  }
+  const single = s.replace(/\n+/g, " ").replace(/\s+/g, " ").trim();
+  if (single.length <= maxChars) return single;
+  return `${single.slice(0, Math.max(1, maxChars - 1)).replace(/\s+\S*$/, "").trim()}…`;
 }
 
 function ensureDiagnosticCommentActionability(
@@ -1469,16 +1497,16 @@ function ensureDiagnosticCommentActionability(
   );
 
   if (!comment) {
-    return { ...item, comment: improvement };
+    return { ...item, comment: clampDiagnosticComment(improvement, DIAGNOSTIC_COMMENT_MAX_CHARS) };
   }
 
-  if (/para chegar a 10\/10|para ficar 10\/10|para melhorar|o que falta|vale ajustar|precisa/i.test(comment)) {
-    return item;
+  if (/para chegar a 10\/10|para 10\/10|para ficar 10\/10|para melhorar|o que falta|vale ajustar|precisa/i.test(comment)) {
+    return { ...item, comment: clampDiagnosticComment(comment, DIAGNOSTIC_COMMENT_MAX_CHARS) };
   }
 
   return {
     ...item,
-    comment: `${comment} ${improvement}`.trim(),
+    comment: clampDiagnosticComment(`${comment} ${improvement}`.trim(), DIAGNOSTIC_COMMENT_MAX_CHARS),
   };
 }
 
@@ -1628,7 +1656,7 @@ ${buildReportCopyVoicePromptSection()}
 1.15) Se "Imagem do website enviada ao modelo" = "sim" **ou** "Snapshot do site disponível no relatório" = "sim", é **proibido** concluir que o site estava "inacessível", "somente tela de carregamento do WordPress" ou "impossível avaliar conteúdo/UX" **só** por causa do HTML/título/H1 da coleta automática (incluindo quando a linha "HTML automático… shell/carregamento" = "sim"). Nesse caso, descreva o que a CAPTURA 1 (ou a captura nas evidências) mostra e avalie estrutura, mensagem e conversão com base nisso.
 1.16) A política de canais da agência (lista restrita) define **apenas** quais nomes entram em "recommendedChannels" e o foco comercial — **não** significa ignorar o site do lead, a CAPTURA 1 nem as notas de website quando o URL existir e houver captura.
 2) Avalie pontos com nota 0-10: posicionamento, identidade visual, clareza da proposta, consistência da comunicação, funil/CTA, presença digital geral.
-2.1) Em cada item de "diagnosticScores" com nota < 10, diga com critérios concretos o que falta evoluir (sem frases vazias). A orientação para a nota máxima entra **uma única vez** no comentário — ver regra de "diagnosticScores.comment" abaixo.
+2.1) Em cada item de "diagnosticScores" com nota < 10, diga com critérios concretos o que falta evoluir (sem frases vazias). A orientação para a nota máxima entra **uma única vez** no comentário — ver regra de "diagnosticScores.comment" abaixo. **Densidade:** comentários curtos, mas cada frase deve carregar dado verificável ou uma ação clara — nada de enrolação nem parágrafos longos só para “parecer análise”.
 2.2) Nunca use frases vagas como "há espaço para melhorar" ou "há espaço para otimizações técnicas" sem explicar exatamente o que deve ser ajustado.
 2.3) Em "Identidade Visual", analise harmonia visual, paleta, contraste, hierarquia, espaçamento, alinhamento, legibilidade e coerência entre site e Instagram.
 3) Faça comentários práticos e acionáveis.
@@ -1641,7 +1669,7 @@ ${buildReportCopyVoicePromptSection()}
 - "strengths", "weaknesses", "opportunities", "quickWins", "longTermActions", "nextSteps": itens curtos, diretos e fáceis de entender. Evite frases longas.
 - "recommendedChannels.description": **exatamente 2 parágrafos curtos** com \\n\\n; linguagem comercial simples. Meta **total ~380–560 caracteres**: 1º = por que o canal faz sentido **neste** caso (detalhe concreto); 2º = ângulo complementar (ex.: público ou prioridade). Sem frase genérica vazia.
 - "recommendedChannels.actions": ações práticas, em tom de orientação direta.
-- "diagnosticScores.comment": **exatamente 2 parágrafos curtos** com \\n\\n; meta **total ~480–720 caracteres** (objetivo, sem texto longo). 1º = o que foi observado (específico); 2º = prioridade ou próximo passo. Se a nota for < 10, o que falta para 10/10 **no máximo uma vez** no comentário inteiro. Cada tópico deve trazer um ângulo novo — não repita o mesmo contraste Instagram vs site em todos.
+- "diagnosticScores.comment": **exatamente 2 parágrafos curtos** com \\n\\n; meta **total ~240–400 caracteres** (cerca da metade do que seria um texto longo — **obrigatório** ficar dentro do teto). **No máximo 2 frases curtas por parágrafo.** 1º = leitura objetiva do tópico com **fato ou evidência concreta**; 2º = **uma** prioridade ou próximo passo mensurável. Proibido preencher com adjetivos genéricos, clichês ou contraste repetido (ex.: Instagram bom / site ruim) em todos os tópicos. Se a nota for < 10, o que falta para 10/10 **no máximo uma vez** no comentário inteiro.
 - "websiteResearchNote" e "instagramResearchNote": **sempre exatamente 2 parágrafos curtos cada** (\\n\\n), como na regra 1.3.
 
 **REGRA ABSOLUTA: NUNCA INVENTE INFORMAÇÃO**
@@ -1702,7 +1730,7 @@ Responda **somente** com um único objeto JSON válido (sem markdown fora do JSO
   "estimatedTimelineMonths": number,
   "nextSteps": ["string"],
   "diagnosticScores": [
-    { "topic": "Posicionamento", "score": number, "comment": "string — exatamente 2 parágrafos curtos com \\n\\n; total preferencialmente ≤720 caracteres" }
+    { "topic": "Posicionamento", "score": number, "comment": "string — 2 parágrafos com \\n\\n; total preferencialmente ≤400 caracteres; máx. 2 frases curtas por parágrafo" }
   ],
   "websiteResearchNote": "string — exatamente 2 parágrafos com \\n\\n; total ~520–780 caracteres; sem repetir métricas das evidências",
   "instagramResearchNote": "string — exatamente 2 parágrafos com \\n\\n; não começar com seguidores/posts; sem bio entre aspas; síntese",
@@ -2050,7 +2078,7 @@ export async function POST(req: NextRequest) {
           ...item,
           score: Math.min(item.score, 3),
           comment:
-            "Não foi possível analisar visualmente o Instagram porque a captura real não ficou disponível. Recomendado recapturar para uma nota precisa.",
+            "Sem captura real do Instagram nesta execução, não dá para avaliar o visual com precisão.\n\nRecapture o perfil para pontuar com segurança.",
           evidenceImageUrl: undefined,
           evidenceNote: "Sem captura visual real de Instagram nesta execução.",
         };
@@ -2060,7 +2088,7 @@ export async function POST(req: NextRequest) {
           ...item,
           score: Math.min(item.score, 3),
           comment:
-            "Não foi possível analisar visualmente o website porque a captura real não ficou disponível. Recomendado recapturar para uma nota precisa.",
+            "Sem captura real do site nesta execução, não dá para avaliar layout e conversão com precisão.\n\nRecapture a home para pontuar com segurança.",
           evidenceImageUrl: undefined,
           evidenceNote: "Sem captura visual real de website nesta execução.",
         };
