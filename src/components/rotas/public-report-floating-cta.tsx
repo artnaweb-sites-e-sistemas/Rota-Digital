@@ -161,7 +161,7 @@ export function PublicReportFloatingCta({
             animate={reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
             exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 16, scale: 0.97 }}
             transition={panelTransition}
-            className="pointer-events-auto w-full max-w-md origin-bottom"
+            className="pointer-events-auto w-full max-md:max-w-sm md:max-w-md origin-bottom"
             style={{ willChange: reduceMotion ? "opacity" : "transform, opacity" }}
           >
             <div
