@@ -62,24 +62,24 @@ export function CardSpotlight({ className, children, ...props }: CardSpotlightPr
       <div
         aria-hidden
         className={cn(
-          "pointer-events-none absolute inset-0 z-0 print:hidden transition-opacity duration-500",
-          spotlight.active ? "opacity-100" : "opacity-0",
+          "pointer-events-none absolute inset-0 z-0 print:hidden transition-opacity duration-[900ms] ease-out",
+          spotlight.active ? "opacity-[0.65]" : "opacity-0",
         )}
         style={{
           background: `
             radial-gradient(
-              650px circle at ${spotlight.x}px ${spotlight.y}px,
-              rgba(142, 125, 77, 0.16),
-              rgba(196, 178, 122, 0.07) 28%,
-              rgba(92, 82, 53, 0.04) 52%,
-              transparent 82%
+              420px circle at ${spotlight.x}px ${spotlight.y}px,
+              color-mix(in srgb, var(--brand) 5%, transparent) 0%,
+              color-mix(in srgb, var(--brand) 2%, transparent) 42%,
+              color-mix(in srgb, var(--brand) 0.7%, transparent) 58%,
+              transparent 72%
             )
           `,
         }}
       />
-      {/* Camada de ruído/textura sutil para profundidade profissional */}
-      <div 
-        className="pointer-events-none absolute inset-0 z-0 opacity-[0.03] mix-blend-overlay"
+      {/* Camada de ruído quase imperceptível */}
+      <div
+        className="pointer-events-none absolute inset-0 z-0 opacity-[0.01] mix-blend-overlay"
         style={{ 
           backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` 
         }}

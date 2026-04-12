@@ -20,6 +20,7 @@ import {
 } from "@/lib/ai-agency-services";
 import { getUserAiPromptSettingsAdmin } from "@/lib/user-settings-admin";
 import { buildReportCopyVoicePromptSection } from "@/lib/report-copy-voice-prompt";
+import { parseModelJson } from "@/lib/model-json-parse";
 
 type GeminiUsageMetadata = {
   promptTokenCount?: number;
@@ -50,22 +51,6 @@ function estimateCostUsdFromUsage(modelName: string, usage?: GeminiUsageMetadata
     (promptTokens / 1_000_000) * pricing.inputUsd +
     (outputTokens / 1_000_000) * pricing.outputUsd;
   return Number.isFinite(estimated) ? Number(estimated.toFixed(8)) : undefined;
-}
-
-function parseModelJson(text: string): Record<string, unknown> {
-  const trimmed = text.trim();
-  try {
-    return JSON.parse(trimmed) as Record<string, unknown>;
-  } catch {
-    const fence = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-    if (fence) return JSON.parse(fence[1].trim()) as Record<string, unknown>;
-    const start = trimmed.indexOf("{");
-    const end = trimmed.lastIndexOf("}");
-    if (start >= 0 && end > start) {
-      return JSON.parse(trimmed.slice(start, end + 1)) as Record<string, unknown>;
-    }
-    throw new Error("Resposta da IA não é um JSON válido.");
-  }
 }
 
 export async function POST(req: NextRequest) {

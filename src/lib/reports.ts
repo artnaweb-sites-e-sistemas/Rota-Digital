@@ -15,6 +15,7 @@ import {
 } from "firebase/firestore";
 import { deleteReportEvidenceForLead } from "./evidence-storage";
 import { db } from "./firebase";
+import { normalizeLeadStatus } from "@/types/lead";
 import { RotaDigitalReport } from "@/types/report";
 
 const REPORTS_COLLECTION = "reports";
@@ -86,10 +87,16 @@ export async function deleteReportAndCleanup(params: {
   try {
     const leadSnap = await getDoc(leadRef);
     if (leadSnap.exists()) {
-      await updateDoc(leadRef, {
+      const data = leadSnap.data();
+      const currentStatus = normalizeLeadStatus(data.status);
+      const payload: Record<string, unknown> = {
         reportId: deleteField(),
         updatedAt: serverTimestamp(),
-      });
+      };
+      if (currentStatus === "Rota Gerada") {
+        payload.status = "Novo Lead";
+      }
+      await updateDoc(leadRef, payload);
     }
   } catch {
     // Não bloqueia a exclusão do relatório se houver regra/permissão no lead.

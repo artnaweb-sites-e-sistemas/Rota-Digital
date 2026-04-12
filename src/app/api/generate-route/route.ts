@@ -34,6 +34,7 @@ import {
   isInstagramLoginWallHtml,
   sanitizeInstagramAssetUrl,
 } from "@/lib/instagram-public-profile";
+import { parseModelJson } from "@/lib/model-json-parse";
 
 export const runtime = "nodejs";
 /** Vercel Pro: até 300s; 180s dá folga para evidências + Gemini + eventual reparo de JSON. */
@@ -172,6 +173,8 @@ type WebsiteEvidence = {
   isDirectoryListing?: boolean;
   isPlaceholder?: boolean;
   isAccessible?: boolean;
+  /** HTML da coleta via fetch pode ser shell SPA/WordPress com pouco texto, enquanto a captura em navegador mostra a página pronta. */
+  htmlTextualLikelyShell?: boolean;
 };
 
 type InstagramEvidence = {
@@ -493,7 +496,7 @@ function buildGenerateContentInput(
   if (options.websiteImagePart) {
     parts.push({
       text:
-        "CAPTURA 1 (Website - página completa): use esta imagem como fonte principal para análise visual do site como um todo, incluindo estrutura da página, paleta, contraste, hierarquia, prova social e clareza de CTA.",
+        "CAPTURA 1 (Website - página completa): use esta imagem como fonte principal para análise visual do site como um todo, incluindo estrutura da página, paleta, contraste, hierarquia, prova social e clareza de CTA. Se o texto do prompt disser que o HTML automático parece shell/carregamento, IGNORE isso para conclusões sobre o que o visitante vê: esta imagem reflete o navegador após renderização.",
     });
     parts.push(options.websiteImagePart);
   }
@@ -788,6 +791,14 @@ async function collectWebsiteEvidence(url?: string): Promise<WebsiteEvidence> {
     const detectedTimeline =
       plain.match(/\b(\d{1,2}\s*(?:a|-)\s*\d{1,2}\s*mes(?:es)?)\b/i)?.[1];
 
+    const plainLen = plain.replace(/\s+/g, " ").trim().length;
+    const headSnippet = `${(title || "").toLowerCase()} ${lower.slice(0, 4000)}`;
+    const titleOrHeadLooksLoading =
+      /carregando|loading\b|loader|aguarde|please\s*wait|wp\s*embed|one\s*moment/i.test(headSnippet);
+    /** Só sinaliza conflito HTML vs navegador quando o fetch parece página de espera, não por ser WordPress em si. */
+    const htmlTextualLikelyShell =
+      titleOrHeadLooksLoading && !(h1 && h1.trim().length > 0) && plainLen < 800;
+
     return {
       url,
       status,
@@ -804,6 +815,7 @@ async function collectWebsiteEvidence(url?: string): Promise<WebsiteEvidence> {
       isDirectoryListing,
       isPlaceholder,
       isAccessible: true,
+      htmlTextualLikelyShell,
     };
   } catch {
     return { url, isAccessible: false };
@@ -1167,75 +1179,67 @@ async function collectInstagramEvidence(url?: string): Promise<InstagramEvidence
   }
 }
 
-function parseModelJson(text: string): Record<string, unknown> {
-  const stripInvalidControlChars = (raw: string): string =>
-    // Remove TODOS os controles ASCII (inclui \n, \r e \t), pois
-    // a IA às vezes injeta esses caracteres dentro de strings JSON.
-    raw.replace(/[\u0000-\u001F]/g, " ");
-
-  const cleanupCommonJsonIssues = (raw: string): string =>
-    stripInvalidControlChars(raw)
-      // Remove vírgulas sobrando antes de fechar objeto/array.
-      .replace(/,\s*([}\]])/g, "$1")
-      // Normaliza aspas “curvas” que podem vir da IA.
-      .replace(/[\u201C\u201D]/g, '"')
-      .replace(/[\u2018\u2019]/g, "'");
-
-  const trimmed = cleanupCommonJsonIssues(text.trim());
-  try {
-    return JSON.parse(trimmed) as Record<string, unknown>;
-  } catch {
-    const fence = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-    if (fence) {
-      return JSON.parse(cleanupCommonJsonIssues(fence[1].trim())) as Record<
-        string,
-        unknown
-      >;
-    }
-    const start = trimmed.indexOf("{");
-    const end = trimmed.lastIndexOf("}");
-    if (start >= 0 && end > start) {
-      return JSON.parse(
-        cleanupCommonJsonIssues(trimmed.slice(start, end + 1))
-      ) as Record<string, unknown>;
-    }
-    throw new Error("Resposta da IA não é um JSON válido.");
-  }
-}
-
 async function repairModelJsonWithGemini(
   genAI: GoogleGenerativeAI,
   rawText: string,
-  candidateModels: string[]
+  candidateModels: string[],
+  parseError?: unknown
 ): Promise<Record<string, unknown>> {
-  const repairPrompt = [
-    "Converta o conteúdo abaixo para um JSON VÁLIDO.",
-    "Regras:",
-    "- Preserve os mesmos campos e valores sempre que possível.",
-    "- Não adicione comentários.",
-    "- Não adicione texto fora do JSON.",
-    "- Retorne apenas um único objeto JSON válido.",
-    "",
-    rawText,
-  ].join("\n");
-  let lastError: unknown = null;
-  for (const modelName of candidateModels) {
-    try {
-      const repairModel = genAI.getGenerativeModel(
-        {
-          model: modelName,
-        },
-        { apiVersion: "v1" }
+  const buildRepairPrompt = (hint: unknown): string => {
+    const lines = [
+      "Converta o conteúdo abaixo para um JSON VÁLIDO.",
+      "Regras:",
+      "- Preserve os mesmos campos e valores sempre que possível.",
+      "- Escape aspas e quebras de linha dentro de strings conforme JSON (\\n, \\\").",
+      "- Não adicione comentários.",
+      "- Não adicione texto fora do JSON.",
+      "- Retorne apenas um único objeto JSON válido.",
+    ];
+    if (hint instanceof Error && hint.message) {
+      lines.push(
+        "",
+        "O parse anterior falhou com esta mensagem — corrija o JSON para eliminar o problema:",
+        hint.message
       );
-      const repaired = await withGeminiCallTimeout(
-        repairModel.generateContent(repairPrompt),
-        GEMINI_JSON_REPAIR_TIMEOUT_MS
-      );
-      return parseModelJson(repaired.response.text());
-    } catch (error) {
-      lastError = error;
+      const posMatch = hint.message.match(/position\s+(\d+)/i);
+      if (posMatch) {
+        const p = Number(posMatch[1]);
+        if (Number.isFinite(p) && p >= 0 && rawText.length > 0) {
+          const from = Math.max(0, p - 450);
+          const to = Math.min(rawText.length, p + 450);
+          lines.push("", "Trecho do texto original próximo ao erro:", rawText.slice(from, to));
+        }
+      }
     }
+    lines.push("", rawText);
+    return lines.join("\n");
+  };
+
+  let hint: unknown = parseError ?? null;
+  let lastError: unknown = null;
+
+  for (let round = 0; round < 2; round++) {
+    const repairPrompt = buildRepairPrompt(hint);
+    for (const modelName of candidateModels) {
+      try {
+        const repairModel = genAI.getGenerativeModel(
+          {
+            model: modelName,
+          },
+          { apiVersion: "v1" }
+        );
+        const repaired = await withGeminiCallTimeout(
+          repairModel.generateContent(repairPrompt),
+          GEMINI_JSON_REPAIR_TIMEOUT_MS
+        );
+        return parseModelJson(repaired.response.text());
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    hint = lastError;
   }
+
   throw new Error(
     `Falha ao reparar JSON com os modelos disponíveis. Último erro: ${
       lastError instanceof Error ? lastError.message : "desconhecido"
@@ -1580,6 +1584,9 @@ ${aiGuidelinesBlock}${channelsPolicyBlock}${servicesFocusBlock}${scoringStrictne
 - Website H1: ${siteEvidence?.h1 || "não encontrado"}
 - Website diretório/listagem: ${siteEvidence?.isDirectoryListing ? "sim" : "não"}
 - Website placeholder: ${siteEvidence?.isPlaceholder ? "sim" : "não"}
+- HTML automático (fetch) parece shell/carregamento ou documento WordPress muito “magro”: ${
+    siteEvidence?.htmlTextualLikelyShell ? "sim" : "não"
+  } (quando "sim", o título/H1 desta lista podem não refletir o que o navegador renderiza; priorize CAPTURA 1 e/ou snapshot do relatório se estiverem disponíveis)
 - Instagram status: ${instaEvidence?.status ?? "não verificado"}
 - Instagram handle: ${instaEvidence?.handle || "não verificado"}
 - Instagram seguidores: ${
@@ -1618,6 +1625,8 @@ ${buildReportCopyVoicePromptSection()}
 1.12) Quando "Imagem do Instagram enviada ao modelo" = "sim", priorize a CAPTURA 2. Quando for "não" mas o snapshot existir no relatório, siga a regra 1.8 (não negue a captura). Só diga "não foi possível analisar visualmente" se **ambos** forem "não" (imagem na IA e snapshot no relatório), ou se a imagem enviada à IA estiver totalmente ilegível (sem conteúdo).
 1.13) NUNCA diga que a captura mostra "tela de login" se houver conteúdo de perfil visível (foto, bio, posts). Um overlay de login por cima de conteúdo de perfil NÃO invalida a análise — extraia o que for possível.
 1.14) Quando a "Captura visual do destino do link da bio" estiver disponível (CAPTURA 3), use essa imagem para avaliar a experiência pós-clique: clareza da proposta, consistência com o Instagram, facilidade de uso e convites para contato na página de destino.
+1.15) Se "Imagem do website enviada ao modelo" = "sim" **ou** "Snapshot do site disponível no relatório" = "sim", é **proibido** concluir que o site estava "inacessível", "somente tela de carregamento do WordPress" ou "impossível avaliar conteúdo/UX" **só** por causa do HTML/título/H1 da coleta automática (incluindo quando a linha "HTML automático… shell/carregamento" = "sim"). Nesse caso, descreva o que a CAPTURA 1 (ou a captura nas evidências) mostra e avalie estrutura, mensagem e conversão com base nisso.
+1.16) A política de canais da agência (lista restrita) define **apenas** quais nomes entram em "recommendedChannels" e o foco comercial — **não** significa ignorar o site do lead, a CAPTURA 1 nem as notas de website quando o URL existir e houver captura.
 2) Avalie pontos com nota 0-10: posicionamento, identidade visual, clareza da proposta, consistência da comunicação, funil/CTA, presença digital geral.
 2.1) Em cada item de "diagnosticScores" com nota < 10, diga com critérios concretos o que falta evoluir (sem frases vazias). A orientação para a nota máxima entra **uma única vez** no comentário — ver regra de "diagnosticScores.comment" abaixo.
 2.2) Nunca use frases vagas como "há espaço para melhorar" ou "há espaço para otimizações técnicas" sem explicar exatamente o que deve ser ajustado.
@@ -1947,7 +1956,12 @@ export async function POST(req: NextRequest) {
       console.warn("[AI_JSON_PARSE] Resposta inválida, tentando reparo automático.", {
         error: parseError instanceof Error ? parseError.message : String(parseError),
       });
-      aiData = await repairModelJsonWithGemini(genAI, responseText, candidateModels);
+      aiData = await repairModelJsonWithGemini(
+        genAI,
+        responseText,
+        candidateModels,
+        parseError
+      );
     }
 
     const proposalRaw =

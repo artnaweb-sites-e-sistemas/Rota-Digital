@@ -5,7 +5,8 @@ import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { Lead, LEAD_STATUSES, normalizeLeadStatus, type LeadStatus } from "@/types/lead";
 import { getLeads, createLead, updateLead, deleteLead } from "@/lib/leads";
-import { deleteReportsByLead } from "@/lib/reports";
+import { deleteReportsByLead, getReportsByUser } from "@/lib/reports";
+import type { RotaDigitalReport } from "@/types/report";
 import { buildWhatsAppHref, maskWhatsappBRDisplay, onlyDigitsPhone } from "@/lib/report-cta";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -20,7 +21,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,10 +29,18 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { isLeadStatusSelectable, leadHasGeneratedRoute } from "@/lib/lead-status-rules";
+import {
+  LEAD_STATUS_DOT_CLASSES,
+  LEAD_STATUS_MENU_DOT_CLASSES,
+  leadStatusDropdownTriggerSurface,
+} from "@/lib/lead-status-ui";
 import {
   Building2,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ExternalLink,
   Loader2,
   Mail,
   MoreHorizontal,
@@ -46,21 +54,6 @@ import { WhatsAppIcon } from "@/components/icons/whatsapp-icon";
 // import { toast } from "sonner"; // If not available, we can use a simple alert or just implement without it
 
 const PAGE_SIZE = 10;
-
-const STATUS_DOT: Record<LeadStatus, string> = {
-  "Novo Lead": "bg-zinc-500 dark:bg-zinc-400",
-  Convertido: "bg-emerald-600 dark:bg-emerald-400",
-  Perdido: "bg-red-600 dark:bg-red-400",
-};
-
-/** Fundo + texto legíveis no claro e no escuro */
-const STATUS_BADGE_SURFACE: Record<LeadStatus, string> = {
-  "Novo Lead":
-    "bg-muted/90 text-muted-foreground ring-1 ring-border dark:bg-zinc-800/90 dark:text-zinc-300 dark:ring-zinc-600/40",
-  Convertido:
-    "bg-emerald-500/12 text-emerald-950 ring-1 ring-emerald-600/28 dark:bg-emerald-500/18 dark:text-emerald-100 dark:ring-emerald-400/30",
-  Perdido: "bg-red-500/12 text-red-950 ring-1 ring-red-600/28 dark:bg-red-500/18 dark:text-red-100 dark:ring-red-400/30",
-};
 
 const ALL_STATUSES: LeadStatus[] = [...LEAD_STATUSES];
 
@@ -117,7 +110,14 @@ function leadMatchesSearch(lead: Lead, rawQuery: string): boolean {
   const q = normalizeSearchText(rawQuery);
   if (!q) return true;
   const terms = q.split(/\s+/).filter(Boolean);
-  const fieldTexts = [lead.name, lead.company, lead.email, lead.phone || ""].map(normalizeSearchText);
+  const fieldTexts = [
+    lead.name,
+    lead.company,
+    lead.email,
+    lead.phone || "",
+    lead.websiteUrl || "",
+    lead.instagramUrl || "",
+  ].map(normalizeSearchText);
   const hayFlat = fieldTexts.join(" ");
   return terms.every((term) => {
     if (hayFlat.includes(term)) return true;
@@ -125,6 +125,47 @@ function leadMatchesSearch(lead: Lead, rawQuery: string): boolean {
       field.split(/[\s@._\-/+]+/).some((word) => word.length > 0 && word.startsWith(term)),
     );
   });
+}
+
+/** Chip verde do WhatsApp na tabela (link externo compacto). */
+const TABLE_EXTERNAL_LINK_CHIP_CLASS =
+  "inline-flex size-[22px] shrink-0 items-center justify-center rounded-md border border-[#25D366]/20 bg-[#25D366]/5 text-[#25D366]/80 transition-colors hover:border-[#25D366]/35 hover:bg-[#25D366]/10 hover:text-[#25D366] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#25D366]/30 focus-visible:ring-offset-1 focus-visible:ring-offset-background dark:border-[#25D366]/15 dark:bg-[#25D366]/10 dark:hover:border-[#25D366]/28 dark:hover:bg-[#25D366]/12";
+
+/** Chip da rota pública / painel — tom marca, distinto do WhatsApp. */
+const TABLE_PUBLIC_ROUTE_CHIP_CLASS =
+  "inline-flex size-[22px] shrink-0 items-center justify-center rounded-md border border-brand/30 bg-brand/10 text-brand transition-colors hover:border-brand/50 hover:bg-brand/18 hover:text-brand focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand/40 focus-visible:ring-offset-1 focus-visible:ring-offset-background dark:border-brand/40 dark:bg-brand/15 dark:text-brand dark:hover:border-brand/50 dark:hover:bg-brand/22";
+
+function LeadTableSharedRouteLink({
+  lead,
+  rowHasRoute,
+  publicSlugByReportId,
+}: {
+  lead: Lead;
+  rowHasRoute: boolean;
+  publicSlugByReportId: Map<string, string>;
+}) {
+  if (!rowHasRoute || lead.status !== "Rota Gerada" || !lead.reportId) {
+    return null;
+  }
+  const slug = publicSlugByReportId.get(lead.reportId);
+  const href = slug ? `/r/${slug}` : `/dashboard/rotas/${lead.reportId}`;
+  const opensPublic = Boolean(slug);
+  const label = opensPublic
+    ? `Abrir rota pública${slug ? ` (${slug})` : ""}`
+    : "Abrir relatório da rota";
+  return (
+    <Link
+      href={href}
+      target={opensPublic ? "_blank" : undefined}
+      rel={opensPublic ? "noopener noreferrer" : undefined}
+      className={TABLE_PUBLIC_ROUTE_CHIP_CLASS}
+      aria-label={label}
+      title={opensPublic ? "Abrir página pública da rota" : "Abrir relatório no painel"}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <ExternalLink className="size-3 shrink-0" aria-hidden />
+    </Link>
+  );
 }
 
 function LeadTablePhoneCell({ phone }: { phone: string | undefined }) {
@@ -145,7 +186,7 @@ function LeadTablePhoneCell({ phone }: { phone: string | undefined }) {
           href={waHref}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex size-[22px] shrink-0 items-center justify-center rounded-md border border-[#25D366]/20 bg-[#25D366]/5 text-[#25D366]/80 transition-colors hover:border-[#25D366]/35 hover:bg-[#25D366]/10 hover:text-[#25D366] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#25D366]/30 focus-visible:ring-offset-1 focus-visible:ring-offset-background dark:border-[#25D366]/15 dark:bg-[#25D366]/10 dark:hover:border-[#25D366]/28 dark:hover:bg-[#25D366]/12"
+          className={TABLE_EXTERNAL_LINK_CHIP_CLASS}
           aria-label={`Abrir WhatsApp ${displayPlus55}`}
           title="Abrir no WhatsApp"
           onClick={(e) => e.stopPropagation()}
@@ -161,6 +202,7 @@ function LeadsPageContent() {
   const searchParams = useSearchParams();
   const { user } = useAuth();
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [reports, setReports] = useState<RotaDigitalReport[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(STATUS_FILTER_TODOS);
   const [currentPage, setCurrentPage] = useState(1);
@@ -175,20 +217,34 @@ function LeadsPageContent() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [company, setCompany] = useState("");
+  const [websiteUrl, setWebsiteUrl] = useState("");
+  const [instagramUrl, setInstagramUrl] = useState("");
   const [status, setStatus] = useState<LeadStatus>("Novo Lead");
 
   const fetchLeads = useCallback(async () => {
     if (!user) return;
     try {
       setLoading(true);
-      const data = await getLeads(user.uid);
+      const [data, userReports] = await Promise.all([
+        getLeads(user.uid),
+        getReportsByUser(user.uid),
+      ]);
       setLeads(data);
+      setReports(userReports);
     } catch (error) {
       console.error(error);
     } finally {
       setLoading(false);
     }
   }, [user]);
+
+  const publicSlugByReportId = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const r of reports) {
+      if (r.publicSlug) m.set(r.id, r.publicSlug);
+    }
+    return m;
+  }, [reports]);
 
   useEffect(() => {
     fetchLeads();
@@ -232,13 +288,24 @@ function LeadsPageContent() {
       setEmail(lead.email);
       setPhone(formatPhoneBr(lead.phone));
       setCompany(lead.company);
-      setStatus(lead.status);
+      setWebsiteUrl(lead.websiteUrl?.trim() ?? "");
+      setInstagramUrl(lead.instagramUrl?.trim() ?? "");
+      const hasRoute = leadHasGeneratedRoute({
+        reportDocumentExists: false,
+        reportIdOnLead: lead.reportId,
+      });
+      let nextStatus = lead.status;
+      if (!hasRoute && nextStatus === "Rota Gerada") nextStatus = "Novo Lead";
+      if (hasRoute && nextStatus === "Novo Lead") nextStatus = "Rota Gerada";
+      setStatus(nextStatus);
     } else {
       setEditingLead(null);
       setName("");
       setEmail("");
       setPhone("");
       setCompany("");
+      setWebsiteUrl("");
+      setInstagramUrl("");
       setStatus("Novo Lead");
     }
     setSaveError(null);
@@ -251,6 +318,17 @@ function LeadsPageContent() {
       setSaveError("Nome e Empresa são obrigatórios.");
       return;
     }
+    const hasRoute = editingLead
+      ? leadHasGeneratedRoute({ reportDocumentExists: false, reportIdOnLead: editingLead.reportId })
+      : false;
+    if (!isLeadStatusSelectable(status, hasRoute)) {
+      setSaveError(
+        hasRoute
+          ? "Com rota gerada não é possível voltar o status para Novo Lead."
+          : "O status Rota Gerada só fica disponível depois de gerar o relatório para este lead.",
+      );
+      return;
+    }
     setIsSaving(true);
     setSaveError(null);
     try {
@@ -260,6 +338,8 @@ function LeadsPageContent() {
         phone,
         company,
         status,
+        websiteUrl: websiteUrl.trim(),
+        instagramUrl: instagramUrl.trim(),
       };
       if (editingLead) {
         await updateLead(editingLead.id, payload);
@@ -286,6 +366,21 @@ function LeadsPageContent() {
       await deleteReportsByLead({ leadId: id, userId: user.uid });
       await deleteLead(id);
       fetchLeads();
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleLeadStatusChange = async (leadRow: Lead, next: LeadStatus) => {
+    if (!user || next === leadRow.status) return;
+    const hasRoute = leadHasGeneratedRoute({
+      reportDocumentExists: false,
+      reportIdOnLead: leadRow.reportId,
+    });
+    if (!isLeadStatusSelectable(next, hasRoute)) return;
+    try {
+      await updateLead(leadRow.id, { status: next });
+      await fetchLeads();
     } catch (error) {
       console.error(error);
     }
@@ -361,7 +456,7 @@ function LeadsPageContent() {
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
                 <div className="space-y-2">
                   <Label htmlFor="lead-email" className="text-xs font-medium text-zinc-500">
-                    E-mail
+                    E-mail <span className="font-normal text-zinc-600">(opcional)</span>
                   </Label>
                   <Input
                     id="lead-email"
@@ -375,7 +470,7 @@ function LeadsPageContent() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="lead-phone" className="text-xs font-medium text-zinc-500">
-                    Telefone / WhatsApp
+                    Telefone / WhatsApp <span className="font-normal text-zinc-600">(opcional)</span>
                   </Label>
                   <div className="relative">
                     <Phone
@@ -392,6 +487,38 @@ function LeadsPageContent() {
                       autoComplete="tel"
                     />
                   </div>
+                </div>
+              </div>
+            </section>
+
+            <section className="space-y-3.5">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
+                <div className="space-y-2">
+                  <Label htmlFor="lead-website" className="text-xs font-medium text-zinc-500">
+                    Site da empresa <span className="font-normal text-zinc-600">(opcional)</span>
+                  </Label>
+                  <Input
+                    id="lead-website"
+                    type="url"
+                    value={websiteUrl}
+                    onChange={(e) => setWebsiteUrl(e.target.value)}
+                    className="h-10 rounded-md border-white/10 bg-white/[0.04] text-sm text-zinc-100 placeholder:text-zinc-600 focus-visible:border-brand/45 focus-visible:ring-2 focus-visible:ring-brand/20"
+                    placeholder="https://empresa.com.br"
+                    autoComplete="url"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lead-instagram" className="text-xs font-medium text-zinc-500">
+                    Instagram <span className="font-normal text-zinc-600">(opcional)</span>
+                  </Label>
+                  <Input
+                    id="lead-instagram"
+                    value={instagramUrl}
+                    onChange={(e) => setInstagramUrl(e.target.value)}
+                    className="h-10 rounded-md border-white/10 bg-white/[0.04] text-sm text-zinc-100 placeholder:text-zinc-600 focus-visible:border-brand/45 focus-visible:ring-2 focus-visible:ring-brand/20"
+                    placeholder="https://instagram.com/empresa ou @empresa"
+                    autoComplete="off"
+                  />
                 </div>
               </div>
             </section>
@@ -414,11 +541,19 @@ function LeadsPageContent() {
                     <SelectValue placeholder="Selecione o status" />
                   </SelectTrigger>
                   <SelectContent sideOffset={8}>
-                    {ALL_STATUSES.map((s) => (
-                      <SelectItem key={s} value={s}>
-                        {s}
-                      </SelectItem>
-                    ))}
+                    {(() => {
+                      const hasRouteForDialog = editingLead
+                        ? leadHasGeneratedRoute({
+                            reportDocumentExists: false,
+                            reportIdOnLead: editingLead.reportId,
+                          })
+                        : false;
+                      return ALL_STATUSES.map((s) => (
+                        <SelectItem key={s} value={s} disabled={!isLeadStatusSelectable(s, hasRouteForDialog)}>
+                          {s}
+                        </SelectItem>
+                      ));
+                    })()}
                   </SelectContent>
                 </Select>
               </div>
@@ -591,7 +726,12 @@ function LeadsPageContent() {
                   </TableCell>
                 </TableRow>
               ) : (
-                paginatedLeads.map((lead) => (
+                paginatedLeads.map((lead) => {
+                  const rowHasRoute = leadHasGeneratedRoute({
+                    reportDocumentExists: false,
+                    reportIdOnLead: lead.reportId,
+                  });
+                  return (
                   <TableRow
                     key={lead.id}
                     className="border-border transition-colors hover:bg-muted/50 dark:border-white/5 dark:hover:bg-white/[0.02] group"
@@ -614,15 +754,61 @@ function LeadsPageContent() {
                       <LeadTablePhoneCell phone={lead.phone} />
                     </TableCell>
                     <TableCell className="px-3 py-4 align-middle">
-                      <Badge
-                        className={cn(
-                          "rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider shadow-sm",
-                          STATUS_BADGE_SURFACE[lead.status],
-                        )}
-                      >
-                        <div className={cn("mr-1.5 h-1.5 w-1.5 shrink-0 rounded-full", STATUS_DOT[lead.status])} />
-                        {lead.status}
-                      </Badge>
+                      <div className="inline-flex max-w-full items-center gap-2">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger
+                            title="Alterar status"
+                            className={cn(
+                              "group/badge inline-flex h-5 min-h-5 w-fit max-w-full min-w-0 shrink cursor-pointer items-center justify-center gap-1 overflow-hidden rounded-md px-2.5 py-0.5 text-left text-[10px] font-bold uppercase tracking-wider shadow-sm outline-none transition-all focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:focus-visible:ring-ring/40",
+                              leadStatusDropdownTriggerSurface(lead.status),
+                            )}
+                          >
+                            <span
+                              className={cn(
+                                "mr-0.5 h-1.5 w-1.5 shrink-0 rounded-full",
+                                LEAD_STATUS_DOT_CLASSES[lead.status],
+                              )}
+                              aria-hidden
+                            />
+                            <span className="min-w-0 truncate">{lead.status}</span>
+                            <ChevronDown className="size-3 shrink-0 opacity-70" aria-hidden />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start" className="min-w-[13.5rem] p-1.5">
+                            <div className="px-2 pb-1.5 pt-0.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                              Status do funil
+                            </div>
+                            {ALL_STATUSES.map((s) => (
+                              <DropdownMenuItem
+                                key={s}
+                                disabled={
+                                  lead.status === s || !isLeadStatusSelectable(s, rowHasRoute)
+                                }
+                                className="gap-2.5 rounded-md py-2"
+                                onClick={() => void handleLeadStatusChange(lead, s)}
+                              >
+                                <span
+                                  className={cn(
+                                    "size-2 shrink-0 rounded-full ring-1 ring-black/8 dark:ring-white/10",
+                                    LEAD_STATUS_MENU_DOT_CLASSES[s],
+                                  )}
+                                  aria-hidden
+                                />
+                                <span className="min-w-0 flex-1 text-left">{s}</span>
+                                {lead.status === s ? (
+                                  <span className="text-[10px] font-medium uppercase text-muted-foreground">
+                                    atual
+                                  </span>
+                                ) : null}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                        <LeadTableSharedRouteLink
+                          lead={lead}
+                          rowHasRoute={rowHasRoute}
+                          publicSlugByReportId={publicSlugByReportId}
+                        />
+                      </div>
                     </TableCell>
                     <TableCell className="py-4 pl-3 pr-6 text-right align-middle">
                      <DropdownMenu>
@@ -647,7 +833,8 @@ function LeadsPageContent() {
                       </DropdownMenu>
                     </TableCell>
                   </TableRow>
-                ))
+                  );
+                })
               )}
             </TableBody>
           </Table>

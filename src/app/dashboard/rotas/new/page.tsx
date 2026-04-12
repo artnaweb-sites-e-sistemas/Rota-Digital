@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ChevronDown, Loader2, Search, Sparkles, UserPlus } from "lucide-react";
+import { ChevronDown, Loader2, Phone, Search, Sparkles, UserPlus } from "lucide-react";
 
 import { useAuth } from "@/lib/auth-context";
 import { createLead, getLeads, updateLead } from "@/lib/leads";
@@ -25,7 +25,8 @@ import type {
   AiServicesFocusPolicy,
 } from "@/types/user-settings";
 import { persistEvidenceImagesToStorage } from "@/lib/evidence-storage";
-import { Lead } from "@/types/lead";
+import { isLeadStatusSelectable } from "@/lib/lead-status-rules";
+import { Lead, LEAD_STATUSES, type LeadStatus } from "@/types/lead";
 import type { RotaDigitalReport } from "@/types/report";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -46,8 +47,6 @@ import { cn } from "@/lib/utils";
 const MAX_AI_GUIDELINES_ROUTE = 3000;
 const FINAL_PROGRESS_MS = 3000;
 const ESTIMATED_PROGRESS_TO_88_MS = 1 * 60 * 1000;
-const LEAD_STATUS_OPTIONS = ["Novo Lead", "Convertido", "Perdido"] as const;
-
 const SCORING_OPTIONS: { id: AiScoringStrictness; label: string }[] = [
   { id: "free", label: "Livre" },
   { id: "low", label: "Baixa" },
@@ -140,7 +139,9 @@ export default function NewRotaPage() {
   const [newLeadCompany, setNewLeadCompany] = useState("");
   const [newLeadEmail, setNewLeadEmail] = useState("");
   const [newLeadPhone, setNewLeadPhone] = useState("");
-  const [newLeadStatus, setNewLeadStatus] = useState<(typeof LEAD_STATUS_OPTIONS)[number]>("Novo Lead");
+  const [newLeadWebsite, setNewLeadWebsite] = useState("");
+  const [newLeadInstagram, setNewLeadInstagram] = useState("");
+  const [newLeadStatus, setNewLeadStatus] = useState<LeadStatus>("Novo Lead");
   const [newLeadSaving, setNewLeadSaving] = useState(false);
   const [newLeadError, setNewLeadError] = useState<string | null>(null);
   const [progressOverlayOpen, setProgressOverlayOpen] = useState(false);
@@ -175,7 +176,9 @@ export default function NewRotaPage() {
     }
     return leads
       .filter((lead) => {
-        const hay = normalizeSearchText(`${lead.name} ${lead.company} ${lead.email} ${lead.phone || ""}`);
+        const hay = normalizeSearchText(
+          `${lead.name} ${lead.company} ${lead.email} ${lead.phone || ""} ${lead.websiteUrl || ""} ${lead.instagramUrl || ""}`,
+        );
         return hay.includes(q);
       })
       .slice(0, 8);
@@ -251,8 +254,14 @@ export default function NewRotaPage() {
   }, [leadId]);
 
   useEffect(() => {
-    if (!selectedLead) return;
+    if (!selectedLead) {
+      setWebsiteUrl("");
+      setInstagramUrl("");
+      return;
+    }
     setLeadQuery(`${selectedLead.name} - ${selectedLead.company}`);
+    setWebsiteUrl(selectedLead.websiteUrl?.trim() ?? "");
+    setInstagramUrl(selectedLead.instagramUrl?.trim() ?? "");
   }, [selectedLead?.id]);
 
   useEffect(() => {
@@ -487,7 +496,7 @@ export default function NewRotaPage() {
         leadId: selectedLead.id,
         reportId,
       });
-      await updateLead(selectedLead.id, { reportId });
+      await updateLead(selectedLead.id, { reportId, status: "Rota Gerada" });
 
       clearProgressTimer();
       setCompletingFinalStretch(true);
@@ -515,6 +524,8 @@ export default function NewRotaPage() {
     setNewLeadCompany("");
     setNewLeadEmail("");
     setNewLeadPhone("");
+    setNewLeadWebsite("");
+    setNewLeadInstagram("");
     setNewLeadStatus("Novo Lead");
     setNewLeadError(null);
     setIsLeadDialogOpen(true);
@@ -527,6 +538,10 @@ export default function NewRotaPage() {
       setNewLeadError("Nome e empresa são obrigatórios.");
       return;
     }
+    if (!isLeadStatusSelectable(newLeadStatus, false)) {
+      setNewLeadError("O status Rota Gerada só fica disponível depois de gerar o relatório.");
+      return;
+    }
     setNewLeadSaving(true);
     setNewLeadError(null);
     try {
@@ -536,6 +551,8 @@ export default function NewRotaPage() {
         company: newLeadCompany.trim(),
         email: newLeadEmail.trim(),
         phone: newLeadPhone.trim(),
+        websiteUrl: newLeadWebsite.trim(),
+        instagramUrl: newLeadInstagram.trim(),
         status: newLeadStatus,
       });
       const freshLeads = await getLeads(user.uid);
@@ -544,6 +561,8 @@ export default function NewRotaPage() {
       if (created) {
         setLeadId(created.id);
         setLeadQuery(`${created.name} - ${created.company}`);
+        setWebsiteUrl(created.websiteUrl?.trim() ?? "");
+        setInstagramUrl(created.instagramUrl?.trim() ?? "");
       } else {
         setLeadId(newId);
       }
@@ -969,90 +988,189 @@ export default function NewRotaPage() {
       </Card>
 
       <Dialog open={isLeadDialogOpen} onOpenChange={setIsLeadDialogOpen}>
-        <DialogContent className="max-h-[min(92vh,820px)] w-full max-w-[calc(100%-1.5rem)] overflow-y-auto overflow-x-hidden rounded-2xl border border-white/10 bg-zinc-950 p-0 text-zinc-100 shadow-2xl sm:max-w-xl md:max-w-[36rem]">
-          <div className="border-b border-white/5 px-6 pb-6 pt-7 pr-14 sm:px-8 sm:pb-7 sm:pt-8 sm:pr-16">
-            <DialogHeader className="text-left">
-              <DialogTitle className="text-xl font-bold tracking-tight text-white sm:text-2xl">
+        <DialogContent
+          showCloseButton
+          className={cn(
+            "max-h-[min(92vh,820px)] w-full max-w-[calc(100%-1.5rem)] gap-0 overflow-y-auto overflow-x-hidden border-white/10 bg-zinc-950 p-0 text-zinc-100 shadow-2xl sm:max-w-xl md:max-w-[36rem]",
+            "rounded-2xl ring-1 ring-white/10",
+          )}
+        >
+          <div className="relative border-b border-white/[0.06] bg-white/[0.015] px-6 pb-5 pt-6 pr-14 sm:px-8 sm:pb-6 sm:pt-7 sm:pr-16">
+            <DialogHeader className="gap-1.5 space-y-0 text-left">
+              <DialogTitle className="font-heading text-lg font-semibold tracking-tight text-white sm:text-xl">
                 Novo lead
               </DialogTitle>
-              <DialogDescription className="text-sm leading-relaxed text-zinc-500">
-                Crie um lead sem sair desta tela.
+              <DialogDescription className="text-[13px] leading-relaxed text-zinc-500 sm:text-sm">
+                Preencha os dados básicos para criar o contacto e acompanhar o funil na Rota Digital.
               </DialogDescription>
             </DialogHeader>
           </div>
-          <div className="space-y-4 px-6 py-6 sm:px-8">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Nome completo *</Label>
-                <Input value={newLeadName} onChange={(e) => setNewLeadName(e.target.value)} />
+
+          <div className="space-y-6 px-6 py-6 sm:px-8 sm:py-7">
+            <section className="space-y-3.5">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
+                <div className="space-y-2">
+                  <Label htmlFor="rota-dialog-lead-name" className="text-xs font-medium text-zinc-500">
+                    Nome completo <span className="text-red-400/90">*</span>
+                  </Label>
+                  <Input
+                    id="rota-dialog-lead-name"
+                    value={newLeadName}
+                    onChange={(e) => setNewLeadName(e.target.value)}
+                    className="h-10 rounded-md border-white/10 bg-white/[0.04] text-sm text-zinc-100 placeholder:text-zinc-600 focus-visible:border-brand/45 focus-visible:ring-2 focus-visible:ring-brand/20"
+                    placeholder="Ex.: João Silva"
+                    autoComplete="name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="rota-dialog-lead-company" className="text-xs font-medium text-zinc-500">
+                    Empresa <span className="text-red-400/90">*</span>
+                  </Label>
+                  <Input
+                    id="rota-dialog-lead-company"
+                    value={newLeadCompany}
+                    onChange={(e) => setNewLeadCompany(e.target.value)}
+                    className="h-10 rounded-md border-white/10 bg-white/[0.04] text-sm text-zinc-100 placeholder:text-zinc-600 focus-visible:border-brand/45 focus-visible:ring-2 focus-visible:ring-brand/20"
+                    placeholder="Ex.: Tech Solutions"
+                    autoComplete="organization"
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>Empresa *</Label>
-                <Input value={newLeadCompany} onChange={(e) => setNewLeadCompany(e.target.value)} />
+            </section>
+
+            <section className="space-y-3.5">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
+                <div className="space-y-2">
+                  <Label htmlFor="rota-dialog-lead-email" className="text-xs font-medium text-zinc-500">
+                    E-mail <span className="font-normal text-zinc-600">(opcional)</span>
+                  </Label>
+                  <Input
+                    id="rota-dialog-lead-email"
+                    type="email"
+                    value={newLeadEmail}
+                    onChange={(e) => setNewLeadEmail(e.target.value)}
+                    className="h-10 rounded-md border-white/10 bg-white/[0.04] text-sm text-zinc-100 placeholder:text-zinc-600 focus-visible:border-brand/45 focus-visible:ring-2 focus-visible:ring-brand/20"
+                    placeholder="nome@empresa.com"
+                    autoComplete="email"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="rota-dialog-lead-phone" className="text-xs font-medium text-zinc-500">
+                    Telefone / WhatsApp <span className="font-normal text-zinc-600">(opcional)</span>
+                  </Label>
+                  <div className="relative">
+                    <Phone
+                      className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-zinc-600"
+                      aria-hidden
+                    />
+                    <Input
+                      id="rota-dialog-lead-phone"
+                      type="tel"
+                      value={newLeadPhone}
+                      onChange={(e) => setNewLeadPhone(formatPhoneBr(e.target.value))}
+                      className="h-10 rounded-md border-white/10 bg-white/[0.04] pl-9 text-sm text-zinc-100 placeholder:text-zinc-600 focus-visible:border-brand/45 focus-visible:ring-2 focus-visible:ring-brand/20"
+                      placeholder="(11) 99999-9999"
+                      autoComplete="tel"
+                    />
+                  </div>
+                </div>
               </div>
-            </div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>E-mail</Label>
-                <Input
-                  type="email"
-                  value={newLeadEmail}
-                  onChange={(e) => setNewLeadEmail(e.target.value)}
-                />
+            </section>
+
+            <section className="space-y-3.5">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
+                <div className="space-y-2">
+                  <Label htmlFor="rota-dialog-lead-website" className="text-xs font-medium text-zinc-500">
+                    Site da empresa <span className="font-normal text-zinc-600">(opcional)</span>
+                  </Label>
+                  <Input
+                    id="rota-dialog-lead-website"
+                    type="url"
+                    value={newLeadWebsite}
+                    onChange={(e) => setNewLeadWebsite(e.target.value)}
+                    className="h-10 rounded-md border-white/10 bg-white/[0.04] text-sm text-zinc-100 placeholder:text-zinc-600 focus-visible:border-brand/45 focus-visible:ring-2 focus-visible:ring-brand/20"
+                    placeholder="https://empresa.com.br"
+                    autoComplete="url"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="rota-dialog-lead-instagram" className="text-xs font-medium text-zinc-500">
+                    Instagram <span className="font-normal text-zinc-600">(opcional)</span>
+                  </Label>
+                  <Input
+                    id="rota-dialog-lead-instagram"
+                    value={newLeadInstagram}
+                    onChange={(e) => setNewLeadInstagram(e.target.value)}
+                    className="h-10 rounded-md border-white/10 bg-white/[0.04] text-sm text-zinc-100 placeholder:text-zinc-600 focus-visible:border-brand/45 focus-visible:ring-2 focus-visible:ring-brand/20"
+                    placeholder="https://instagram.com/empresa ou @empresa"
+                    autoComplete="off"
+                  />
+                </div>
               </div>
+            </section>
+
+            <section className="space-y-3.5">
               <div className="space-y-2">
-                <Label>Telefone / WhatsApp</Label>
-                <Input
-                  type="tel"
-                  value={newLeadPhone}
-                  onChange={(e) => setNewLeadPhone(formatPhoneBr(e.target.value))}
-                  placeholder="(11) 99999-9999"
-                />
+                <Label htmlFor="rota-dialog-lead-status" className="text-xs font-medium text-zinc-500">
+                  Status atual
+                </Label>
+                <Select
+                  value={newLeadStatus}
+                  onValueChange={(value) => {
+                    if (value) setNewLeadStatus(value as LeadStatus);
+                  }}
+                >
+                  <SelectTrigger
+                    id="rota-dialog-lead-status"
+                    className="h-10 w-full rounded-md border-white/10 bg-white/[0.04] text-sm text-zinc-100 focus-visible:border-brand/45 dark:hover:bg-white/[0.06]"
+                  >
+                    <SelectValue placeholder="Selecione o status" />
+                  </SelectTrigger>
+                  <SelectContent sideOffset={8}>
+                    {LEAD_STATUSES.map((statusOpt) => (
+                      <SelectItem
+                        key={statusOpt}
+                        value={statusOpt}
+                        disabled={!isLeadStatusSelectable(statusOpt, false)}
+                      >
+                        {statusOpt}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Status</Label>
-              <Select
-                value={newLeadStatus}
-                onValueChange={(value) => {
-                  if (value) setNewLeadStatus(value as (typeof LEAD_STATUS_OPTIONS)[number]);
-                }}
-              >
-                <SelectTrigger className="w-full rounded-md border-white/10 bg-white/[0.04] text-zinc-100 dark:hover:bg-white/[0.06]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {LEAD_STATUS_OPTIONS.map((statusOpt) => (
-                    <SelectItem key={statusOpt} value={statusOpt}>
-                      {statusOpt}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            </section>
+
             {newLeadError ? (
-              <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+              <div
+                role="alert"
+                className="rounded-md border border-red-500/25 bg-red-500/10 px-3.5 py-2.5 text-sm font-medium leading-relaxed text-red-300"
+              >
                 {newLeadError}
               </div>
             ) : null}
           </div>
-          <div className="flex flex-col-reverse gap-3 border-t border-white/5 bg-white/[0.02] px-6 py-5 sm:flex-row sm:justify-end sm:px-8">
+
+          <div className="flex flex-col-reverse gap-3 border-t border-white/[0.06] bg-white/[0.02] px-6 py-4 sm:flex-row sm:items-center sm:justify-end sm:gap-3 sm:px-8 sm:py-5">
             <Button
               type="button"
               variant="ghost"
               onClick={() => setIsLeadDialogOpen(false)}
               disabled={newLeadSaving}
+              className="h-10 rounded-md text-zinc-400 hover:bg-white/5 hover:text-zinc-200 sm:min-w-[7rem]"
             >
               Cancelar
             </Button>
             <Button
               type="button"
+              variant="cta"
+              size="lg"
               onClick={() => void handleCreateLead()}
               disabled={newLeadSaving}
-              className="gap-2"
+              className="min-w-[10rem] gap-2"
             >
-              {newLeadSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              {newLeadSaving ? "Salvando..." : "Adicionar lead"}
+              {newLeadSaving ? <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden /> : null}
+              {newLeadSaving ? "A guardar…" : "Salvar lead"}
             </Button>
           </div>
         </DialogContent>

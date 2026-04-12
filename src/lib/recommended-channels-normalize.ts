@@ -11,6 +11,61 @@ function normalizeChannelName(name: string): string {
     .trim();
 }
 
+/**
+ * Quando a política é restrita, a IA costuma encurtar rótulos ("TikTok" vs "TikTok Ads").
+ * Mapeia variações comuns para o rótulo canônico permitido, sem ambiguidade agressiva.
+ */
+function resolveCanonicalRestrictedLabel(rawName: string, allowedLabels: string[]): string | undefined {
+  const norm = normalizeChannelName(rawName);
+  if (!norm) return undefined;
+  const rawLower = rawName.toLowerCase();
+
+  const pick = (predicate: (label: string) => boolean) => allowedLabels.find(predicate);
+
+  if (/\btiktok\b|\btik\s*tok\b/i.test(rawLower)) {
+    const row = pick((l) => /\btiktok\b/i.test(l));
+    if (row) return row;
+  }
+  if (/\bwhatsapp\b|\bzap\b/i.test(rawLower)) {
+    const row = pick((l) => normalizeChannelName(l).includes("whatsapp"));
+    if (row) return row;
+  }
+  if (/\byoutube\b/i.test(rawLower)) {
+    const row = pick((l) => normalizeChannelName(l).includes("youtube"));
+    if (row) return row;
+  }
+  if (/\bgoogle\b/.test(rawLower) && /\bads\b/.test(rawLower)) {
+    const row = pick((l) => /google/i.test(l) && /ads/i.test(l));
+    if (row) return row;
+  }
+  if (/\blinkedin\b/.test(rawLower) && /\bads\b/.test(rawLower)) {
+    const row = pick((l) => /linkedin/i.test(l) && /ads/i.test(l));
+    if (row) return row;
+  }
+  if (/\bmeta\b/.test(rawLower) && /\bads\b/.test(rawLower)) {
+    const row = pick((l) => /meta ads/i.test(l));
+    if (row) return row;
+  }
+  if (/\bfacebook\b/.test(rawLower) && /\bads\b/.test(rawLower)) {
+    const row = pick((l) => /meta ads/i.test(l));
+    if (row) return row;
+  }
+  if (/\binstagram\b/.test(rawLower) && /\bads\b/.test(rawLower)) {
+    const row = pick((l) => /meta ads/i.test(l));
+    if (row) return row;
+  }
+  if (/\bemail\b|\be-mail\b|\bmailing\b/i.test(rawLower)) {
+    const row = pick((l) => normalizeChannelName(l).includes("e-mail") || normalizeChannelName(l).includes("email"));
+    if (row) return row;
+  }
+  if (/\bseo\b|\bblog\b/i.test(rawLower)) {
+    const row = pick((l) => normalizeChannelName(l).includes("seo"));
+    if (row) return row;
+  }
+
+  return undefined;
+}
+
 function sanitizeChannelEntry(input: unknown, forcedName?: string): DigitalChannel | null {
   if (!input || typeof input !== "object") return null;
   const row = input as Record<string, unknown>;
@@ -69,7 +124,9 @@ export function normalizeRecommendedChannels(
       const rawName = typeof (row as Record<string, unknown>)?.name === "string"
         ? String((row as Record<string, unknown>).name)
         : "";
-      const canonical = allowedByNorm.get(normalizeChannelName(rawName));
+      const canonical =
+        allowedByNorm.get(normalizeChannelName(rawName)) ||
+        resolveCanonicalRestrictedLabel(rawName, allowedLabels);
       if (!canonical) continue;
       pushIfUnique(sanitizeChannelEntry(row, canonical));
     }

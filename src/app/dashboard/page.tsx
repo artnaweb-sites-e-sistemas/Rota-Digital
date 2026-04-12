@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Users,
-  List,
+  Compass,
   CheckCircle,
   XCircle,
   Sparkles,
@@ -211,7 +211,7 @@ export default function DashboardPage() {
         value: formatInt(total),
         description: total === 0 ? "Nenhum lead cadastrado ainda" : describeLeadMonthComparison(leads),
         icon: Users,
-        color: "text-brand",
+        color: "text-muted-foreground",
         href: "/dashboard/leads",
       },
       {
@@ -221,7 +221,7 @@ export default function DashboardPage() {
           reportCount === 0 ? "Nenhum relatório gerado ainda" : "Relatórios gerados na sua conta",
         icon: Sparkles,
         color: "text-brand",
-        href: "/dashboard/rotas",
+        href: `/dashboard/leads?status=${encodeURIComponent("Rota Gerada")}`,
       },
       {
         title: "Leads convertidos",
@@ -272,7 +272,9 @@ export default function DashboardPage() {
                     "flex h-8 w-8 items-center justify-center rounded-lg ring-1 transition-all duration-300 group-hover:scale-110",
                     stat.color === "text-brand"
                       ? "bg-brand/10 ring-brand/25 group-hover:ring-brand/40 dark:bg-brand/[0.12] dark:ring-brand/30 dark:group-hover:ring-brand/45"
-                      : "bg-muted ring-border group-hover:ring-border/80 dark:bg-white/5 dark:ring-white/10 dark:group-hover:ring-white/20",
+                      : stat.color === "text-muted-foreground"
+                        ? "bg-muted/70 ring-border/80 group-hover:ring-border dark:bg-white/[0.06] dark:ring-white/10 dark:group-hover:ring-white/18"
+                        : "bg-muted ring-border group-hover:ring-border/80 dark:bg-white/5 dark:ring-white/10 dark:group-hover:ring-white/20",
                     stat.color,
                   )}
                 >
@@ -311,12 +313,14 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="overflow-hidden border border-border bg-card shadow-xl dark:border-white/5 dark:bg-white/[0.02] md:col-span-3">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-lg font-bold text-foreground">Últimas rotas</CardTitle>
-            <CardDescription>Relatórios gerados recentemente</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4 pt-2">
+        <Card className="gap-0 overflow-hidden border border-border bg-card pt-0 pb-4 shadow-xl dark:border-white/5 dark:bg-white/[0.02] md:col-span-3">
+          <div className="border-b border-brand/25 bg-gradient-to-br from-brand/16 via-brand/9 to-brand/[0.04] px-5 py-3.5 dark:border-brand/35 dark:from-brand/18 dark:via-brand/11 dark:to-brand/[0.06]">
+            <h2 className="text-lg font-bold tracking-tight text-zinc-950 dark:text-zinc-50">Últimas rotas</h2>
+            <p className="mt-1 text-sm leading-snug text-zinc-700 dark:text-zinc-400">
+              Relatórios gerados recentemente
+            </p>
+          </div>
+          <CardContent className="space-y-4 pt-4">
             {loading ? (
               <div className="flex justify-center py-12">
                 <Loader2 className="size-8 animate-spin text-muted-foreground" aria-hidden />
@@ -361,9 +365,9 @@ export default function DashboardPage() {
                 <div className="pt-2">
                   <Link
                     href="/dashboard/rotas"
-                    className="flex items-center justify-center gap-2 rounded-md border border-border bg-muted/40 py-2.5 text-xs font-bold text-muted-foreground transition-all hover:bg-muted hover:text-foreground dark:border-white/5 dark:bg-white/5 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-zinc-200"
+                    className="flex items-center justify-center gap-2 rounded-md border border-border bg-muted/40 py-2.5 text-xs font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground dark:border-white/5 dark:bg-white/5 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-zinc-200"
                   >
-                    <List className="size-3.5 shrink-0" aria-hidden />
+                    <Compass className="size-3.5 shrink-0 text-brand dark:text-brand" aria-hidden />
                     Ver todas as rotas
                   </Link>
                 </div>

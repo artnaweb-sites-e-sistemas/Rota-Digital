@@ -39,8 +39,6 @@ import {
   AlertCircle,
   Star,
   ArrowRight,
-  Link2,
-  Copy,
   ExternalLink,
   Globe,
   Pencil,
@@ -76,14 +74,14 @@ const PRIORITY_COLORS: Record<string, string> = {
     "border border-[color:var(--rota-sev-c-border)]/35 bg-[color:var(--rota-sev-c-bar)]/12 text-[color:var(--rota-sev-c-fg)] dark:bg-[color:var(--rota-sev-c-bar)]/18 dark:text-[color:var(--rota-sev-c-fg-dark)] dark:border-[color:var(--rota-sev-c-border)]/42",
 };
 
-/** Fundo opaco na aba de prioridade (só mobile) — evita “vazado” sobre o BorderGlow e o fundo da página. */
-const CHANNEL_PRIORITY_TAB_MOBILE_SURFACE: Record<string, string> = {
+/** Fundo opaco da aba de prioridade (fora da moldura BorderGlow) — todos os breakpoints. */
+const CHANNEL_PRIORITY_TAB_SURFACE: Record<string, string> = {
   Alta:
-    "max-md:!bg-[oklch(0.22_0.045_38_/_0.96)] max-md:dark:!bg-[oklch(0.2_0.04_38_/_0.94)] max-md:!text-[color:var(--rota-sev-a-fg-dark)] max-md:dark:!text-[color:var(--rota-sev-a-fg-dark)]",
+    "!bg-[oklch(0.22_0.045_38_/_0.96)] dark:!bg-[oklch(0.2_0.04_38_/_0.94)] !text-[color:var(--rota-sev-a-fg-dark)] dark:!text-[color:var(--rota-sev-a-fg-dark)]",
   Média:
-    "max-md:!bg-[oklch(0.24_0.035_78_/_0.95)] max-md:dark:!bg-[oklch(0.22_0.03_78_/_0.92)] max-md:!text-[color:var(--rota-sev-b-fg)] max-md:dark:!text-[color:var(--rota-sev-b-fg-dark)]",
+    "!bg-[oklch(0.24_0.035_78_/_0.95)] dark:!bg-[oklch(0.22_0.03_78_/_0.92)] !text-[color:var(--rota-sev-b-fg)] dark:!text-[color:var(--rota-sev-b-fg-dark)]",
   Baixa:
-    "max-md:!bg-[oklch(0.22_0.04_152_/_0.95)] max-md:dark:!bg-[oklch(0.2_0.035_152_/_0.92)] max-md:!text-[color:var(--rota-sev-c-fg)] max-md:dark:!text-[color:var(--rota-sev-c-fg-dark)]",
+    "!bg-[oklch(0.22_0.04_152_/_0.95)] dark:!bg-[oklch(0.2_0.035_152_/_0.92)] !text-[color:var(--rota-sev-c-fg)] dark:!text-[color:var(--rota-sev-c-fg-dark)]",
 };
 
 /** Borda 1px do BorderGlow em repouso (inline — evita conflito com `border-border` do componente). */
@@ -111,9 +109,9 @@ const CHANNEL_ACTION_ICON_SHELL: Record<string, string> = {
     "border-[color:var(--rota-sev-c-border)]/35 bg-[color:var(--rota-sev-c-bar)]/10 text-[color:var(--rota-sev-c-fg)] ring-[color:var(--rota-sev-c-border)]/25 dark:text-[color:var(--rota-sev-c-fg-dark)] dark:ring-[color:var(--rota-sev-c-border)]/20",
 };
 
-/** Mesmo visual da pill “WEBSITE” / “Instagram” nas evidências — rótulo em caixa alta (sutil). */
+/** Pill “WEBSITE” / “Instagram” nas evidências — ouro da marca (alinhado ao resto do UI). */
 const TOPIC_PILL_CLASS =
-  "inline-flex max-w-full items-center gap-1.5 rounded-full border border-border bg-muted px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide leading-none text-foreground/82 dark:text-muted-foreground";
+  "inline-flex max-w-full items-center gap-1.5 rounded-full border border-brand/35 bg-brand/[0.11] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide leading-none text-brand dark:border-brand/45 dark:bg-brand/15 dark:text-brand";
 
 /** Rótulo ao lado de ícone na pill — desce o texto para alinhar ao centro óptico do glifo. */
 const TOPIC_PILL_LABEL_NEXT_TO_ICON = "translate-y-0.5";
@@ -160,6 +158,9 @@ function InstagramBrandGlyph(props: SVGProps<SVGSVGElement>) {
  */
 const ROTA_REPORT_CARD_BOX = "py-6 sm:py-7";
 
+/** Casco vertical quando o topo do card é “colado” ao primeiro bloco (ex.: faixa de cabeçalho interna). */
+const ROTA_REPORT_CARD_BOX_FLUSH_TOP = "pb-6 pt-0 sm:pb-7 sm:pt-0";
+
 /**
  * Superfície das secções do relatório (dashboard): no escuro alinha ao zinc da página + painel `white/[0.02]`.
  */
@@ -176,6 +177,10 @@ const ROTA_REPORT_SURFACE_GLOW_INNER = "bg-card dark:bg-background";
 /** SWOT (3 colunas): menos padding vertical + fundo sólido alinhado ao `card` do tema. */
 const ROTA_SWOT_CARD_BOX = "gap-2 py-4 sm:gap-3 sm:py-5";
 
+/** Faixa superior dentro dos cards “O que fazer primeiro” / “Longo prazo” (corpo da lista fica mais claro). */
+const ROTA_ACTIONLIST_INNER_HEADER =
+  "border-b border-border/65 bg-gradient-to-b from-muted/55 via-muted/38 to-muted/18 px-5 py-4 dark:border-white/[0.08] dark:from-zinc-800/95 dark:via-zinc-900/88 dark:to-zinc-950/90 sm:px-7 sm:py-5 print:border-zinc-200 print:from-zinc-100 print:via-zinc-50 print:to-white";
+
 /**
  * Capturas full-page no quadro: em repouso mostra o **topo** da página (início do screenshot).
  * Com `hoverScroll`: no desktop o pan segue o rato; no touch, um toque alterna o pan (sobe/desce).
@@ -184,10 +189,6 @@ const FULL_PAGE_SNAPSHOT_IDLE_FROM_TOP_RATIO = 0;
 
 /** Só no card Posicionamento (grid site + Instagram): repouso no meio do pan vertical. Clareza da proposta = topo. */
 const POSICIONAMENTO_COMBINED_SNAPSHOT_IDLE_CENTER_RATIO = 0.5;
-
-/** Linha de apoio sob o título do card (tom e escala iguais no relatório). */
-const ROTA_CARD_SUBTITLE =
-  "max-w-prose text-sm font-normal leading-relaxed text-muted-foreground";
 
 type RotaHeaderIconTone = "indigo" | "yellow" | "purple" | "green" | "red" | "blue";
 
@@ -1244,22 +1245,20 @@ function ChannelCard({ channel }: { channel: DigitalChannel }) {
   const restingBorder =
     PRIORITY_RESTING_BORDER[channel.priority] || PRIORITY_RESTING_BORDER.Média;
   const priorityBadgeCls = PRIORITY_COLORS[channel.priority] || PRIORITY_COLORS.Média;
-  const priorityTabMobileSurface =
-    CHANNEL_PRIORITY_TAB_MOBILE_SURFACE[channel.priority] ||
-    CHANNEL_PRIORITY_TAB_MOBILE_SURFACE.Média;
+  const priorityTabSurface =
+    CHANNEL_PRIORITY_TAB_SURFACE[channel.priority] || CHANNEL_PRIORITY_TAB_SURFACE.Média;
   const priorityBadgeLabelText = channelPriorityBadgeLabel(channel.priority);
   return (
-    <div className="relative max-md:pt-1 md:pt-0">
+    <div className="relative pt-1">
       {/*
-        Aba só no mobile: fora do BorderGlow + z-0. Descendentes do glow são sempre pintados
-        por cima da borda do frame — assim o selo fica atrás da moldura inteira.
+        Aba fora do BorderGlow (z-0): o glow pinta por cima da borda do frame — o selo fica
+        “por trás” da moldura, igual visual mobile/desktop.
       */}
       <Badge
         className={cn(
-          "md:hidden",
-          "pointer-events-none absolute left-5 top-0 z-0 inline-flex h-auto min-h-7 -translate-y-[calc(100%-8px)] shrink-0 items-center justify-center gap-1 rounded-t-md rounded-b-none border-x border-t border-b-0 px-2.5 pb-2 pt-1.5 text-[11px] font-medium leading-snug whitespace-nowrap",
+          "pointer-events-none absolute right-5 top-0 z-0 inline-flex h-auto min-h-7 -translate-y-[calc(100%-8px)] shrink-0 items-center justify-center gap-1 rounded-t-md rounded-b-none border-x border-t border-b-0 px-2.5 pb-2 pt-1.5 text-[11px] font-medium leading-snug whitespace-nowrap sm:right-7",
           priorityBadgeCls,
-          priorityTabMobileSurface,
+          priorityTabSurface,
         )}
       >
         {priorityBadgeLabelText}
@@ -1285,15 +1284,12 @@ function ChannelCard({ channel }: { channel: DigitalChannel }) {
             ROTA_REPORT_SURFACE_GLOW_INNER,
           )}
         >
-          <div className="flex items-start justify-between gap-2 pb-1">
+          <div className="flex items-start gap-2 pb-1">
             <h4 className="m-0 min-w-0 flex-1 font-normal leading-none" title={channel.name}>
               <span className={TOPIC_PILL_CLASS}>
                 <span className="truncate">{channel.name}</span>
               </span>
             </h4>
-            <Badge className={cn("hidden shrink-0 text-xs md:inline-flex", priorityBadgeCls)}>
-              {priorityBadgeLabelText}
-            </Badge>
           </div>
           <ReportProseBlocks text={channel.description} size="sm" sentencesPerBlock={1} />
           {channel.actions.length > 0 && (
@@ -1344,8 +1340,6 @@ export function RotaDigitalReportView({
   const router = useRouter();
   const isDashboard = variant === "dashboard";
   const [report, setReport] = useState<RotaDigitalReport>(initialReport);
-  const [origin, setOrigin] = useState("");
-  const [copied, setCopied] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
@@ -1369,10 +1363,6 @@ export function RotaDigitalReportView({
   useEffect(() => {
     setReport(initialReport);
   }, [initialReport]);
-
-  useEffect(() => {
-    setOrigin(typeof window !== "undefined" ? window.location.origin : "");
-  }, []);
 
   useEffect(() => {
     if (variant !== "public") return;
@@ -1682,60 +1672,6 @@ export function RotaDigitalReportView({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      ) : null}
-
-      {isDashboard && report.publicSlug && origin ? (
-        <Card
-          className={cn(
-            "no-print border border-border bg-card shadow-lg dark:border-border dark:bg-card dark:shadow-xl",
-            "border-l-[3px] border-l-brand/45 dark:border-l-brand/40",
-            ROTA_REPORT_CARD_BOX,
-          )}
-        >
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-3 text-base text-foreground">
-              <RotaHeaderIcon tone="indigo">
-                <Link2 size={18} className="text-brand" />
-              </RotaHeaderIcon>
-              Página pública para o lead
-            </CardTitle>
-            <p className={ROTA_CARD_SUBTITLE}>
-              Envie este link para o cliente ver a proposta no navegador, sem login.
-            </p>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center">
-            <code className="min-w-0 flex-1 truncate rounded-md bg-muted px-3 py-2 text-left text-sm text-foreground/90">
-              {`${origin}/r/${report.publicSlug}`}
-            </code>
-            <div className="flex shrink-0 flex-wrap gap-2">
-              <Button
-                type="button"
-                variant="cta"
-                className="gap-2"
-                onClick={async () => {
-                  await navigator.clipboard.writeText(
-                    `${origin}/r/${report.publicSlug}`
-                  );
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 2000);
-                }}
-              >
-                {copied ? <CheckCircle2 size={16} /> : <Copy size={16} />}
-                {copied ? "Copiado" : "Copiar"}
-              </Button>
-              <LinkButton
-                href={`/r/${report.publicSlug}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                variant="outline"
-                className="gap-2"
-              >
-                <ExternalLink size={16} />
-                Abrir
-              </LinkButton>
-            </div>
-          </CardContent>
-        </Card>
       ) : null}
 
       {isDashboard && isEditing ? (
@@ -2291,7 +2227,7 @@ export function RotaDigitalReportView({
                       )}
                     >
                       <div className={cn("mb-5", TOPIC_PILL_CLASS)}>
-                        <Globe className="size-3.5 shrink-0 stroke-[1.75] text-sky-400" aria-hidden />
+                        <Globe className="size-3.5 shrink-0 stroke-[1.75] text-brand" aria-hidden />
                         <span className={TOPIC_PILL_LABEL_NEXT_TO_ICON}>Website</span>
                       </div>
                       <EvidenceResearchNoteProse
@@ -2324,7 +2260,7 @@ export function RotaDigitalReportView({
                       )}
                     >
                       <div className={cn("mb-5", TOPIC_PILL_CLASS)}>
-                        <InstagramBrandGlyph className="size-3.5 text-[#f472b6]" aria-hidden />
+                        <InstagramBrandGlyph className="size-3.5 text-brand" aria-hidden />
                         <span className={TOPIC_PILL_LABEL_NEXT_TO_ICON}>Instagram</span>
                       </div>
                       <EvidenceResearchNoteProse text={normalizedInstagramNote} size="md" />
@@ -2542,22 +2478,22 @@ export function RotaDigitalReportView({
       <div className="grid min-w-0 grid-cols-1 gap-5 md:grid-cols-2">
         <Card
           className={cn(
-            "min-w-0 overflow-visible",
+            "min-w-0 gap-2 overflow-hidden",
             ROTA_REPORT_SURFACE_SECTION,
             "print-white",
-            ROTA_REPORT_CARD_BOX,
+            ROTA_REPORT_CARD_BOX_FLUSH_TOP,
           )}
         >
-          <CardHeader className="pb-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-md border border-brand/25 bg-brand/[0.09] dark:border-border dark:bg-muted">
-                <Zap size={18} className="text-brand dark:text-brand" aria-hidden />
+          <header className={ROTA_ACTIONLIST_INNER_HEADER}>
+            <div className="flex min-h-[2.75rem] items-center gap-3 sm:min-h-[3rem]">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-brand/30 bg-brand/[0.12] dark:border-brand/25 dark:bg-brand/[0.1]">
+                <Zap size={19} className="text-brand dark:text-brand" aria-hidden />
               </div>
-              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-foreground dark:text-zinc-200">
+              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-foreground dark:text-zinc-100">
                 O que fazer primeiro
               </CardTitle>
             </div>
-          </CardHeader>
+          </header>
           <CardContent>
             <ul className="space-y-0">
               {report.quickWins.map((win, i) => (
@@ -2581,22 +2517,22 @@ export function RotaDigitalReportView({
 
         <Card
           className={cn(
-            "min-w-0 overflow-visible",
+            "min-w-0 gap-2 overflow-hidden",
             ROTA_REPORT_SURFACE_SECTION,
             "print-white",
-            ROTA_REPORT_CARD_BOX,
+            ROTA_REPORT_CARD_BOX_FLUSH_TOP,
           )}
         >
-          <CardHeader className="pb-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-md border border-brand/25 bg-brand/[0.09] dark:border-border dark:bg-muted">
-                <Target size={18} className="text-brand dark:text-brand" aria-hidden />
+          <header className={ROTA_ACTIONLIST_INNER_HEADER}>
+            <div className="flex min-h-[2.75rem] items-center gap-3 sm:min-h-[3rem]">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-brand/30 bg-brand/[0.12] dark:border-brand/25 dark:bg-brand/[0.1]">
+                <Target size={19} className="text-brand dark:text-brand" aria-hidden />
               </div>
-              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-foreground dark:text-zinc-200">
+              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-foreground dark:text-zinc-100">
                 Ações de Longo Prazo
               </CardTitle>
             </div>
-          </CardHeader>
+          </header>
           <CardContent>
             <ul className="space-y-0">
               {report.longTermActions.map((action, i) => (

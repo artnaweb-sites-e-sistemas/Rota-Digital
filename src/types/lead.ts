@@ -1,5 +1,5 @@
 /** Status ativos no funil (Novo e Qualificado foram descontinuados). */
-export const LEAD_STATUSES = ["Novo Lead", "Convertido", "Perdido"] as const;
+export const LEAD_STATUSES = ["Novo Lead", "Rota Gerada", "Convertido", "Perdido"] as const;
 export type LeadStatus = (typeof LEAD_STATUSES)[number];
 
 const LEGACY_TO_ACTIVE: Record<string, LeadStatus> = {
@@ -7,6 +7,7 @@ const LEGACY_TO_ACTIVE: Record<string, LeadStatus> = {
   Qualificado: "Novo Lead",
   "Em Contato": "Novo Lead",
   "Novo Lead": "Novo Lead",
+  "Rota Gerada": "Rota Gerada",
   Convertido: "Convertido",
   Perdido: "Perdido",
 };
@@ -30,4 +31,8 @@ export interface Lead {
   updatedAt: number;
   notes?: string;
   reportId?: string;
+  /** Site da empresa (opcional). */
+  websiteUrl?: string;
+  /** Perfil ou URL do Instagram (opcional). */
+  instagramUrl?: string;
 }

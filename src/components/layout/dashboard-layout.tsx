@@ -89,47 +89,37 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="fixed inset-0 flex h-dvh max-h-dvh min-h-0 w-full flex-row overflow-hidden bg-background text-foreground font-sans">
-      {/* Sidebar principal — expandida ou só ícones */}
-      <aside
+      {/* Sidebar principal — largura no wrapper para o botão “aba” ficar metade fora */}
+      <div
         className={cn(
-          "flex max-h-full min-h-0 shrink-0 flex-col justify-between overflow-y-auto border-r border-sidebar-border bg-sidebar/95 text-sidebar-foreground shadow-sm backdrop-blur-xl transition-[width] duration-200 ease-out dark:shadow-[1px_0_0_0_rgba(255,255,255,0.05)] dark:bg-zinc-950/50",
+          "relative flex min-h-0 max-h-full shrink-0 flex-col transition-[width] duration-200 ease-out",
           mainCollapsed ? "w-[4.5rem]" : "w-64",
         )}
       >
-        <div className="min-h-0 min-w-0">
-          <div
-            className={cn(
-              "flex border-b border-sidebar-border dark:border-white/5",
-              mainCollapsed ? "flex-col items-center gap-2 py-3 px-2" : "h-20 items-center justify-between px-4",
-            )}
-          >
-            {!mainCollapsed ? (
-              <div className="flex min-w-0 flex-1 items-center">
-                <span className="truncate font-heading text-lg font-bold tracking-tight text-foreground dark:text-white">
-                  Rota Digital
-                </span>
-              </div>
-            ) : null}
-            <button
-              type="button"
-              onClick={toggleMainSidebar}
-              aria-expanded={!mainCollapsed}
-              aria-label={mainCollapsed ? "Expandir menu lateral" : "Recolher menu lateral (só ícones)"}
-              title={mainCollapsed ? "Expandir menu" : "Recolher para ícones"}
+        <aside
+          className={cn(
+            "flex min-h-0 min-w-0 flex-1 flex-col justify-between overflow-y-auto border-r border-sidebar-border bg-sidebar/95 text-sidebar-foreground shadow-sm backdrop-blur-xl dark:shadow-[1px_0_0_0_rgba(255,255,255,0.05)] dark:bg-zinc-950/50",
+          )}
+        >
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            <div
               className={cn(
-                "flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground dark:text-zinc-500 dark:hover:bg-white/10 dark:hover:text-zinc-200",
-                mainCollapsed && "order-first",
+                "flex h-20 shrink-0 items-center border-b border-sidebar-border dark:border-white/5",
+                mainCollapsed ? "justify-center px-2" : "px-4",
               )}
             >
-              {mainCollapsed ? (
-                <ChevronRight className="size-5" aria-hidden />
+              {!mainCollapsed ? (
+                <div className="flex min-w-0 flex-1 items-center pr-1">
+                  <span className="truncate font-heading text-lg font-bold tracking-tight text-foreground dark:text-white">
+                    Rota Digital
+                  </span>
+                </div>
               ) : (
-                <ChevronLeft className="size-5" aria-hidden />
+                <span className="sr-only">Rota Digital</span>
               )}
-            </button>
-          </div>
+            </div>
 
-          <nav className={cn("mt-6 space-y-1.5", mainCollapsed ? "px-2" : "px-4")}>
+          <nav className={cn("mt-6 min-h-0 flex-1 space-y-1.5 overflow-y-auto", mainCollapsed ? "px-2" : "px-4")}>
             {navItems.map((item) => {
               const isActive =
                 pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
@@ -176,20 +166,21 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 
         <div
           className={cn(
-            "border-t border-sidebar-border bg-muted/30 p-4 dark:border-white/5 dark:bg-white/[0.02]",
-            mainCollapsed && "px-2",
+            "mt-auto shrink-0 border-t border-sidebar-border/90 bg-gradient-to-b from-sidebar/40 to-muted/25 px-3 pb-3 pt-3 backdrop-blur-sm dark:border-white/[0.08] dark:from-zinc-950/40 dark:to-zinc-900/50",
+            mainCollapsed ? "px-2 pb-3 pt-2" : "px-3",
           )}
         >
           {!mainCollapsed ? (
-            <div className="mb-3 rounded-md bg-muted px-3 py-3 font-sans ring-1 ring-border dark:bg-white/5 dark:ring-white/5">
-              <div className="min-w-0 space-y-1">
-                <p className="truncate text-[14px] font-medium leading-snug tracking-tight text-foreground dark:text-zinc-100">
-                  {user.email}
-                </p>
-                <p className="font-heading text-[10px] font-semibold uppercase tracking-widest text-muted-foreground dark:text-zinc-500">
-                  Plano Pro
-                </p>
-              </div>
+            <div className="mb-3 space-y-2 rounded-xl border border-sidebar-border bg-sidebar-accent/40 p-3 shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:shadow-none">
+              <p
+                className="truncate text-sm font-medium leading-snug text-sidebar-foreground dark:text-zinc-100"
+                title={user.email ?? undefined}
+              >
+                {user.email}
+              </p>
+              <span className="inline-flex w-fit items-center rounded-full border border-brand/30 bg-brand/[0.1] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-brand dark:border-brand/40 dark:bg-brand/15 dark:text-brand">
+                Plano Pro
+              </span>
             </div>
           ) : null}
           <button
@@ -198,15 +189,39 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             title={mainCollapsed ? "Sair" : undefined}
             aria-label={mainCollapsed ? "Sair" : undefined}
             className={cn(
-              "group flex w-full items-center rounded-md text-muted-foreground transition-all duration-200 hover:bg-red-500/10 hover:text-red-600 dark:text-zinc-400 dark:hover:text-red-400",
-              mainCollapsed ? "justify-center px-2 py-2.5" : "gap-3 px-3.5 py-2.5",
+              "group flex w-full items-center rounded-lg border border-transparent text-muted-foreground transition-all duration-200",
+              "hover:border-red-200/90 hover:bg-red-500/[0.07] hover:text-red-700",
+              "dark:text-zinc-400 dark:hover:border-red-500/25 dark:hover:bg-red-500/10 dark:hover:text-red-300",
+              mainCollapsed ? "justify-center px-2 py-2.5" : "gap-3 px-3 py-2.5",
             )}
           >
             <LogOut className="size-5 shrink-0 transition-transform group-hover:-translate-x-0.5" aria-hidden />
-            {!mainCollapsed ? <span className="font-medium text-[14px]">Sair</span> : null}
+            {!mainCollapsed ? <span className="text-sm font-medium">Sair</span> : null}
           </button>
         </div>
-      </aside>
+        </aside>
+
+        <button
+          type="button"
+          onClick={toggleMainSidebar}
+          aria-expanded={!mainCollapsed}
+          aria-label={mainCollapsed ? "Expandir menu lateral" : "Recolher menu lateral (só ícones)"}
+          title={mainCollapsed ? "Expandir menu" : "Recolher para ícones"}
+          className={cn(
+            "absolute right-0 top-10 z-20 flex h-10 w-[1.375rem] -translate-y-1/2 translate-x-1/2 items-center justify-center",
+            "rounded-l-md rounded-r-lg border border-black/10 bg-brand text-brand-foreground shadow-md",
+            "transition-[filter,box-shadow] hover:brightness-[0.92] active:brightness-[0.86]",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/80 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+            "dark:border-black/25 dark:shadow-[0_2px_8px_-2px_rgba(0,0,0,0.45)]",
+          )}
+        >
+          {mainCollapsed ? (
+            <ChevronRight className="size-4 shrink-0 opacity-95" aria-hidden strokeWidth={2.5} />
+          ) : (
+            <ChevronLeft className="size-4 shrink-0 opacity-95" aria-hidden strokeWidth={2.5} />
+          )}
+        </button>
+      </div>
 
       {/* Segunda sidebar — só na área Configurações */}
       {settingsSection ? (
