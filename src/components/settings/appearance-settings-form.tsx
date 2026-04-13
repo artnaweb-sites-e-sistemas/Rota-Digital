@@ -5,7 +5,7 @@ import { useTheme } from "next-themes";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth-context";
 import switchTheme, {
-  THEME_SWITCH_CIRCULAR_DURATION_MS,
+  buildSharedCircularThemeAnimation,
   themeSwitchCircularOrigin,
 } from "@/lib/theme-switch-animation";
 import { getUserUiTheme, saveUserUiTheme } from "@/lib/user-settings";
@@ -103,11 +103,8 @@ export function AppearanceSettingsForm() {
     } else {
       switchTheme({
         switchThemeFunction: apply,
-        animationConfig: {
-          type: "circular",
-          duration: THEME_SWITCH_CIRCULAR_DURATION_MS,
-          startingPoint: origin,
-        },
+        animationConfig: buildSharedCircularThemeAnimation(origin),
+        disableAnimation: reduceMotion,
       });
     }
 

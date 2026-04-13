@@ -5,7 +5,7 @@ import { flushSync } from "react-dom";
 import { useTheme } from "next-themes";
 
 import switchTheme, {
-  THEME_SWITCH_CIRCULAR_DURATION_MS,
+  buildSharedCircularThemeAnimation,
   themeSwitchViewportCenter,
 } from "@/lib/theme-switch-animation";
 
@@ -58,11 +58,7 @@ export function PublicReportThemeIntro() {
             if (savedPreference === "system") setTheme("system");
             else setTheme(savedPreference);
           },
-          animationConfig: {
-            type: "circular",
-            duration: THEME_SWITCH_CIRCULAR_DURATION_MS,
-            startingPoint: center,
-          },
+          animationConfig: buildSharedCircularThemeAnimation(center),
         });
       });
     });

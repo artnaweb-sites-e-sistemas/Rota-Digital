@@ -25,6 +25,21 @@ export type SwitchThemeOptions = {
 export const THEME_SWITCH_CIRCULAR_DURATION_MS = 900;
 export const THEME_SWITCH_FADE_DURATION_MS = 900;
 
+/**
+ * Configuração circular **única** para toda a app (Aparência, toggle do relatório público, intro automático).
+ * Usa sempre a mesma duração e o mesmo caminho em `switchTheme` / View Transitions; só varia o ponto de origem.
+ */
+export function buildSharedCircularThemeAnimation(startingPoint: {
+  cx: number;
+  cy: number;
+}): Extract<ThemeSwitchAnimationConfig, { type: "circular" }> {
+  return {
+    type: "circular",
+    duration: THEME_SWITCH_CIRCULAR_DURATION_MS,
+    startingPoint,
+  };
+}
+
 /** Centro do alvo (equivalente a `measure` + metade da largura/altura no RN). */
 export function themeSwitchCircularOrigin(element: Element): { cx: number; cy: number } {
   const r = element.getBoundingClientRect();
