@@ -8,10 +8,11 @@ import { getLeads, createLead, updateLead, deleteLead } from "@/lib/leads";
 import { deleteReportsByLead, getReportsByUser } from "@/lib/reports";
 import type { RotaDigitalReport } from "@/types/report";
 import { buildWhatsAppHref, maskWhatsappBRDisplay, onlyDigitsPhone } from "@/lib/report-cta";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
@@ -43,6 +44,7 @@ import {
   ExternalLink,
   Loader2,
   Mail,
+  MapPin,
   MoreHorizontal,
   Phone,
   Plus,
@@ -52,6 +54,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { WhatsAppIcon } from "@/components/icons/whatsapp-icon";
+import { LeadCaptureProgressOverlay } from "@/components/leads/lead-capture-progress-overlay";
 // import { toast } from "sonner"; // If not available, we can use a simple alert or just implement without it
 
 const PAGE_SIZE = 10;
@@ -73,6 +76,15 @@ function normalizeSearchText(s: string): string {
     .normalize("NFD")
     .replace(/\p{M}/gu, "")
     .trim();
+}
+
+/** Uma linha ou vírgula/ponto e vírgula por item (nichos e cidades). */
+function splitToList(raw: string): string[] {
+  const parts = raw
+    .split(/[\n,;]+/g)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return Array.from(new Set(parts)).slice(0, 40);
 }
 
 function formatPhoneBr(value: string): string {
@@ -103,7 +115,7 @@ function statusFromQueryParam(raw: string | null): LeadStatus | null {
   }
   if (ALL_STATUSES.includes(decoded as LeadStatus)) return decoded as LeadStatus;
   const fromLegacy = normalizeLeadStatus(decoded);
-  if (decoded === "Em Contato" || decoded === "Novo" || decoded === "Qualificado") return fromLegacy;
+  if (decoded === "Novo" || decoded === "Qualificado") return fromLegacy;
   return null;
 }
 
@@ -150,7 +162,7 @@ function LeadTableSharedRouteLink({
   publicSlugByReportId: Map<string, string>;
 }) {
   const canOpenNewRotaForm =
-    lead.status === "Novo Lead" && !rowHasRoute;
+    (lead.status === "Novo Lead" || lead.status === "Em Contato") && !rowHasRoute;
 
   if (canOpenNewRotaForm) {
     const href = `/dashboard/rotas/new?leadId=${encodeURIComponent(lead.id)}`;
@@ -235,6 +247,16 @@ function LeadsPageContent() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  const [captureOpen, setCaptureOpen] = useState(false);
+  const [captureNiches, setCaptureNiches] = useState("");
+  const [captureCities, setCaptureCities] = useState("");
+  const [captureMax, setCaptureMax] = useState(25);
+  const [captureBusy, setCaptureBusy] = useState(false);
+  const [captureProgress, setCaptureProgress] = useState(0);
+  const [captureError, setCaptureError] = useState<string | null>(null);
+  const [captureNoticeOpen, setCaptureNoticeOpen] = useState(false);
+  const [captureNoticeMessage, setCaptureNoticeMessage] = useState("");
+
   // Form State
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -269,9 +291,25 @@ function LeadsPageContent() {
     return m;
   }, [reports]);
 
+  const captureOverlayHint = useMemo(() => {
+    const n = splitToList(captureNiches)[0];
+    const c = splitToList(captureCities)[0];
+    if (n && c) return `${n} · ${c}`;
+    if (n) return n;
+    return undefined;
+  }, [captureNiches, captureCities]);
+
   useEffect(() => {
     fetchLeads();
   }, [fetchLeads]);
+
+  useEffect(() => {
+    if (!captureBusy) return;
+    const id = window.setInterval(() => {
+      setCaptureProgress((p) => (p >= 88 ? p : p + 2));
+    }, 240);
+    return () => window.clearInterval(id);
+  }, [captureBusy]);
 
   const statusQuery = searchParams.get("status");
   useEffect(() => {
@@ -409,6 +447,104 @@ function LeadsPageContent() {
     }
   };
 
+  const openCapture = () => {
+    setCaptureError(null);
+    setCaptureOpen(true);
+  };
+
+  const runCapture = async () => {
+    if (!user) return;
+    const niches = splitToList(captureNiches);
+    const cities = splitToList(captureCities);
+    if (!niches.length || !cities.length) {
+      setCaptureError("Informe ao menos um nicho e uma cidade (linhas ou separados por vírgula).");
+      return;
+    }
+    const maxResults = Math.min(50, Math.max(1, Math.floor(Number(captureMax)) || 25));
+    setCaptureError(null);
+    setCaptureBusy(true);
+    setCaptureProgress(4);
+    try {
+      const idToken = await user.getIdToken();
+      const res = await fetch("/api/leads-capture", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          niches,
+          cities,
+          maxResults,
+        }),
+      });
+      const payload = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        created?: number;
+        requested?: number;
+        eligibleUnique?: number;
+        diagnostics?: {
+          textSearches: number;
+          placesFromSearch: number;
+          detailCalls: number;
+          skippedNoDetails: number;
+          skippedNoContact: number;
+          skippedDuplicate: number;
+        };
+      };
+      if (!res.ok) {
+        setCaptureError(payload.error || "Não foi possível concluir a captura.");
+        return;
+      }
+      setCaptureProgress(100);
+      const created = typeof payload.created === "number" ? payload.created : 0;
+      const requested = typeof payload.requested === "number" ? payload.requested : maxResults;
+      const eligible =
+        typeof payload.eligibleUnique === "number" ? payload.eligibleUnique : undefined;
+      await fetchLeads();
+      if (created === 0) {
+        const d = payload.diagnostics;
+        let msg =
+          "Nenhum lead novo gravado. Só entram empresas com telefone (8+ dígitos), site ou e-mail público, sem duplicar a sua lista.";
+        if (d) {
+          if (d.placesFromSearch === 0 && d.textSearches > 0) {
+            msg +=
+              " O Google não devolveu resultados para esta pesquisa — confira a chave `GOOGLE_PLACES_API_KEY`, a API Places (New) e as restrições da chave (pedidos vêm do servidor, não do browser).";
+          } else if (d.detailCalls > 0 && d.skippedNoDetails === d.detailCalls) {
+            msg +=
+              " Não foi possível obter detalhes dos lugares (404/erro) — confira se a mesma chave permite Place Details (New).";
+          } else {
+            if (d.skippedNoContact > 0) {
+              msg += ` ${d.skippedNoContact} resultado(s) sem contacto público suficiente.`;
+            }
+            if (d.skippedDuplicate > 0) {
+              msg += ` ${d.skippedDuplicate} ignorado(s) por já existirem na base (telefone, site ou Google Place).`;
+            }
+          }
+        }
+        setCaptureError(msg);
+        return;
+      }
+      setCaptureOpen(false);
+      if (created < requested) {
+        const extra =
+          typeof eligible === "number"
+            ? ` Na pesquisa apareceram ${eligible} empresa(s) com contacto público (telefone, site ou e-mail) que ainda não estavam duplicadas na sua base.`
+            : "";
+        setCaptureNoticeMessage(
+          `Foram cadastrados ${created} de ${requested} leads.${extra} Para chegar ao número total, experimente alargar cidades, variar os nichos ou repetir mais tarde — o Google pode devolver resultados diferentes ao longo do tempo.`,
+        );
+        setCaptureNoticeOpen(true);
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Erro de rede ao capturar leads.";
+      setCaptureError(msg);
+    } finally {
+      setCaptureBusy(false);
+      setTimeout(() => setCaptureProgress(0), 400);
+    }
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -416,10 +552,23 @@ function LeadsPageContent() {
           <h1 className="text-4xl font-extrabold tracking-tight text-foreground">Leads</h1>
           <p className="mt-1 text-muted-foreground">Gerencie seus contatos e oportunidades de negócio.</p>
         </div>
-        <Button variant="cta" size="lg" onClick={() => openForm()} className="gap-2">
-          <Plus className="size-4 shrink-0" aria-hidden />
-          Novo Lead
-        </Button>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            className="gap-2 border-white/15 bg-white/[0.03] text-foreground hover:bg-white/[0.06]"
+            onClick={openCapture}
+            disabled={captureBusy || !user}
+          >
+            <MapPin className="size-4 shrink-0" aria-hidden />
+            Captura automática
+          </Button>
+          <Button variant="cta" size="lg" onClick={() => openForm()} className="gap-2">
+            <Plus className="size-4 shrink-0" aria-hidden />
+            Novo Lead
+          </Button>
+        </div>
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -612,6 +761,178 @@ function LeadsPageContent() {
             >
               {isSaving ? <Loader2 className="size-4 animate-spin shrink-0" aria-hidden /> : null}
               {isSaving ? "A guardar…" : "Salvar lead"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={captureOpen}
+        onOpenChange={(next) => {
+          if (captureBusy) return;
+          setCaptureOpen(next);
+          if (!next) setCaptureError(null);
+        }}
+      >
+        <DialogContent
+          showCloseButton
+          className={cn(
+            "max-h-[min(92vh,820px)] w-full max-w-[calc(100%-1.5rem)] gap-0 overflow-y-auto overflow-x-hidden border-white/10 bg-zinc-950 p-0 text-zinc-100 shadow-2xl sm:max-w-xl md:max-w-[36rem]",
+            "rounded-2xl ring-1 ring-white/10",
+          )}
+        >
+          <div className="relative border-b border-white/[0.06] bg-white/[0.015] px-6 pb-5 pt-6 pr-14 sm:px-8 sm:pb-6 sm:pt-7 sm:pr-16">
+            <DialogHeader className="gap-1.5 space-y-0 text-left">
+              <DialogTitle className="font-heading text-lg font-semibold tracking-tight text-white sm:text-xl">
+                Captura automática (Google Places)
+              </DialogTitle>
+              <DialogDescription className="text-[13px] leading-relaxed text-zinc-300 sm:text-sm">
+                Nichos e cidades no Google Places. Mínimo: telefone (8+ dígitos), site ou e-mail público. Sem duplicados.
+                Novos em <span className="font-medium text-white">Novo Lead</span>.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="space-y-5 px-6 py-6 sm:px-8 sm:py-7">
+            <div className="space-y-2">
+              <Label htmlFor="capture-niches" className="text-xs font-medium text-zinc-200">
+                Nichos / segmentos <span className="text-red-400">*</span>
+              </Label>
+              <Textarea
+                id="capture-niches"
+                value={captureNiches}
+                onChange={(e) => setCaptureNiches(e.target.value)}
+                rows={3}
+                placeholder={"Ex.: clínica dentária\nmarketing para restaurantes"}
+                className="min-h-[88px] rounded-md border border-white/15 bg-white/[0.07] text-sm text-zinc-50 placeholder:text-zinc-400 placeholder:opacity-100 focus-visible:border-brand/55 focus-visible:ring-2 focus-visible:ring-brand/25"
+              />
+              <p className="text-[11px] leading-relaxed text-zinc-400">Um por linha, ou separados por vírgula.</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="capture-cities" className="text-xs font-medium text-zinc-200">
+                Cidades <span className="text-red-400">*</span>
+              </Label>
+              <Textarea
+                id="capture-cities"
+                value={captureCities}
+                onChange={(e) => setCaptureCities(e.target.value)}
+                rows={2}
+                placeholder={"Campinas\nSão Paulo"}
+                className="min-h-[72px] rounded-md border border-white/15 bg-white/[0.07] text-sm text-zinc-50 placeholder:text-zinc-400 placeholder:opacity-100 focus-visible:border-brand/55 focus-visible:ring-2 focus-visible:ring-brand/25"
+              />
+            </div>
+
+            <div className="space-y-4 rounded-xl border border-white/12 bg-white/[0.05] px-4 py-4 sm:px-5 sm:py-5">
+              <div className="flex items-end justify-between gap-4">
+                <div className="space-y-1">
+                  <Label htmlFor="capture-radius" className="text-xs font-medium text-zinc-200">
+                    Raio da captação
+                  </Label>
+                  <p className="text-[12px] leading-relaxed text-zinc-300 sm:text-[13px]">
+                    Quanto maior o valor, mais empresas tentamos trazer.
+                  </p>
+                </div>
+                <output
+                  htmlFor="capture-radius"
+                  className="shrink-0 rounded-full border border-brand/45 bg-brand px-3 py-1.5 text-sm font-bold tabular-nums text-brand-foreground shadow-[0_1px_0_0_rgba(255,255,255,0.12)_inset,0_1px_8px_-2px_rgba(0,0,0,0.35)] ring-1 ring-black/20 dark:border-brand/55 dark:shadow-[0_1px_0_0_rgba(255,255,255,0.14)_inset,0_2px_12px_-2px_rgba(0,0,0,0.45)] dark:ring-white/10"
+                >
+                  {captureMax} leads
+                </output>
+              </div>
+              <div className="relative pt-1">
+                <div
+                  className="pointer-events-none absolute left-0 right-0 top-[calc(50%+2px)] h-2 -translate-y-1/2 rounded-full bg-white/18"
+                  aria-hidden
+                />
+                <input
+                  id="capture-radius"
+                  type="range"
+                  min={1}
+                  max={50}
+                  step={1}
+                  value={captureMax}
+                  onChange={(e) => {
+                    const v = Number(e.target.value);
+                    setCaptureMax(Number.isFinite(v) ? v : 25);
+                  }}
+                  className={cn(
+                    "relative z-[1] h-2 w-full cursor-pointer appearance-none bg-transparent",
+                    "[&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-runnable-track]:bg-transparent",
+                    "[&::-webkit-slider-thumb]:mt-[-4px] [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-white/25 [&::-webkit-slider-thumb]:bg-gradient-to-br [&::-webkit-slider-thumb]:from-[#8a7a4a] [&::-webkit-slider-thumb]:to-brand [&::-webkit-slider-thumb]:shadow-[0_2px_10px_rgba(0,0,0,0.35)]",
+                    "[&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-full [&::-moz-range-track]:bg-transparent",
+                    "[&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border [&::-moz-range-thumb]:border-white/25 [&::-moz-range-thumb]:bg-gradient-to-br [&::-moz-range-thumb]:from-[#8a7a4a] [&::-moz-range-thumb]:to-brand [&::-moz-range-thumb]:shadow-[0_2px_10px_rgba(0,0,0,0.35)]",
+                  )}
+                  aria-valuemin={1}
+                  aria-valuemax={50}
+                  aria-valuenow={captureMax}
+                  aria-valuetext={`${captureMax} leads`}
+                />
+              </div>
+              <div className="flex justify-between text-xs font-semibold tabular-nums tracking-wide text-zinc-400">
+                <span>1</span>
+                <span>50</span>
+              </div>
+            </div>
+
+            {captureError ? (
+              <div
+                role="alert"
+                className="rounded-md border border-red-400/35 bg-red-500/15 px-3.5 py-2.5 text-sm font-medium leading-relaxed text-red-200"
+              >
+                {captureError}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="flex flex-col-reverse gap-3 border-t border-white/[0.06] bg-white/[0.02] px-6 py-4 sm:flex-row sm:items-center sm:justify-end sm:gap-3 sm:px-8 sm:py-5">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setCaptureOpen(false)}
+              disabled={captureBusy}
+              className="h-10 rounded-md text-zinc-200 hover:bg-white/10 hover:text-white sm:min-w-[7rem]"
+            >
+              Fechar
+            </Button>
+            <Button
+              type="button"
+              variant="cta"
+              size="lg"
+              disabled={captureBusy}
+              onClick={() => void runCapture()}
+              className="min-w-[10rem] gap-2"
+            >
+              {captureBusy ? <Loader2 className="size-4 animate-spin shrink-0" aria-hidden /> : null}
+              {captureBusy ? "A capturar…" : "Iniciar captura"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <LeadCaptureProgressOverlay open={captureBusy} progress={captureProgress} hint={captureOverlayHint} />
+
+      <Dialog open={captureNoticeOpen} onOpenChange={setCaptureNoticeOpen}>
+        <DialogContent
+          showCloseButton
+          className={cn(
+            "w-full max-w-[calc(100%-1.5rem)] gap-0 overflow-hidden border-white/10 bg-zinc-950 p-0 text-zinc-100 shadow-2xl sm:max-w-md",
+            "rounded-2xl ring-1 ring-white/10",
+          )}
+        >
+          <div className="border-b border-white/[0.06] bg-white/[0.015] px-6 py-5 sm:px-8 sm:py-6">
+            <DialogHeader className="space-y-2 text-left">
+              <DialogTitle className="font-heading text-lg font-semibold tracking-tight text-white">
+                Resultado da captura
+              </DialogTitle>
+              <DialogDescription className="text-sm leading-relaxed text-zinc-200">
+                {captureNoticeMessage}
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+          <div className="flex justify-end border-t border-white/[0.06] bg-white/[0.02] px-6 py-4 sm:px-8 sm:py-5">
+            <Button type="button" variant="cta" size="lg" onClick={() => setCaptureNoticeOpen(false)}>
+              Entendi
             </Button>
           </div>
         </DialogContent>
@@ -835,13 +1156,14 @@ function LeadsPageContent() {
                     </TableCell>
                     <TableCell className="py-4 pl-3 pr-6 text-right align-middle">
                      <DropdownMenu>
-                        <DropdownMenuTrigger>
-                          <Button
-                            variant="ghost"
-                            className="h-9 w-9 rounded-lg p-0 text-muted-foreground transition-all hover:bg-muted hover:text-foreground dark:hover:bg-white/10 dark:hover:text-white"
-                          >
-                            <MoreHorizontal className="h-5 w-5" />
-                          </Button>
+                        <DropdownMenuTrigger
+                          title="Mais opções"
+                          className={cn(
+                            buttonVariants({ variant: "ghost", size: "icon" }),
+                            "h-9 w-9 rounded-lg p-0 text-muted-foreground transition-all hover:bg-muted hover:text-foreground dark:hover:bg-white/10 dark:hover:text-white",
+                          )}
+                        >
+                          <MoreHorizontal className="h-5 w-5" aria-hidden />
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="min-w-[168px]">
                           <DropdownMenuItem onClick={() => (window.location.href = `/dashboard/leads/${lead.id}`)}>

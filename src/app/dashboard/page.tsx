@@ -7,7 +7,7 @@ import {
   Users,
   Compass,
   CheckCircle,
-  XCircle,
+  MessageCircle,
   Sparkles,
   Loader2,
   ChevronRight,
@@ -199,20 +199,34 @@ export default function DashboardPage() {
 
   const stats = useMemo(() => {
     const total = leads.length;
+    const novos = leads.filter((l) => l.status === "Novo Lead").length;
+    const emContato = leads.filter((l) => l.status === "Em Contato").length;
     const convertidos = leads.filter((l) => l.status === "Convertido").length;
-    const perdidos = leads.filter((l) => l.status === "Perdido").length;
     const taxa =
       total > 0 ? Math.round((convertidos / total) * 100) : 0;
-    const taxaPerdidos = total > 0 ? Math.round((perdidos / total) * 100) : 0;
 
     return [
       {
-        title: "Total de Leads",
-        value: formatInt(total),
-        description: total === 0 ? "Nenhum lead cadastrado ainda" : describeLeadMonthComparison(leads),
+        title: "Novo Lead",
+        value: formatInt(novos),
+        description:
+          novos === 0
+            ? "Nenhum lead em status “Novo Lead”"
+            : `${formatInt(novos)} lead(s) em status “Novo Lead”`,
         icon: Users,
         color: "text-muted-foreground",
-        href: "/dashboard/leads",
+        href: `/dashboard/leads?status=${encodeURIComponent("Novo Lead")}`,
+      },
+      {
+        title: "Em contato",
+        value: formatInt(emContato),
+        description:
+          emContato === 0
+            ? "Nenhum lead em status “Em Contato”"
+            : `${formatInt(emContato)} lead(s) em status “Em Contato”`,
+        icon: MessageCircle,
+        color: "text-brand",
+        href: `/dashboard/leads?status=${encodeURIComponent("Em Contato")}`,
       },
       {
         title: "Rotas Digitais",
@@ -221,6 +235,7 @@ export default function DashboardPage() {
           reportCount === 0 ? "Nenhum relatório gerado ainda" : "Relatórios gerados na sua conta",
         icon: Sparkles,
         color: "text-brand",
+        brandIconAccent: true,
         href: `/dashboard/leads?status=${encodeURIComponent("Rota Gerada")}`,
       },
       {
@@ -233,17 +248,6 @@ export default function DashboardPage() {
         icon: CheckCircle,
         color: "text-green-500",
         href: "/dashboard/leads?status=Convertido",
-      },
-      {
-        title: "Leads perdidos",
-        value: formatInt(perdidos),
-        description:
-          total === 0
-            ? "Cadastre leads para acompanhar o funil"
-            : `${taxaPerdidos}% da base com status “Perdido”`,
-        icon: XCircle,
-        color: "text-red-500",
-        href: "/dashboard/leads?status=Perdido",
       },
     ] as const;
   }, [leads, reportCount]);
@@ -269,12 +273,14 @@ export default function DashboardPage() {
                 </CardTitle>
                 <div
                   className={cn(
-                    "flex h-8 w-8 items-center justify-center rounded-lg ring-1 transition-all duration-300 group-hover:scale-110",
-                    stat.color === "text-brand"
-                      ? "bg-brand/10 ring-brand/25 group-hover:ring-brand/40 dark:bg-brand/[0.12] dark:ring-brand/30 dark:group-hover:ring-brand/45"
-                      : stat.color === "text-muted-foreground"
-                        ? "bg-muted/70 ring-border/80 group-hover:ring-border dark:bg-white/[0.06] dark:ring-white/10 dark:group-hover:ring-white/18"
-                        : "bg-muted ring-border group-hover:ring-border/80 dark:bg-white/5 dark:ring-white/10 dark:group-hover:ring-white/20",
+                    "flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-300 group-hover:scale-110",
+                    stat.color === "text-brand" && "brandIconAccent" in stat && stat.brandIconAccent
+                      ? "bg-brand/[0.14] ring-1 ring-brand/32 group-hover:bg-brand/[0.18] group-hover:ring-brand/40 dark:bg-brand/[0.15] dark:ring-brand/34 dark:group-hover:bg-brand/[0.19] dark:group-hover:ring-brand/46"
+                      : stat.color === "text-brand"
+                        ? "bg-brand/10 ring-1 ring-brand/25 group-hover:ring-brand/40 dark:bg-brand/[0.12] dark:ring-brand/30 dark:group-hover:ring-brand/45"
+                        : stat.color === "text-muted-foreground"
+                          ? "bg-muted/70 ring-1 ring-border/80 group-hover:ring-border dark:bg-white/[0.06] dark:ring-white/10 dark:group-hover:ring-white/18"
+                          : "bg-muted ring-1 ring-border group-hover:ring-border/80 dark:bg-white/5 dark:ring-white/10 dark:group-hover:ring-white/20",
                     stat.color,
                   )}
                 >
@@ -344,7 +350,11 @@ export default function DashboardPage() {
                       >
                         <div className="relative">
                           <div className="absolute -inset-1 rounded-full bg-brand/20 opacity-0 blur-sm transition-opacity group-hover:opacity-100" />
-                          <ReportSiteAvatar report={r} className="relative ring-1 ring-border transition-all group-hover:ring-brand/30 dark:ring-white/10" />
+                          <ReportSiteAvatar
+                            report={r}
+                            faviconOnly
+                            className="relative ring-1 ring-border transition-all group-hover:ring-brand/30 dark:ring-white/10"
+                          />
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="truncate font-bold text-foreground transition-colors group-hover:text-primary">{r.leadCompany}</p>

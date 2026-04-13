@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { RotaDigitalReport } from "@/types/report";
@@ -22,13 +22,19 @@ type Props = {
   report: RotaDigitalReport;
   size?: Size;
   className?: string;
+  /** Só favicon Google (listagens); hero do relatório e OG seguem iguais. */
+  faviconOnly?: boolean;
 };
 
 /** Favicon/logo do site do relatório; se falhar ao carregar ou não houver URL, mostra ícone de prédio. */
-export function ReportSiteAvatar({ report, size = "md", className }: Props) {
+export function ReportSiteAvatar({ report, size = "md", className, faviconOnly }: Props) {
   const [broken, setBroken] = useState(false);
-  const src = getReportSiteIconSrc(report);
+  const src = getReportSiteIconSrc(report, { faviconOnly });
   const showImg = Boolean(src) && !broken;
+
+  useEffect(() => {
+    setBroken(false);
+  }, [report.id, src]);
 
   return (
     <div

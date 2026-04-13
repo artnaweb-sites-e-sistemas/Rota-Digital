@@ -1,11 +1,11 @@
 /** Status ativos no funil (Novo e Qualificado foram descontinuados). */
-export const LEAD_STATUSES = ["Novo Lead", "Rota Gerada", "Convertido", "Perdido"] as const;
+export const LEAD_STATUSES = ["Novo Lead", "Em Contato", "Rota Gerada", "Convertido", "Perdido"] as const;
 export type LeadStatus = (typeof LEAD_STATUSES)[number];
 
 const LEGACY_TO_ACTIVE: Record<string, LeadStatus> = {
   Novo: "Novo Lead",
   Qualificado: "Novo Lead",
-  "Em Contato": "Novo Lead",
+  "Em Contato": "Em Contato",
   "Novo Lead": "Novo Lead",
   "Rota Gerada": "Rota Gerada",
   Convertido: "Convertido",
@@ -18,6 +18,9 @@ export function normalizeLeadStatus(raw: unknown): LeadStatus {
   if (s in LEGACY_TO_ACTIVE) return LEGACY_TO_ACTIVE[s]!;
   return "Novo Lead";
 }
+
+/** Origem do cadastro no painel. */
+export type LeadSource = "manual" | "google_places";
 
 export interface Lead {
   id: string;
@@ -35,4 +38,7 @@ export interface Lead {
   websiteUrl?: string;
   /** Perfil ou URL do Instagram (opcional). */
   instagramUrl?: string;
+  /** Referência Google Places (resource name, ex.: `places/ChIJ…`) para dedupe. */
+  googlePlaceId?: string;
+  leadSource?: LeadSource;
 }

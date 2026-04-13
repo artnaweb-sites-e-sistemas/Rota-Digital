@@ -252,6 +252,7 @@ export default function RotasPage() {
                     <ReportSiteAvatar
                       report={report}
                       size="sm"
+                      faviconOnly
                       className="border border-border bg-muted text-muted-foreground dark:border-zinc-700 dark:bg-zinc-800/80 dark:text-zinc-500"
                     />
                     <h3 className="truncate font-semibold text-foreground">{report.leadCompany}</h3>
