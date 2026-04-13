@@ -1454,11 +1454,41 @@ function buildDiagnosticImprovementText(
   return "Para 10/10: evidenciar o que funciona, corrigir atritos e traduzir em ação no site e no Instagram.";
 }
 
-const DIAGNOSTIC_COMMENT_MAX_CHARS = 430;
+/** Teto alinhado ao prompt: cabe 2 parágrafos com frases completas sem truncar a meio. */
+const DIAGNOSTIC_COMMENT_MAX_CHARS = 520;
 
-/** Garante teto de caracteres sem partir no meio de uma palavra quando possível. */
+/**
+ * Encurta até `maxLen` preferindo cortar no fim da última frase completa (`.!?` + espaço ou fim).
+ * Sem reticências artificiais; se não houver frase completa, corta no limite de palavra.
+ */
+function fitTextToMaxCharsPreferSentenceEnd(text: string, maxLen: number): string {
+  const t = text.replace(/\s+/g, " ").trim();
+  if (t.length <= maxLen) return t;
+  const w = t.slice(0, maxLen);
+  const floor = Math.min(36, Math.max(20, Math.floor(maxLen * 0.32)));
+  for (let i = w.length - 1; i >= floor; i--) {
+    const ch = w[i];
+    if (ch !== "." && ch !== "!" && ch !== "?") continue;
+    const next = i + 1 < w.length ? w[i + 1] : "";
+    if (next === "" || /\s/.test(next)) {
+      return w.slice(0, i + 1).trim();
+    }
+  }
+  return w.replace(/\s+\S*$/, "").trim();
+}
+
+/** Normaliza comentário do modelo (remove reticências soltas no fim). */
+function normalizeDiagnosticCommentRaw(raw: string): string {
+  return raw
+    .replace(/\r\n/g, "\n")
+    .replace(/[ \t]*\u2026[ \t]*$/g, "")
+    .replace(/[ \t]*\.{3,}[ \t]*$/g, "")
+    .trim();
+}
+
+/** Garante teto de caracteres mantendo 2 parágrafos quando possível, sem `…` forçado. */
 function clampDiagnosticComment(raw: string, maxChars: number): string {
-  let s = raw.replace(/\r\n/g, "\n").trim();
+  let s = normalizeDiagnosticCommentRaw(raw);
   if (s.length <= maxChars) return s;
   const paras = s
     .split(/\n{2,}/)
@@ -1471,8 +1501,7 @@ function clampDiagnosticComment(raw: string, maxChars: number): string {
     const maxSecond = maxChars - first.length - sep.length;
     if (maxSecond >= 28) {
       if (second.length > maxSecond) {
-        second = second.slice(0, maxSecond).replace(/\s+\S*$/, "").trim();
-        if (second && !/[.!?…]$/.test(second)) second += "…";
+        second = fitTextToMaxCharsPreferSentenceEnd(second, maxSecond);
       }
       const out = `${first}${sep}${second}`;
       if (out.length <= maxChars) return out;
@@ -1480,7 +1509,7 @@ function clampDiagnosticComment(raw: string, maxChars: number): string {
   }
   const single = s.replace(/\n+/g, " ").replace(/\s+/g, " ").trim();
   if (single.length <= maxChars) return single;
-  return `${single.slice(0, Math.max(1, maxChars - 1)).replace(/\s+\S*$/, "").trim()}…`;
+  return fitTextToMaxCharsPreferSentenceEnd(single, maxChars);
 }
 
 function ensureDiagnosticCommentActionability(
@@ -1669,7 +1698,7 @@ ${buildReportCopyVoicePromptSection()}
 - "strengths", "weaknesses", "opportunities", "quickWins", "longTermActions", "nextSteps": itens curtos, diretos e fáceis de entender. Evite frases longas.
 - "recommendedChannels.description": **exatamente 2 parágrafos curtos** com \\n\\n; linguagem comercial simples. Meta **total ~380–560 caracteres**: 1º = por que o canal faz sentido **neste** caso (detalhe concreto); 2º = ângulo complementar (ex.: público ou prioridade). Sem frase genérica vazia.
 - "recommendedChannels.actions": ações práticas, em tom de orientação direta.
-- "diagnosticScores.comment": **exatamente 2 parágrafos curtos** com \\n\\n; meta **total ~240–400 caracteres** (cerca da metade do que seria um texto longo — **obrigatório** ficar dentro do teto). **No máximo 2 frases curtas por parágrafo.** 1º = leitura objetiva do tópico com **fato ou evidência concreta**; 2º = **uma** prioridade ou próximo passo mensurável. Proibido preencher com adjetivos genéricos, clichês ou contraste repetido (ex.: Instagram bom / site ruim) em todos os tópicos. Se a nota for < 10, o que falta para 10/10 **no máximo uma vez** no comentário inteiro.
+- "diagnosticScores.comment": **exatamente 2 parágrafos curtos** com \\n\\n; meta **total ~260–480 caracteres** (teto rígido ~520 — planeje frases completas dentro disso). **No máximo 2 frases curtas por parágrafo.** 1º = leitura objetiva do tópico com **fato ou evidência concreta**; 2º = **uma** prioridade ou próximo passo mensurável. **Cada parágrafo deve terminar com frase completa** (`.` `!` ou `?`). **Proibido** usar reticências (`...` ou `…`) ou deixar frase aberta como se fosse continuar. Proibido preencher com adjetivos genéricos, clichês ou contraste repetido (ex.: Instagram bom / site ruim) em todos os tópicos. Se a nota for < 10, o que falta para 10/10 **no máximo uma vez** no comentário inteiro.
 - "websiteResearchNote" e "instagramResearchNote": **sempre exatamente 2 parágrafos curtos cada** (\\n\\n), como na regra 1.3.
 
 **REGRA ABSOLUTA: NUNCA INVENTE INFORMAÇÃO**
