@@ -35,6 +35,7 @@ import {
   sanitizeInstagramAssetUrl,
 } from "@/lib/instagram-public-profile";
 import { parseModelJson } from "@/lib/model-json-parse";
+import { maturityFromDiagnosticScores } from "@/lib/maturity-from-diagnostics";
 
 export const runtime = "nodejs";
 /** Vercel Pro: até 300s; 180s dá folga para evidências + Gemini + eventual reparo de JSON. */
@@ -1693,7 +1694,8 @@ ${buildReportCopyVoicePromptSection()}
 4.1) No texto visível de "proposalPageHtml" (títulos, parágrafos, botões), aplique a **Voz do relatório**: linguagem natural, sem siglas nem jargão de agência.
 
 **Tom obrigatório por campo**
-- "executiveSummary": **exatamente 2 parágrafos curtos**, separados por \\n\\n (proibido terceiro parágrafo). **Meta: no máximo ~520 caracteres no total** (soma dos dois): 1º = leitura objetiva do que a empresa já mostra no digital; 2º = por que a nota de maturidade faz sentido. Frases curtas. **Não** repita listas de canais, forças ou tópicos do diagnóstico — isso vai em outros campos.
+- "executiveSummary": **exatamente 2 parágrafos curtos**, separados por \\n\\n (proibido terceiro parágrafo). **Meta: no máximo ~520 caracteres no total** (soma dos dois): 1º = leitura objetiva do que a empresa já mostra no digital; 2º = por que o **resultado global** (síntese das notas dos tópicos) faz sentido, **sem** listar cada tópico nem repetir números que já vêm no JSON. Frases curtas. **Não** repita listas de canais, forças ou tópicos do diagnóstico — isso vai em outros campos.
+- **Coerência de maturidade:** quando houver pelo menos um item em "diagnosticScores", faça "digitalMaturityScore" **numericamente igual** à média aritmética dos "score" desses itens (uma casa decimal) e "digitalMaturityLevel" coerente: **<4** Iniciante; **≥4 e <7** Intermediário; **≥7** Avançado. Cada nota de tópico deve obedecer à exigência definida e o "comment" deve sustentar a nota com evidência; em exigência **alta**, seja mais duro nos tópicos onde houver falhas reais.
 - "companyProfile": texto curto e claro sobre o que a empresa aparenta vender, para quem e com qual proposta.
 - "strengths", "weaknesses", "opportunities", "quickWins", "longTermActions", "nextSteps": itens curtos, diretos e fáceis de entender. Evite frases longas.
 - "recommendedChannels.description": **exatamente 2 parágrafos curtos** com \\n\\n; linguagem comercial simples. Meta **total ~380–560 caracteres**: 1º = por que o canal faz sentido **neste** caso (detalhe concreto); 2º = ângulo complementar (ex.: público ou prioridade). Sem frase genérica vazia.
@@ -1742,7 +1744,7 @@ Responda **somente** com um único objeto JSON válido (sem markdown fora do JSO
   "executiveSummary": "string — exatamente 2 parágrafos curtos separados por \\n\\n; preferencialmente ≤520 caracteres no total",
   "companyProfile": "string",
   "digitalMaturityLevel": "Iniciante" | "Intermediário" | "Avançado",
-  "digitalMaturityScore": number (0 a 10, usar casa decimal se necessário),
+  "digitalMaturityScore": number (0 a 10, uma casa decimal; se existir diagnosticScores, igual à média dos score),
   "strengths": ["string"],
   "weaknesses": ["string"],
   "opportunities": ["string"],
@@ -2146,11 +2148,14 @@ export async function POST(req: NextRequest) {
       item.topic.toLowerCase().includes("rede")
     );
 
+    const maturityFromTopics = maturityFromDiagnosticScores(harmonizedDiagnosticScores);
+
     const rawMaturityScore = Number(aiData.digitalMaturityScore) || 0;
     const normalizedMaturityScore = rawMaturityScore > 10 ? rawMaturityScore / 10 : rawMaturityScore;
-    const defaultScoreText = `${Math.max(
-      0,
-      Math.min(10, normalizedMaturityScore)
+    const fallbackOverall = Math.max(0, Math.min(10, normalizedMaturityScore));
+    const defaultScoreText = `${(maturityFromTopics
+      ? maturityFromTopics.digitalMaturityScore
+      : fallbackOverall
     ).toFixed(1)}/10`;
     const websiteScoreText = websiteTopic
       ? `${websiteTopic.score.toFixed(1)}/10`
@@ -2197,13 +2202,15 @@ export async function POST(req: NextRequest) {
       executiveSummary: String(aiData.executiveSummary || ""),
       companyProfile: String(aiData.companyProfile || ""),
       digitalMaturityLevel:
-        (aiData.digitalMaturityLevel as RotaDigitalReport["digitalMaturityLevel"]) ||
-        "Iniciante",
-      digitalMaturityScore: (() => {
-        const raw = Number(aiData.digitalMaturityScore) || 0;
-        const normalized = raw > 10 ? raw / 10 : raw;
-        return Math.max(0, Math.min(10, Number(normalized.toFixed(1))));
-      })(),
+        maturityFromTopics?.digitalMaturityLevel ??
+        ((aiData.digitalMaturityLevel as RotaDigitalReport["digitalMaturityLevel"]) || "Iniciante"),
+      digitalMaturityScore: maturityFromTopics
+        ? maturityFromTopics.digitalMaturityScore
+        : (() => {
+            const raw = Number(aiData.digitalMaturityScore) || 0;
+            const normalized = raw > 10 ? raw / 10 : raw;
+            return Math.max(0, Math.min(10, Number(normalized.toFixed(1))));
+          })(),
       strengths: (aiData.strengths as string[]) || [],
       weaknesses: (aiData.weaknesses as string[]) || [],
       opportunities: (aiData.opportunities as string[]) || [],

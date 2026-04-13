@@ -21,6 +21,7 @@ import {
 import { getUserAiPromptSettingsAdmin } from "@/lib/user-settings-admin";
 import { buildReportCopyVoicePromptSection } from "@/lib/report-copy-voice-prompt";
 import { parseModelJson } from "@/lib/model-json-parse";
+import { maturityFromDiagnosticScores } from "@/lib/maturity-from-diagnostics";
 
 type GeminiUsageMetadata = {
   promptTokenCount?: number;
@@ -121,7 +122,8 @@ Regra principal de escrita:
 - Se o destino final do link da bio for WhatsApp, diga isso claramente e não invente Linktree com várias opções.
 
 Tom por campo:
-- "executiveSummary": **exatamente 2 parágrafos curtos** com \\n\\n. **Meta: no máximo ~520 caracteres no total**; 1º = leitura do digital; 2º = por que a nota de maturidade faz sentido. Não repita strengths/diagnosticScores nem liste todos os canais.
+- "executiveSummary": **exatamente 2 parágrafos curtos** com \\n\\n. **Meta: no máximo ~520 caracteres no total**; 1º = leitura do digital; 2º = por que o **resultado global** (síntese das notas dos tópicos) faz sentido, sem listar cada tópico. Não repita strengths/diagnosticScores nem liste todos os canais.
+- **Coerência de maturidade:** com "diagnosticScores" preenchido, "digitalMaturityScore" deve ser a **média aritmética** dos "score" (uma casa decimal) e "digitalMaturityLevel" coerente: **<4** Iniciante; **≥4 e <7** Intermediário; **≥7** Avançado. O servidor harmoniza; ainda assim mantenha o JSON alinhado.
 - "companyProfile": texto curto, direto e fácil de entender.
 - "strengths", "weaknesses", "opportunities", "quickWins", "longTermActions", "nextSteps": itens curtos e objetivos.
 - "recommendedChannels.description": **exatamente 2 parágrafos curtos** com \\n\\n; meta total ~380–560 caracteres; comercial, com detalhe deste caso (evite genérico).
@@ -142,7 +144,7 @@ Retorne SOMENTE um JSON válido com os campos atualizados:
   "executiveSummary": "string — exatamente 2 parágrafos com \\n\\n; preferencialmente ≤520 caracteres no total",
   "companyProfile": "string",
   "digitalMaturityLevel": "Iniciante" | "Intermediário" | "Avançado",
-  "digitalMaturityScore": number (0 a 10),
+  "digitalMaturityScore": number (0 a 10, uma casa decimal; com diagnosticScores, igual à média dos score),
   "strengths": ["string"],
   "weaknesses": ["string"],
   "opportunities": ["string"],
@@ -197,11 +199,6 @@ Retorne SOMENTE um JSON válido com os campos atualizados:
     }
 
     const aiData = parseModelJson(responseText);
-    const normalizedScore = (() => {
-      const raw = Number(aiData.digitalMaturityScore) || report.digitalMaturityScore || 0;
-      const normalized = raw > 10 ? raw / 10 : raw;
-      return Math.max(0, Math.min(10, Number(normalized.toFixed(1))));
-    })();
 
     const diagnosticScores = Array.isArray(aiData.diagnosticScores)
       ? (aiData.diagnosticScores as DiagnosticScore[]).map((item) => ({
@@ -213,6 +210,19 @@ Retorne SOMENTE um JSON válido com os campos atualizados:
           evidenceNote: item.evidenceNote,
         }))
       : report.diagnosticScores || [];
+
+    const maturityFromTopics = maturityFromDiagnosticScores(diagnosticScores);
+    const normalizedScore = maturityFromTopics
+      ? maturityFromTopics.digitalMaturityScore
+      : (() => {
+          const raw = Number(aiData.digitalMaturityScore) || report.digitalMaturityScore || 0;
+          const normalized = raw > 10 ? raw / 10 : raw;
+          return Math.max(0, Math.min(10, Number(normalized.toFixed(1))));
+        })();
+    const resolvedMaturityLevel = maturityFromTopics
+      ? maturityFromTopics.digitalMaturityLevel
+      : ((aiData.digitalMaturityLevel as RotaDigitalReport["digitalMaturityLevel"]) ||
+          report.digitalMaturityLevel);
 
     const reanalysisEstimatedCostUsd = estimateCostUsdFromUsage(selectedModelName, selectedUsage);
     const reanalysisEstimatedCostBrl =
@@ -243,9 +253,7 @@ Retorne SOMENTE um JSON válido com os campos atualizados:
       report: {
         executiveSummary: String(aiData.executiveSummary || report.executiveSummary || ""),
         companyProfile: String(aiData.companyProfile || report.companyProfile || ""),
-        digitalMaturityLevel:
-          (aiData.digitalMaturityLevel as RotaDigitalReport["digitalMaturityLevel"]) ||
-          report.digitalMaturityLevel,
+        digitalMaturityLevel: resolvedMaturityLevel,
         digitalMaturityScore: normalizedScore,
         strengths: (aiData.strengths as string[]) || report.strengths || [],
         weaknesses: (aiData.weaknesses as string[]) || report.weaknesses || [],

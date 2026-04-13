@@ -12,13 +12,17 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { updateReport } from "@/lib/reports";
+import { maturityFromDiagnosticScores } from "@/lib/maturity-from-diagnostics";
 import { getUserReportCtaSettings } from "@/lib/user-settings";
 import { resolveReportCtas } from "@/lib/report-cta";
 import { PublicReportFloatingCta } from "@/components/rotas/public-report-floating-cta";
+import { DashboardEditableRegion } from "@/components/rotas/dashboard-editable-region";
+import { DiagnosticScoreSlider } from "@/components/rotas/diagnostic-score-slider";
 import { RotaDigitalReport, DigitalChannel, DiagnosticScore } from "@/types/report";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
@@ -42,8 +46,6 @@ import {
   ArrowRight,
   ExternalLink,
   Globe,
-  Pencil,
-  Save,
   X,
   Bot,
   Compass,
@@ -53,6 +55,10 @@ import {
   MessageSquare,
   Tag,
   ClipboardList,
+  Copy,
+  Link2,
+  Plus,
+  Pencil,
   FileText,
   Images,
   type LucideIcon,
@@ -710,6 +716,22 @@ function parseResearchNotes(text?: string): {
   };
 }
 
+/** Reconstrói `evidences.researchNotes` após edição de Website / Instagram no dashboard. */
+function buildResearchNotesFromParts(parts: {
+  website: string;
+  instagram: string;
+  general: string[];
+}): string {
+  const w = parts.website.trim();
+  const ig = parts.instagram.trim();
+  const gen = parts.general.map((g) => g.trim()).filter(Boolean);
+  let out = `Website (validação automática):\n\n${w}\n\nInstagram (validação automática):\n\n${ig}`;
+  for (const g of gen) {
+    out += `\n\n${g}`;
+  }
+  return out;
+}
+
 function parseInstagramMetricFromText(text: string, type: "followers" | "following" | "posts"): number | undefined {
   const pattern =
     type === "followers"
@@ -1212,7 +1234,38 @@ function TopicEvidence({
   );
 }
 
-function ChannelCard({ channel }: { channel: DigitalChannel }) {
+/** Secções de lista no dashboard: um lápis na caixa abre o modo tópico-a-tópico. */
+type DashboardListSectionKey =
+  | "strengths"
+  | "weaknesses"
+  | "opportunities"
+  | "quickWins"
+  | "longTermActions"
+  | "nextSteps";
+
+type DashboardChannelEdit = {
+  editingField: string | null;
+  fieldSaving: boolean;
+  fieldError: string | null;
+  editDraft: string;
+  setEditDraft: (v: string) => void;
+  beginTextEdit: (field: string, initial: string) => void;
+  cancelFieldEdit: () => void;
+  onSaveChannelDescription: (sortedIndex: number) => Promise<void>;
+  onSaveChannelActionItem: (sortedIndex: number, actionIndex: number) => Promise<void>;
+  appendChannelAction: (sortedIndex: number) => Promise<void>;
+  removeChannelAction: (sortedIndex: number, actionIndex: number) => Promise<void>;
+};
+
+function ChannelCard({
+  channel,
+  channelIndex,
+  dashboardChannelEdit,
+}: {
+  channel: DigitalChannel;
+  channelIndex: number;
+  dashboardChannelEdit?: DashboardChannelEdit;
+}) {
   const glowByPriority: Record<string, { glowColor: string; colors: string[] }> = {
     Alta: {
       glowColor: "24 58 48",
@@ -1234,6 +1287,9 @@ function ChannelCard({ channel }: { channel: DigitalChannel }) {
   const priorityTabSurface =
     CHANNEL_PRIORITY_TAB_SURFACE[channel.priority] || CHANNEL_PRIORITY_TAB_SURFACE.Média;
   const priorityBadgeLabelText = channelPriorityBadgeLabel(channel.priority);
+  const d = dashboardChannelEdit;
+  const descKey = `channel-${channelIndex}-description`;
+  const [actionsSectionOpen, setActionsSectionOpen] = useState(false);
   return (
     <div className="relative flex h-full min-h-0 flex-col pt-1 md:self-stretch">
       {/*
@@ -1268,8 +1324,9 @@ function ChannelCard({ channel }: { channel: DigitalChannel }) {
       >
         <div
           className={cn(
-            "flex min-h-0 flex-1 flex-col overflow-visible space-y-3 rounded-lg px-5 py-5 sm:px-7 sm:py-5",
+            "relative flex min-h-0 flex-1 flex-col overflow-visible space-y-3 rounded-lg px-5 py-5 sm:px-7 sm:py-5",
             ROTA_REPORT_SURFACE_GLOW_INNER,
+            d && !actionsSectionOpen && "pb-12",
           )}
         >
           <div className="flex items-start gap-2 pb-1">
@@ -1279,27 +1336,182 @@ function ChannelCard({ channel }: { channel: DigitalChannel }) {
               </span>
             </h4>
           </div>
-          <ReportProseBlocks text={channel.description} size="sm" collapseToTwoParagraphs />
-          {channel.actions.length > 0 && (
-            <ul className="space-y-2.5">
-              {channel.actions.map((action, i) => (
-                <li key={i} className="flex items-center gap-3 text-[13px] leading-relaxed">
-                  <div
-                    className={cn(
-                      "flex h-7 w-7 shrink-0 items-center justify-center rounded-md border ring-1",
-                      CHANNEL_ACTION_ICON_SHELL[channel.priority] || CHANNEL_ACTION_ICON_SHELL.Média,
-                    )}
-                    aria-hidden
-                  >
-                    <ArrowRight size={13} className="shrink-0 opacity-95" strokeWidth={2.25} />
-                  </div>
-                  <span className="min-w-0 flex-1 text-muted-foreground dark:text-zinc-300">
-                    {action}
-                  </span>
-                </li>
-              ))}
-            </ul>
+          {d ? (
+            <DashboardEditableRegion
+              enabled
+              hideReadToolbar
+              isEditing={d.editingField === descKey}
+              onStartEdit={() => d.beginTextEdit(descKey, channel.description)}
+              onCancel={d.cancelFieldEdit}
+              onSave={() => d.onSaveChannelDescription(channelIndex)}
+              saving={d.fieldSaving}
+              error={d.editingField === descKey ? d.fieldError : null}
+              draft={d.editDraft}
+              onDraftChange={d.setEditDraft}
+              ariaLabel="Editar descrição do canal"
+            >
+              {actionsSectionOpen && d.editingField !== descKey ? (
+                <div
+                  role="button"
+                  tabIndex={0}
+                  title="Clique para editar o texto da descrição"
+                  className="cursor-pointer rounded-md outline-none transition-colors hover:bg-muted/35 focus-visible:ring-2 focus-visible:ring-ring"
+                  onClick={() => {
+                    if (d.fieldSaving) return;
+                    d.beginTextEdit(descKey, channel.description);
+                  }}
+                  onKeyDown={(e) => {
+                    if (d.fieldSaving) return;
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      d.beginTextEdit(descKey, channel.description);
+                    }
+                  }}
+                >
+                  <ReportProseBlocks text={channel.description} size="sm" collapseToTwoParagraphs />
+                </div>
+              ) : (
+                <ReportProseBlocks text={channel.description} size="sm" collapseToTwoParagraphs />
+              )}
+            </DashboardEditableRegion>
+          ) : (
+            <ReportProseBlocks text={channel.description} size="sm" collapseToTwoParagraphs />
           )}
+          {(channel.actions.length > 0 || d) ? (
+            d ? (
+              !actionsSectionOpen ? (
+                <>
+                  {channel.actions.length > 0 ? (
+                    <ul className="space-y-2.5">
+                      {channel.actions.map((action, i) => (
+                        <li key={i} className="flex items-center gap-3 text-[13px] leading-relaxed">
+                          <div
+                            className={cn(
+                              "flex h-7 w-7 shrink-0 items-center justify-center rounded-md border ring-1",
+                              CHANNEL_ACTION_ICON_SHELL[channel.priority] || CHANNEL_ACTION_ICON_SHELL.Média,
+                            )}
+                            aria-hidden
+                          >
+                            <ArrowRight size={13} className="shrink-0 opacity-95" strokeWidth={2.25} />
+                          </div>
+                          <span className="min-w-0 flex-1 text-muted-foreground dark:text-zinc-300">
+                            {action}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Sem ações listadas. Use o lápis para adicionar ou editar.
+                    </p>
+                  )}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    disabled={d.fieldSaving}
+                    onClick={() => setActionsSectionOpen(true)}
+                    className="no-print absolute bottom-3 right-3 z-[6] size-8 rounded-md border border-border/70 bg-background/95 text-muted-foreground shadow-sm backdrop-blur-sm hover:bg-muted hover:text-foreground sm:bottom-4 sm:right-4"
+                    aria-label="Editar descrição e ações deste canal"
+                  >
+                    <Pencil className="size-3.5" aria-hidden />
+                  </Button>
+                </>
+              ) : (
+                <div className="space-y-3">
+                  {channel.actions.length > 0 ? (
+                    <ul className="space-y-2.5">
+                      {channel.actions.map((action, i) => {
+                        const actionKey = `channel-${channelIndex}-action-${i}`;
+                        return (
+                          <li key={i} className="flex items-start gap-2 text-[13px] leading-relaxed">
+                            <div
+                              className={cn(
+                                "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border ring-1",
+                                CHANNEL_ACTION_ICON_SHELL[channel.priority] || CHANNEL_ACTION_ICON_SHELL.Média,
+                              )}
+                              aria-hidden
+                            >
+                              <ArrowRight size={13} className="shrink-0 opacity-95" strokeWidth={2.25} />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <DashboardEditableRegion
+                                density="compact"
+                                enabled
+                                isEditing={d.editingField === actionKey}
+                                onStartEdit={() => d.beginTextEdit(actionKey, action)}
+                                onCancel={d.cancelFieldEdit}
+                                onSave={() => d.onSaveChannelActionItem(channelIndex, i)}
+                                saving={d.fieldSaving}
+                                error={d.editingField === actionKey ? d.fieldError : null}
+                                draft={d.editDraft}
+                                onDraftChange={d.setEditDraft}
+                                ariaLabel={`Editar ação ${i + 1} do canal`}
+                                onDelete={() => {
+                                  d.cancelFieldEdit();
+                                  void d.removeChannelAction(channelIndex, i);
+                                }}
+                                deleteAriaLabel="Remover esta ação"
+                              >
+                                <span className="block text-muted-foreground dark:text-zinc-300">{action}</span>
+                              </DashboardEditableRegion>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Sem ações listadas.</p>
+                  )}
+                  <div className="no-print mt-3 flex flex-wrap items-center justify-end gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                      disabled={d.fieldSaving}
+                      onClick={() => void d.appendChannelAction(channelIndex)}
+                    >
+                      <Plus className="size-4" aria-hidden />
+                      Adicionar ação
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={d.fieldSaving}
+                      onClick={() => {
+                        d.cancelFieldEdit();
+                        setActionsSectionOpen(false);
+                      }}
+                      aria-label="Concluir edição desta secção"
+                    >
+                      Concluir
+                    </Button>
+                  </div>
+                </div>
+              )
+            ) : (
+              <ul className="space-y-2.5">
+                {channel.actions.map((action, i) => (
+                  <li key={i} className="flex items-center gap-3 text-[13px] leading-relaxed">
+                    <div
+                      className={cn(
+                        "flex h-7 w-7 shrink-0 items-center justify-center rounded-md border ring-1",
+                        CHANNEL_ACTION_ICON_SHELL[channel.priority] || CHANNEL_ACTION_ICON_SHELL.Média,
+                      )}
+                      aria-hidden
+                    >
+                      <ArrowRight size={13} className="shrink-0 opacity-95" strokeWidth={2.25} />
+                    </div>
+                    <span className="min-w-0 flex-1 text-muted-foreground dark:text-zinc-300">
+                      {action}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )
+          ) : null}
         </div>
       </BorderGlow>
     </div>
@@ -1328,20 +1540,25 @@ export function RotaDigitalReportView({
   const router = useRouter();
   const isDashboard = variant === "dashboard";
   const [report, setReport] = useState<RotaDigitalReport>(initialReport);
-  const [isEditing, setIsEditing] = useState(false);
-  const [isSavingEdit, setIsSavingEdit] = useState(false);
-  const [editError, setEditError] = useState<string | null>(null);
-  const [editSummary, setEditSummary] = useState("");
-  const [editCompanyProfile, setEditCompanyProfile] = useState("");
-  const [editServices, setEditServices] = useState("");
-  const [editObjective, setEditObjective] = useState("");
+  const [editingField, setEditingField] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState("");
+  const [fieldSaving, setFieldSaving] = useState(false);
+  const [fieldError, setFieldError] = useState<string | null>(null);
+  const [diagEditSortedIndex, setDiagEditSortedIndex] = useState<number | null>(null);
+  const [diagTopicDraft, setDiagTopicDraft] = useState("");
+  const [diagScoreDraft, setDiagScoreDraft] = useState("");
+  const [diagCommentDraft, setDiagCommentDraft] = useState("");
   const [reanalyzeOpen, setReanalyzeOpen] = useState(false);
   const [reanalyzeNotes, setReanalyzeNotes] = useState("");
   const [reanalyzing, setReanalyzing] = useState(false);
   const [reanalyzeError, setReanalyzeError] = useState<string | null>(null);
+  const [publicLinkOrigin, setPublicLinkOrigin] = useState("");
+  const [publicLinkCopied, setPublicLinkCopied] = useState(false);
   const [ctaSettings, setCtaSettings] = useState<UserReportCtaSettings | null>(
     () => initialCtaSettings ?? null
   );
+  /** Modo tópico-a-tópico só depois de abrir a secção com o lápis da caixa. */
+  const [listSectionEditOpen, setListSectionEditOpen] = useState<DashboardListSectionKey | null>(null);
 
   const reportCta = useMemo(
     () => resolveReportCtas(ctaSettings, process.env.NEXT_PUBLIC_ROTA_REPORT_CTA_URL),
@@ -1351,6 +1568,11 @@ export function RotaDigitalReportView({
   useEffect(() => {
     setReport(initialReport);
   }, [initialReport]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setPublicLinkOrigin(window.location.origin);
+  }, []);
 
   useEffect(() => {
     if (variant !== "public") return;
@@ -1373,57 +1595,73 @@ export function RotaDigitalReportView({
     };
   }, [report?.userId, variant]);
 
-  const startEdit = () => {
-    if (!report) return;
-    setIsEditing(true);
-    setEditError(null);
-    setEditSummary(report.executiveSummary || "");
-    setEditCompanyProfile(report.companyProfile || "");
-    setEditServices(report.brief?.servicesOffered || "");
-    setEditObjective(report.brief?.objective || "");
-  };
+  const cancelFieldEdit = useCallback(() => {
+    setEditingField(null);
+    setEditDraft("");
+    setFieldError(null);
+    setDiagEditSortedIndex(null);
+  }, []);
 
-  const cancelEdit = () => {
-    setIsEditing(false);
-    setEditError(null);
-  };
+  const openListSectionEdit = useCallback(
+    (key: DashboardListSectionKey) => {
+      cancelFieldEdit();
+      setListSectionEditOpen(key);
+    },
+    [cancelFieldEdit],
+  );
 
-  const saveEdit = async () => {
-    if (!report) return;
-    setIsSavingEdit(true);
-    setEditError(null);
-    try {
-      await updateReport(report.id, {
-        executiveSummary: editSummary,
-        companyProfile: editCompanyProfile,
-        brief: {
-          ...(report.brief || {}),
-          servicesOffered: editServices,
-          objective: editObjective,
-        },
-      });
+  const closeListSectionEdit = useCallback(() => {
+    cancelFieldEdit();
+    setListSectionEditOpen(null);
+  }, [cancelFieldEdit]);
 
-      setReport((prev) => {
-        const next = {
-          ...prev,
-          executiveSummary: editSummary,
-          companyProfile: editCompanyProfile,
-          brief: {
-            ...(prev.brief || {}),
-            servicesOffered: editServices,
-            objective: editObjective,
-          },
-        };
-        onReportChange?.(next);
-        return next;
-      });
-      setIsEditing(false);
-    } catch (err: unknown) {
-      setEditError(err instanceof Error ? err.message : "Erro ao salvar edição.");
-    } finally {
-      setIsSavingEdit(false);
-    }
-  };
+  const applyReportPatch = useCallback(
+    async (patch: Partial<RotaDigitalReport>) => {
+      setFieldSaving(true);
+      setFieldError(null);
+      try {
+        await updateReport(report.id, patch);
+        setReport((prev) => {
+          const { evidences: evPatch, brief: brPatch, ...rest } = patch;
+          const next = { ...prev, ...rest } as RotaDigitalReport;
+          if (evPatch) {
+            next.evidences = { ...(prev.evidences || {}), ...evPatch };
+          }
+          if (brPatch) {
+            next.brief = { ...(prev.brief || {}), ...brPatch };
+          }
+          onReportChange?.(next);
+          return next;
+        });
+        cancelFieldEdit();
+      } catch (err: unknown) {
+        setFieldError(err instanceof Error ? err.message : "Erro ao guardar.");
+      } finally {
+        setFieldSaving(false);
+      }
+    },
+    [report.id, onReportChange, cancelFieldEdit],
+  );
+
+  const beginTextEdit = useCallback((field: string, initial: string) => {
+    setEditingField(field);
+    setEditDraft(initial);
+    setFieldError(null);
+  }, []);
+
+  const beginDiagnosticEdit = useCallback(
+    (sortedIndex: number, scores: DiagnosticScore[]) => {
+      const it = scores[sortedIndex];
+      if (!it) return;
+      setEditingField(`diagnostic:${sortedIndex}`);
+      setDiagEditSortedIndex(sortedIndex);
+      setDiagTopicDraft(it.topic);
+      setDiagScoreDraft(String(it.score));
+      setDiagCommentDraft(it.comment);
+      setFieldError(null);
+    },
+    [],
+  );
 
   const handleReanalyze = async () => {
     if (!report) return;
@@ -1463,14 +1701,220 @@ export function RotaDigitalReportView({
     }
   };
 
-  const sortedChannels = [...report.recommendedChannels].sort(
-    (a, b) =>
-      ["Alta", "Média", "Baixa"].indexOf(a.priority) -
-      ["Alta", "Média", "Baixa"].indexOf(b.priority)
+  const sortedChannels = useMemo(
+    () =>
+      [...report.recommendedChannels].sort(
+        (a, b) =>
+          ["Alta", "Média", "Baixa"].indexOf(a.priority) -
+          ["Alta", "Média", "Baixa"].indexOf(b.priority),
+      ),
+    [report.recommendedChannels],
   );
-  const sortedDiagnosticScores = [...(report.diagnosticScores || [])].sort(
-    (a, b) => a.score - b.score
+  /** No dashboard mantém a ordem do array (novo tópico fica no fim). Na vista pública ordena por nota crescente. */
+  const sortedDiagnosticScores = useMemo(() => {
+    const list = [...(report.diagnosticScores || [])];
+    if (isDashboard) return list;
+    return list.sort((a, b) => a.score - b.score);
+  }, [report.diagnosticScores, isDashboard]);
+
+  const headlineMaturity = useMemo(() => {
+    const fromTopics = maturityFromDiagnosticScores(report.diagnosticScores);
+    if (fromTopics) return fromTopics;
+    return {
+      digitalMaturityScore: report.digitalMaturityScore,
+      digitalMaturityLevel: report.digitalMaturityLevel,
+    };
+  }, [report.diagnosticScores, report.digitalMaturityScore, report.digitalMaturityLevel]);
+
+  const onSaveChannelDescription = useCallback(
+    async (sortedIndex: number) => {
+      const list = [...sortedChannels];
+      const row = list[sortedIndex];
+      if (!row) return;
+      list[sortedIndex] = { ...row, description: editDraft.trim() };
+      await applyReportPatch({ recommendedChannels: list });
+    },
+    [sortedChannels, editDraft, applyReportPatch],
   );
+
+  const onSaveChannelActionItem = useCallback(
+    async (sortedIndex: number, actionIndex: number) => {
+      const list = [...sortedChannels];
+      const row = list[sortedIndex];
+      if (!row || row.actions[actionIndex] === undefined) return;
+      const actions = [...row.actions];
+      actions[actionIndex] = editDraft.trim();
+      list[sortedIndex] = { ...row, actions };
+      await applyReportPatch({ recommendedChannels: list });
+    },
+    [sortedChannels, editDraft, applyReportPatch],
+  );
+
+  const appendChannelAction = useCallback(
+    async (sortedIndex: number) => {
+      const list = [...sortedChannels];
+      const row = list[sortedIndex];
+      if (!row) return;
+      list[sortedIndex] = {
+        ...row,
+        actions: [...row.actions, "Nova ação — edite o texto."],
+      };
+      await applyReportPatch({ recommendedChannels: list });
+    },
+    [sortedChannels, applyReportPatch],
+  );
+
+  const removeChannelAction = useCallback(
+    async (sortedIndex: number, actionIndex: number) => {
+      const list = [...sortedChannels];
+      const row = list[sortedIndex];
+      if (!row) return;
+      const actions = row.actions.filter((_, j) => j !== actionIndex);
+      list[sortedIndex] = { ...row, actions };
+      await applyReportPatch({ recommendedChannels: list });
+    },
+    [sortedChannels, applyReportPatch],
+  );
+
+  type SwotListKey = "strengths" | "weaknesses" | "opportunities";
+
+  const patchSwotItem = useCallback(
+    async (key: SwotListKey, index: number, value: string) => {
+      const arr = [...report[key]];
+      if (arr[index] === undefined) return;
+      arr[index] = value.trim();
+      await applyReportPatch({ [key]: arr });
+    },
+    [report, applyReportPatch],
+  );
+
+  const removeSwotItem = useCallback(
+    async (key: SwotListKey, index: number) => {
+      const arr = report[key].filter((_, j) => j !== index);
+      await applyReportPatch({ [key]: arr });
+    },
+    [report, applyReportPatch],
+  );
+
+  const appendSwotItem = useCallback(
+    async (key: SwotListKey) => {
+      const arr = [...report[key], "Novo ponto — edite o texto."];
+      await applyReportPatch({ [key]: arr });
+    },
+    [report, applyReportPatch],
+  );
+
+  type ReportStringListKey = "quickWins" | "longTermActions" | "nextSteps";
+
+  const patchReportStringListItem = useCallback(
+    async (key: ReportStringListKey, index: number, value: string) => {
+      const arr = [...report[key]];
+      if (arr[index] === undefined) return;
+      arr[index] = value.trim();
+      await applyReportPatch({ [key]: arr });
+    },
+    [report, applyReportPatch],
+  );
+
+  const removeReportStringListItem = useCallback(
+    async (key: ReportStringListKey, index: number) => {
+      const arr = report[key].filter((_, j) => j !== index);
+      await applyReportPatch({ [key]: arr });
+    },
+    [report, applyReportPatch],
+  );
+
+  const appendReportStringListItem = useCallback(
+    async (key: ReportStringListKey) => {
+      const arr = [...report[key], "Novo ponto — edite o texto."];
+      await applyReportPatch({ [key]: arr });
+    },
+    [report, applyReportPatch],
+  );
+
+  const dashboardChannelEdit: DashboardChannelEdit | undefined = isDashboard
+    ? {
+        editingField,
+        fieldSaving,
+        fieldError,
+        editDraft,
+        setEditDraft,
+        beginTextEdit,
+        cancelFieldEdit,
+        onSaveChannelDescription,
+        onSaveChannelActionItem,
+        appendChannelAction,
+        removeChannelAction,
+      }
+    : undefined;
+
+  const strengthsTopicMode = isDashboard && listSectionEditOpen === "strengths";
+  const weaknessesTopicMode = isDashboard && listSectionEditOpen === "weaknesses";
+  const opportunitiesTopicMode = isDashboard && listSectionEditOpen === "opportunities";
+  const quickWinsTopicMode = isDashboard && listSectionEditOpen === "quickWins";
+  const longTermTopicMode = isDashboard && listSectionEditOpen === "longTermActions";
+  const nextStepsTopicMode = isDashboard && listSectionEditOpen === "nextSteps";
+
+  const saveDiagnosticEdit = useCallback(async () => {
+    if (diagEditSortedIndex == null) return;
+    const ref = sortedDiagnosticScores[diagEditSortedIndex];
+    if (!ref) return;
+    const score = Number(diagScoreDraft.replace(",", "."));
+    if (!Number.isFinite(score) || score < 0 || score > 10) {
+      setFieldError("Nota entre 0 e 10.");
+      return;
+    }
+    const topic = diagTopicDraft.trim();
+    if (!topic) {
+      setFieldError("Indique o nome do tópico.");
+      return;
+    }
+    const next = (report.diagnosticScores || []).map((d) =>
+      d === ref ? { ...d, topic, score, comment: diagCommentDraft.trim() } : d,
+    );
+    const maturityPatch = maturityFromDiagnosticScores(next);
+    await applyReportPatch(
+      maturityPatch
+        ? { diagnosticScores: next, ...maturityPatch }
+        : { diagnosticScores: next },
+    );
+  }, [
+    diagEditSortedIndex,
+    sortedDiagnosticScores,
+    diagTopicDraft,
+    diagScoreDraft,
+    diagCommentDraft,
+    report.diagnosticScores,
+    applyReportPatch,
+  ]);
+
+  const addDiagnosticTopic = useCallback(async () => {
+    const next = [
+      ...(report.diagnosticScores || []),
+      {
+        topic: "Novo tópico",
+        score: 7,
+        comment:
+          "Primeiro parágrafo: descreva o que foi observado.\n\nSegundo parágrafo: indique uma prioridade ou próximo passo.",
+      },
+    ];
+    const maturityPatch = maturityFromDiagnosticScores(next)!;
+    await applyReportPatch({ diagnosticScores: next, ...maturityPatch });
+  }, [report.diagnosticScores, applyReportPatch]);
+
+  const removeDiagnosticItem = useCallback(
+    async (item: DiagnosticScore) => {
+      const next = (report.diagnosticScores || []).filter((d) => d !== item);
+      const maturityPatch = maturityFromDiagnosticScores(next);
+      await applyReportPatch(
+        maturityPatch
+          ? { diagnosticScores: next, ...maturityPatch }
+          : { diagnosticScores: next },
+      );
+    },
+    [report.diagnosticScores, applyReportPatch],
+  );
+
   const notes = parseResearchNotes(report.evidences?.researchNotes);
   const instagramEvidenceSrc = buildInstagramEvidenceSrc(report);
   const brandImageSrc =
@@ -1582,39 +2026,6 @@ export function RotaDigitalReportView({
               <Bot size={16} />
               Reanalise
             </Button>
-            {isEditing ? (
-              <>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={cancelEdit}
-                  className="gap-2 no-print"
-                >
-                  <X size={16} />
-                  Cancelar
-                </Button>
-                <Button
-                  type="button"
-                  variant="cta"
-                  onClick={saveEdit}
-                  disabled={isSavingEdit}
-                  className="gap-2 no-print"
-                >
-                  {isSavingEdit ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                  Salvar alterações
-                </Button>
-              </>
-            ) : (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={startEdit}
-                className="gap-2 no-print"
-              >
-                <Pencil size={16} />
-                Editar
-              </Button>
-            )}
           </div>
         ) : (
           <div className="flex shrink-0 items-center gap-3 sm:gap-4">
@@ -1662,55 +2073,6 @@ export function RotaDigitalReportView({
       </Dialog>
       ) : null}
 
-      {isDashboard && isEditing ? (
-        <Card className={cn("no-print", ROTA_REPORT_SURFACE_SECTION, ROTA_REPORT_CARD_BOX)}>
-          <CardHeader>
-            <CardTitle className="text-base">Editar rota gerada</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm text-muted-foreground">Resumo</label>
-              <Textarea
-                value={editSummary}
-                onChange={(e) => setEditSummary(e.target.value)}
-                className="min-h-[110px]"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm text-muted-foreground">Perfil da empresa</label>
-              <Textarea
-                value={editCompanyProfile}
-                onChange={(e) => setEditCompanyProfile(e.target.value)}
-                className="min-h-[110px]"
-              />
-            </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <label className="text-sm text-muted-foreground">Serviços oferecidos</label>
-                <Textarea
-                  value={editServices}
-                  onChange={(e) => setEditServices(e.target.value)}
-                  className="min-h-[80px]"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm text-muted-foreground">Objetivo</label>
-                <Textarea
-                  value={editObjective}
-                  onChange={(e) => setEditObjective(e.target.value)}
-                  className="min-h-[80px]"
-                />
-              </div>
-            </div>
-            {editError ? (
-              <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-                {editError}
-              </div>
-            ) : null}
-          </CardContent>
-        </Card>
-      ) : null}
-
       {/* Print Header (only on print) */}
       <div className="hidden print:block mb-8">
         <h1 className="text-3xl font-bold">Rota Digital — {report.leadCompany}</h1>
@@ -1723,6 +2085,60 @@ export function RotaDigitalReportView({
           })}
         </p>
       </div>
+
+      {isDashboard && report.publicSlug?.trim() && publicLinkOrigin ? (
+        <Card
+          className={cn(
+            "no-print border border-border bg-card shadow-lg ring-1 ring-foreground/10 dark:border-border dark:bg-card dark:shadow-xl",
+            "border-l-[3px] border-l-brand/45 dark:border-l-brand/40",
+            ROTA_REPORT_CARD_BOX,
+          )}
+        >
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-3 text-base text-foreground">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-brand/35 bg-brand/10">
+                <Link2 size={18} className="text-brand" aria-hidden />
+              </div>
+              Página pública para o lead
+            </CardTitle>
+            <p className="max-w-prose text-sm font-normal leading-relaxed text-muted-foreground">
+              Envie este link para o cliente ver a proposta no navegador, sem login.
+            </p>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center">
+            <code className="min-w-0 flex-1 truncate rounded-md bg-muted px-3 py-2 text-left text-sm text-foreground/90">
+              {`${publicLinkOrigin}/r/${report.publicSlug.trim()}`}
+            </code>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="cta"
+                className="gap-2"
+                onClick={async () => {
+                  await navigator.clipboard.writeText(
+                    `${publicLinkOrigin}/r/${report.publicSlug!.trim()}`,
+                  );
+                  setPublicLinkCopied(true);
+                  setTimeout(() => setPublicLinkCopied(false), 2000);
+                }}
+              >
+                {publicLinkCopied ? <CheckCircle2 size={16} aria-hidden /> : <Copy size={16} aria-hidden />}
+                {publicLinkCopied ? "Copiado" : "Copiar"}
+              </Button>
+              <LinkButton
+                href={`/r/${report.publicSlug.trim()}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                variant="outline"
+                className="gap-2"
+              >
+                <ExternalLink size={16} aria-hidden />
+                Abrir
+              </LinkButton>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {/* Executive Summary */}
       <div className="grid min-w-0 grid-cols-1 gap-5 md:grid-cols-12">
@@ -1741,11 +2157,24 @@ export function RotaDigitalReportView({
             </div>
           </CardHeader>
           <CardContent>
-            <ReportProseBlocks
-              text={report.executiveSummary}
-              size="lg"
-              collapseToTwoParagraphs
-            />
+            <DashboardEditableRegion
+              enabled={isDashboard}
+              isEditing={editingField === "executiveSummary"}
+              onStartEdit={() => beginTextEdit("executiveSummary", report.executiveSummary || "")}
+              onCancel={cancelFieldEdit}
+              onSave={() => void applyReportPatch({ executiveSummary: editDraft.trim() })}
+              saving={fieldSaving}
+              error={editingField === "executiveSummary" ? fieldError : null}
+              draft={editDraft}
+              onDraftChange={setEditDraft}
+              ariaLabel="Editar resumo executivo"
+            >
+              <ReportProseBlocks
+                text={report.executiveSummary}
+                size="lg"
+                collapseToTwoParagraphs
+              />
+            </DashboardEditableRegion>
           </CardContent>
         </Card>
 
@@ -1789,6 +2218,40 @@ export function RotaDigitalReportView({
         </Card>
       </div>
 
+      {isDashboard ? (
+        <Card className={cn("no-print", ROTA_REPORT_SURFACE_SECTION, ROTA_REPORT_CARD_BOX)}>
+          <CardHeader className="pb-4">
+            <div className="flex items-center gap-2.5">
+              <SectionHeaderIcon Icon={FileText} tone="indigo" />
+              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-foreground/78 dark:text-muted-foreground">
+                Perfil da empresa
+              </CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <DashboardEditableRegion
+              enabled
+              isEditing={editingField === "companyProfile"}
+              onStartEdit={() => beginTextEdit("companyProfile", report.companyProfile || "")}
+              onCancel={cancelFieldEdit}
+              onSave={() => void applyReportPatch({ companyProfile: editDraft.trim() })}
+              saving={fieldSaving}
+              error={editingField === "companyProfile" ? fieldError : null}
+              draft={editDraft}
+              onDraftChange={setEditDraft}
+              ariaLabel="Editar perfil da empresa"
+            >
+              <ReportProseBlocks
+                text={report.companyProfile?.trim() ? report.companyProfile : "—"}
+                size="md"
+                collapseToTwoParagraphs
+                firstProminent={false}
+              />
+            </DashboardEditableRegion>
+          </CardContent>
+        </Card>
+      ) : null}
+
       {/* KPIs: Layout Bento com hierarquia e profundidade */}
       <div className="grid min-w-0 grid-cols-1 gap-5 md:grid-cols-12">
         {/* Maturidade Digital - Destaque */}
@@ -1809,34 +2272,37 @@ export function RotaDigitalReportView({
             </div>
           </CardHeader>
           <CardContent className="flex flex-1 flex-col gap-6">
-            <div className="flex items-baseline gap-2">
-              <span className="text-5xl font-bold tracking-tight tabular-nums text-foreground">
-                {report.digitalMaturityScore.toFixed(1)}
-              </span>
-              <span className="text-lg font-medium text-muted-foreground">/10</span>
-            </div>
-            <div className="space-y-2">
-              <div className="h-2 w-full overflow-hidden rounded-full bg-muted/60">
-                <div
-                  className={cn(
-                    "h-full rounded-full transition-all duration-1000",
-                    MATURITY_CONFIG[report.digitalMaturityLevel]?.bar || "bg-brand",
-                  )}
-                  style={{ width: `${report.digitalMaturityScore * 10}%` }}
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <Badge
-                  className={cn(
-                    "border-none px-0 text-sm font-semibold bg-transparent",
-                    MATURITY_CONFIG[report.digitalMaturityLevel]?.scoreText || "text-brand dark:text-brand",
-                  )}
-                >
-                  Nível {report.digitalMaturityLevel}
-                </Badge>
-                <span className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
-                  Score
+            <div className="space-y-1">
+              <div className="flex items-baseline gap-2">
+                <span className="text-5xl font-bold tracking-tight tabular-nums text-foreground">
+                  {headlineMaturity.digitalMaturityScore.toFixed(1)}
                 </span>
+                <span className="text-lg font-medium text-muted-foreground">/10</span>
+              </div>
+              <div className="space-y-2">
+                <div className="h-2 w-full overflow-hidden rounded-full bg-muted/60">
+                  <div
+                    className={cn(
+                      "h-full rounded-full transition-all duration-1000",
+                      MATURITY_CONFIG[headlineMaturity.digitalMaturityLevel]?.bar || "bg-brand",
+                    )}
+                    style={{ width: `${headlineMaturity.digitalMaturityScore * 10}%` }}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Badge
+                    className={cn(
+                      "border-none px-0 text-sm font-semibold bg-transparent",
+                      MATURITY_CONFIG[headlineMaturity.digitalMaturityLevel]?.scoreText ||
+                        "text-brand dark:text-brand",
+                    )}
+                  >
+                    Nível {headlineMaturity.digitalMaturityLevel}
+                  </Badge>
+                  <span className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
+                    Score
+                  </span>
+                </div>
               </div>
             </div>
           </CardContent>
@@ -1858,35 +2324,72 @@ export function RotaDigitalReportView({
             aria-hidden
           />
           <CardHeader className="relative pb-4">
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-brand/35 bg-brand/10">
-                <Calendar size={14} className="text-brand dark:text-brand" aria-hidden />
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-brand/35 bg-brand/10">
+                  <Calendar size={14} className="text-brand dark:text-brand" aria-hidden />
+                </div>
+                <CardTitle className="text-xs font-semibold uppercase tracking-wider text-foreground/78 dark:text-muted-foreground print:text-foreground">
+                  Prazo estimado
+                </CardTitle>
               </div>
-              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-foreground/78 dark:text-muted-foreground print:text-foreground">
-                Prazo estimado
-              </CardTitle>
+              {isDashboard && editingField !== "timeline" ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  disabled={fieldSaving}
+                  onClick={() => beginTextEdit("timeline", String(report.estimatedTimelineMonths))}
+                  className="no-print size-8 shrink-0 rounded-md border border-border/70 bg-background/95 text-muted-foreground shadow-sm backdrop-blur-sm hover:bg-muted hover:text-foreground"
+                  aria-label="Editar prazo estimado (meses)"
+                >
+                  <Pencil className="size-3.5" aria-hidden />
+                </Button>
+              ) : null}
             </div>
           </CardHeader>
           <CardContent className="relative flex flex-1 flex-col justify-between gap-4">
-            <div className="space-y-2.5">
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-5xl font-bold tracking-tight tabular-nums text-brand dark:text-brand">
-                  {report.estimatedTimelineMonths}
-                </span>
-                <span className="text-lg font-medium text-muted-foreground print:text-muted-foreground">meses</span>
+            <DashboardEditableRegion
+              enabled={isDashboard}
+              hideReadToolbar
+              isEditing={editingField === "timeline"}
+              onStartEdit={() => beginTextEdit("timeline", String(report.estimatedTimelineMonths))}
+              onCancel={cancelFieldEdit}
+              onSave={async () => {
+                const m = parseInt(editDraft.trim(), 10);
+                if (!Number.isFinite(m) || m < 1 || m > 120) {
+                  setFieldError("Indique um número de meses entre 1 e 120.");
+                  return;
+                }
+                await applyReportPatch({ estimatedTimelineMonths: m });
+              }}
+              saving={fieldSaving}
+              error={editingField === "timeline" ? fieldError : null}
+              draft={editDraft}
+              onDraftChange={setEditDraft}
+              ariaLabel="Editar prazo estimado (meses)"
+              textAreaClassName="min-h-[72px] font-mono text-sm"
+            >
+              <div className="space-y-2.5">
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-5xl font-bold tracking-tight tabular-nums text-brand dark:text-brand">
+                    {report.estimatedTimelineMonths}
+                  </span>
+                  <span className="text-lg font-medium text-muted-foreground print:text-muted-foreground">meses</span>
+                </div>
+                <p className="border-l-2 border-brand/45 pl-2.5 text-[11px] leading-snug text-foreground/90 antialiased print:border-l-brand/50 print:text-zinc-800 dark:border-brand/40">
+                  Tempo previsto para{" "}
+                  <span className="font-semibold text-brand dark:text-brand print:text-zinc-900">
+                    colocar este plano em prática
+                  </span>
+                  {" "}no seu negócio, em{" "}
+                  <span className="font-semibold text-brand dark:text-brand print:text-zinc-900">meses corridos</span>.
+                  <span className="text-muted-foreground print:text-muted-foreground">
+                    {" "}Serve para você entender o caminho, planejar o investimento e avançar com mais segurança.
+                  </span>
+                </p>
               </div>
-              <p className="border-l-2 border-brand/45 pl-2.5 text-[11px] leading-snug text-foreground/90 antialiased print:border-l-brand/50 print:text-zinc-800 dark:border-brand/40">
-                Tempo previsto para{" "}
-                <span className="font-semibold text-brand dark:text-brand print:text-zinc-900">
-                  colocar este plano em prática
-                </span>
-                {" "}no seu negócio, em{" "}
-                <span className="font-semibold text-brand dark:text-brand print:text-zinc-900">meses corridos</span>.
-                <span className="text-muted-foreground print:text-muted-foreground">
-                  {" "}Serve para você entender o caminho, planejar o investimento e avançar com mais segurança.
-                </span>
-              </p>
-            </div>
+            </DashboardEditableRegion>
             <a
               href={reportCta.top.href}
               {...(reportCta.top.openInNewTab ? { target: "_blank", rel: "noopener noreferrer" } : {})}
@@ -2006,27 +2509,68 @@ export function RotaDigitalReportView({
           <CardContent className="grid gap-5 md:grid-cols-2">
             <div className="space-y-2">
               <p className="text-xs text-muted-foreground mb-1">Serviços oferecidos</p>
-              <ReportProseBlocks
-                text={report.brief?.servicesOffered?.trim() ? report.brief.servicesOffered : "—"}
-                size="sm"
-                collapseToTwoParagraphs
-                firstProminent={false}
-              />
+              <DashboardEditableRegion
+                enabled={isDashboard}
+                isEditing={editingField === "brief-services"}
+                onStartEdit={() =>
+                  beginTextEdit(
+                    "brief-services",
+                    report.brief?.servicesOffered?.trim() ? report.brief.servicesOffered : "",
+                  )
+                }
+                onCancel={cancelFieldEdit}
+                onSave={() =>
+                  void applyReportPatch({
+                    brief: { ...(report.brief || {}), servicesOffered: editDraft.trim() },
+                  })
+                }
+                saving={fieldSaving}
+                error={editingField === "brief-services" ? fieldError : null}
+                draft={editDraft}
+                onDraftChange={setEditDraft}
+                ariaLabel="Editar serviços oferecidos"
+              >
+                <ReportProseBlocks
+                  text={report.brief?.servicesOffered?.trim() ? report.brief.servicesOffered : "—"}
+                  size="sm"
+                  collapseToTwoParagraphs
+                  firstProminent={false}
+                />
+              </DashboardEditableRegion>
             </div>
             <div className="space-y-2">
               <p className="text-xs text-muted-foreground mb-1">Objetivo</p>
-              <ReportProseBlocks
-                text={report.brief?.objective?.trim() ? report.brief.objective : "—"}
-                size="sm"
-                collapseToTwoParagraphs
-                firstProminent={false}
-              />
+              <DashboardEditableRegion
+                enabled={isDashboard}
+                isEditing={editingField === "brief-objective"}
+                onStartEdit={() =>
+                  beginTextEdit("brief-objective", report.brief?.objective?.trim() ? report.brief.objective : "")
+                }
+                onCancel={cancelFieldEdit}
+                onSave={() =>
+                  void applyReportPatch({
+                    brief: { ...(report.brief || {}), objective: editDraft.trim() },
+                  })
+                }
+                saving={fieldSaving}
+                error={editingField === "brief-objective" ? fieldError : null}
+                draft={editDraft}
+                onDraftChange={setEditDraft}
+                ariaLabel="Editar objetivo do briefing"
+              >
+                <ReportProseBlocks
+                  text={report.brief?.objective?.trim() ? report.brief.objective : "—"}
+                  size="sm"
+                  collapseToTwoParagraphs
+                  firstProminent={false}
+                />
+              </DashboardEditableRegion>
             </div>
           </CardContent>
         </Card>
       ) : null}
 
-      {sortedDiagnosticScores.length > 0 ? (
+      {sortedDiagnosticScores.length > 0 || isDashboard ? (
         <Card
           id="report-section-diagnostico-topicos"
           className={cn(ROTA_REPORT_SURFACE_SECTION, "print-white", ROTA_REPORT_CARD_BOX)}
@@ -2040,6 +2584,11 @@ export function RotaDigitalReportView({
             </div>
           </CardHeader>
           <CardContent className="space-y-5 lg:space-y-6">
+            {sortedDiagnosticScores.length === 0 && isDashboard ? (
+              <p className="text-sm text-muted-foreground">
+                Ainda não há tópicos de diagnóstico. Use &quot;Adicionar tópico&quot; para criar o primeiro.
+              </p>
+            ) : null}
             {sortedDiagnosticScores.map((item, idx) => {
               const topicGlow = getDiagnosticTopicGlow(item.score);
               return (
@@ -2067,17 +2616,74 @@ export function RotaDigitalReportView({
                         <div className="space-y-1.5">
                           <DiagnosticTopicPill topic={item.topic} />
                         </div>
-                        <Badge className={cn("text-xs font-bold px-2.5 py-0.5", getScoreBadgeClass(item.score))}>
-                          {item.score}/10
-                        </Badge>
+                        <div className="flex shrink-0 items-center gap-1">
+                          <Badge className={cn("text-xs font-bold px-2.5 py-0.5", getScoreBadgeClass(item.score))}>
+                            {item.score}/10
+                          </Badge>
+                        </div>
                       </div>
-                      <ReportProseBlocks text={item.comment} size="md" collapseToTwoParagraphs />
+                      <DashboardEditableRegion
+                        enabled={isDashboard}
+                        isEditing={editingField === `diagnostic:${idx}`}
+                        onStartEdit={() => beginDiagnosticEdit(idx, sortedDiagnosticScores)}
+                        onCancel={cancelFieldEdit}
+                        onSave={() => void saveDiagnosticEdit()}
+                        saving={fieldSaving}
+                        error={editingField === `diagnostic:${idx}` ? fieldError : null}
+                        draft=""
+                        onDraftChange={() => {}}
+                        ariaLabel={`Editar comentário: ${item.topic}`}
+                        onDelete={() => void removeDiagnosticItem(item)}
+                        deleteAriaLabel={`Remover tópico ${item.topic}`}
+                        editSlot={
+                          <div className="space-y-2">
+                            <div className="space-y-1">
+                              <label className="text-xs text-muted-foreground">Nome do tópico</label>
+                              <Input
+                                value={diagTopicDraft}
+                                onChange={(e) => setDiagTopicDraft(e.target.value)}
+                                className="text-sm"
+                              />
+                            </div>
+                            <DiagnosticScoreSlider
+                              value={diagScoreDraft}
+                              onChange={setDiagScoreDraft}
+                              disabled={fieldSaving}
+                            />
+                            <div className="space-y-1">
+                              <label className="text-xs text-muted-foreground">Comentário</label>
+                              <Textarea
+                                value={diagCommentDraft}
+                                onChange={(e) => setDiagCommentDraft(e.target.value)}
+                                className="min-h-[160px] resize-y text-sm"
+                              />
+                            </div>
+                          </div>
+                        }
+                      >
+                        <ReportProseBlocks text={item.comment} size="md" collapseToTwoParagraphs />
+                      </DashboardEditableRegion>
                     </div>
                   </div>
                 </div>
               </BorderGlow>
               );
             })}
+            {isDashboard ? (
+              <div className="no-print flex justify-end border-t border-border/60 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => void addDiagnosticTopic()}
+                  disabled={fieldSaving}
+                >
+                  <Plus className="size-4" aria-hidden />
+                  Adicionar tópico
+                </Button>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
       ) : null}
@@ -2217,17 +2823,44 @@ export function RotaDigitalReportView({
                         ROTA_REPORT_SURFACE_GLOW_INNER,
                       )}
                     >
-                      <div className={cn("mb-5", TOPIC_PILL_WEBSITE)}>
-                        <Globe className="size-3.5 shrink-0 stroke-[1.75] text-sky-600 dark:text-sky-400" aria-hidden />
-                        <span className={TOPIC_PILL_LABEL_NEXT_TO_ICON}>Website</span>
-                      </div>
-                      <EvidenceResearchNoteProse
-                        text={
-                          notes.website ||
-                          "Website: não foi possível validar conteúdo relevante; tratar como presença fraca ou inexistente até revisão manual."
-                        }
-                        size="md"
-                      />
+                      <DashboardEditableRegion
+                        enabled={isDashboard}
+                        isEditing={editingField === "research-website"}
+                        onStartEdit={() => {
+                          const initial =
+                            notes.website ||
+                            "Website: não foi possível validar conteúdo relevante; tratar como presença fraca ou inexistente até revisão manual.";
+                          beginTextEdit("research-website", initial);
+                        }}
+                        onCancel={cancelFieldEdit}
+                        onSave={() => {
+                          const cur = parseResearchNotes(report.evidences?.researchNotes);
+                          const merged = buildResearchNotesFromParts({
+                            ...cur,
+                            website: editDraft.trim(),
+                          });
+                          void applyReportPatch({
+                            evidences: { ...(report.evidences || {}), researchNotes: merged },
+                          });
+                        }}
+                        saving={fieldSaving}
+                        error={editingField === "research-website" ? fieldError : null}
+                        draft={editDraft}
+                        onDraftChange={setEditDraft}
+                        ariaLabel="Editar nota de pesquisa do website"
+                      >
+                        <div className={cn("mb-5", TOPIC_PILL_WEBSITE)}>
+                          <Globe className="size-3.5 shrink-0 stroke-[1.75] text-sky-600 dark:text-sky-400" aria-hidden />
+                          <span className={TOPIC_PILL_LABEL_NEXT_TO_ICON}>Website</span>
+                        </div>
+                        <EvidenceResearchNoteProse
+                          text={
+                            notes.website ||
+                            "Website: não foi possível validar conteúdo relevante; tratar como presença fraca ou inexistente até revisão manual."
+                          }
+                          size="md"
+                        />
+                      </DashboardEditableRegion>
                     </div>
                   </BorderGlow>
                   <BorderGlow
@@ -2250,11 +2883,38 @@ export function RotaDigitalReportView({
                         ROTA_REPORT_SURFACE_GLOW_INNER,
                       )}
                     >
-                      <div className={cn("mb-5", TOPIC_PILL_INSTAGRAM)}>
-                        <InstagramBrandGlyph className="size-3.5 text-pink-600 dark:text-pink-400" aria-hidden />
-                        <span className={TOPIC_PILL_LABEL_NEXT_TO_ICON}>Instagram</span>
-                      </div>
-                      <EvidenceResearchNoteProse text={normalizedInstagramNote} size="md" />
+                      <DashboardEditableRegion
+                        enabled={isDashboard}
+                        isEditing={editingField === "research-instagram"}
+                        onStartEdit={() => {
+                          const initial = notes.instagram?.trim()
+                            ? notes.instagram
+                            : normalizedInstagramNote;
+                          beginTextEdit("research-instagram", initial);
+                        }}
+                        onCancel={cancelFieldEdit}
+                        onSave={() => {
+                          const cur = parseResearchNotes(report.evidences?.researchNotes);
+                          const merged = buildResearchNotesFromParts({
+                            ...cur,
+                            instagram: editDraft.trim(),
+                          });
+                          void applyReportPatch({
+                            evidences: { ...(report.evidences || {}), researchNotes: merged },
+                          });
+                        }}
+                        saving={fieldSaving}
+                        error={editingField === "research-instagram" ? fieldError : null}
+                        draft={editDraft}
+                        onDraftChange={setEditDraft}
+                        ariaLabel="Editar nota de pesquisa do Instagram"
+                      >
+                        <div className={cn("mb-5", TOPIC_PILL_INSTAGRAM)}>
+                          <InstagramBrandGlyph className="size-3.5 text-pink-600 dark:text-pink-400" aria-hidden />
+                          <span className={TOPIC_PILL_LABEL_NEXT_TO_ICON}>Instagram</span>
+                        </div>
+                        <EvidenceResearchNoteProse text={normalizedInstagramNote} size="md" />
+                      </DashboardEditableRegion>
                     </div>
                   </BorderGlow>
                   {notes.general.length > 0 ? (
@@ -2312,23 +2972,97 @@ export function RotaDigitalReportView({
                 Forças
               </CardTitle>
             </CardHeader>
-            <CardContent className="flex min-h-0 flex-1 flex-col">
+            <CardContent
+              className={cn(
+                "flex min-h-0 flex-1 flex-col",
+                isDashboard && !strengthsTopicMode && "pb-12",
+              )}
+            >
               <ul className="space-y-0">
+                {report.strengths.length === 0 && strengthsTopicMode ? (
+                  <li className="py-3 text-sm text-muted-foreground">Sem itens — use “Adicionar força”.</li>
+                ) : null}
                 {report.strengths.map((s, i) => (
                   <li
                     key={i}
                     className={cn(
-                      "relative flex items-center gap-3 py-3.5 text-sm leading-relaxed text-foreground/90 sm:py-4",
+                      "relative flex items-start gap-2 py-3.5 text-sm leading-relaxed text-foreground/90 sm:gap-3 sm:py-4",
                       i > 0 &&
                         "before:pointer-events-none before:absolute before:left-0 before:right-[8%] before:top-0 before:h-px before:rounded-full before:bg-gradient-to-r before:from-[color:var(--rota-sev-c-border)]/45 before:via-[color:var(--rota-sev-c-bar)]/28 before:to-transparent before:content-[''] dark:before:from-[color:var(--rota-sev-c-border)]/38 dark:before:via-[color:var(--rota-sev-c-bar)]/22 print:before:hidden",
                     )}
                   >
-                    <CheckCircle2 size={16} className="shrink-0 text-[color:var(--rota-sev-c-border)]/70" />
-                    <span>{s}</span>
+                    <CheckCircle2
+                      size={16}
+                      className="mt-1 shrink-0 text-[color:var(--rota-sev-c-border)]/70"
+                    />
+                    <div className="min-w-0 flex-1">
+                      {strengthsTopicMode ? (
+                        <DashboardEditableRegion
+                          density="compact"
+                          enabled
+                          isEditing={editingField === `strengths:${i}`}
+                          onStartEdit={() => beginTextEdit(`strengths:${i}`, s)}
+                          onCancel={cancelFieldEdit}
+                          onSave={() => void patchSwotItem("strengths", i, editDraft)}
+                          saving={fieldSaving}
+                          error={editingField === `strengths:${i}` ? fieldError : null}
+                          draft={editDraft}
+                          onDraftChange={setEditDraft}
+                          ariaLabel={`Editar força ${i + 1}`}
+                          onDelete={() => {
+                            cancelFieldEdit();
+                            void removeSwotItem("strengths", i);
+                          }}
+                          deleteAriaLabel="Remover força"
+                        >
+                          <span className="block">{s}</span>
+                        </DashboardEditableRegion>
+                      ) : (
+                        <span>{s}</span>
+                      )}
+                    </div>
                   </li>
                 ))}
               </ul>
+              {strengthsTopicMode ? (
+                <div className="no-print mt-3 flex flex-wrap items-center justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    disabled={fieldSaving}
+                    onClick={() => void appendSwotItem("strengths")}
+                  >
+                    <Plus className="size-4" aria-hidden />
+                    Adicionar força
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={fieldSaving}
+                    onClick={closeListSectionEdit}
+                    aria-label="Concluir edição desta secção"
+                  >
+                    Concluir
+                  </Button>
+                </div>
+              ) : null}
             </CardContent>
+            {isDashboard && !strengthsTopicMode ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                disabled={fieldSaving}
+                onClick={() => openListSectionEdit("strengths")}
+                className="no-print absolute bottom-3 right-3 z-[6] size-8 rounded-md border border-border/70 bg-background/95 text-muted-foreground shadow-sm backdrop-blur-sm hover:bg-muted hover:text-foreground sm:bottom-4 sm:right-4"
+                aria-label="Editar forças"
+              >
+                <Pencil className="size-3.5" aria-hidden />
+              </Button>
+            ) : null}
           </Card>
         </BorderGlow>
 
@@ -2365,23 +3099,97 @@ export function RotaDigitalReportView({
                 Fraquezas
               </CardTitle>
             </CardHeader>
-            <CardContent className="flex min-h-0 flex-1 flex-col">
+            <CardContent
+              className={cn(
+                "flex min-h-0 flex-1 flex-col",
+                isDashboard && !weaknessesTopicMode && "pb-12",
+              )}
+            >
               <ul className="space-y-0">
+                {report.weaknesses.length === 0 && weaknessesTopicMode ? (
+                  <li className="py-3 text-sm text-muted-foreground">Sem itens — use “Adicionar fraqueza”.</li>
+                ) : null}
                 {report.weaknesses.map((w, i) => (
                   <li
                     key={i}
                     className={cn(
-                      "relative flex items-center gap-3 py-3.5 text-sm leading-relaxed text-foreground/90 sm:py-4",
+                      "relative flex items-start gap-2 py-3.5 text-sm leading-relaxed text-foreground/90 sm:gap-3 sm:py-4",
                       i > 0 &&
                         "before:pointer-events-none before:absolute before:left-0 before:right-[8%] before:top-0 before:h-px before:rounded-full before:bg-gradient-to-r before:from-[color:var(--rota-sev-a-border)]/45 before:via-[color:var(--rota-sev-a-bar)]/28 before:to-transparent before:content-[''] dark:before:from-[color:var(--rota-sev-a-border)]/38 dark:before:via-[color:var(--rota-sev-a-bar)]/22 print:before:hidden",
                     )}
                   >
-                    <AlertCircle size={16} className="shrink-0 text-[color:var(--rota-sev-a-border)]/65" />
-                    <span>{w}</span>
+                    <AlertCircle
+                      size={16}
+                      className="mt-1 shrink-0 text-[color:var(--rota-sev-a-border)]/65"
+                    />
+                    <div className="min-w-0 flex-1">
+                      {weaknessesTopicMode ? (
+                        <DashboardEditableRegion
+                          density="compact"
+                          enabled
+                          isEditing={editingField === `weaknesses:${i}`}
+                          onStartEdit={() => beginTextEdit(`weaknesses:${i}`, w)}
+                          onCancel={cancelFieldEdit}
+                          onSave={() => void patchSwotItem("weaknesses", i, editDraft)}
+                          saving={fieldSaving}
+                          error={editingField === `weaknesses:${i}` ? fieldError : null}
+                          draft={editDraft}
+                          onDraftChange={setEditDraft}
+                          ariaLabel={`Editar fraqueza ${i + 1}`}
+                          onDelete={() => {
+                            cancelFieldEdit();
+                            void removeSwotItem("weaknesses", i);
+                          }}
+                          deleteAriaLabel="Remover fraqueza"
+                        >
+                          <span className="block">{w}</span>
+                        </DashboardEditableRegion>
+                      ) : (
+                        <span>{w}</span>
+                      )}
+                    </div>
                   </li>
                 ))}
               </ul>
+              {weaknessesTopicMode ? (
+                <div className="no-print mt-3 flex flex-wrap items-center justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    disabled={fieldSaving}
+                    onClick={() => void appendSwotItem("weaknesses")}
+                  >
+                    <Plus className="size-4" aria-hidden />
+                    Adicionar fraqueza
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={fieldSaving}
+                    onClick={closeListSectionEdit}
+                    aria-label="Concluir edição desta secção"
+                  >
+                    Concluir
+                  </Button>
+                </div>
+              ) : null}
             </CardContent>
+            {isDashboard && !weaknessesTopicMode ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                disabled={fieldSaving}
+                onClick={() => openListSectionEdit("weaknesses")}
+                className="no-print absolute bottom-3 right-3 z-[6] size-8 rounded-md border border-border/70 bg-background/95 text-muted-foreground shadow-sm backdrop-blur-sm hover:bg-muted hover:text-foreground sm:bottom-4 sm:right-4"
+                aria-label="Editar fraquezas"
+              >
+                <Pencil className="size-3.5" aria-hidden />
+              </Button>
+            ) : null}
           </Card>
         </BorderGlow>
 
@@ -2418,23 +3226,94 @@ export function RotaDigitalReportView({
                 Oportunidades
               </CardTitle>
             </CardHeader>
-            <CardContent className="flex min-h-0 flex-1 flex-col">
+            <CardContent
+              className={cn(
+                "flex min-h-0 flex-1 flex-col",
+                isDashboard && !opportunitiesTopicMode && "pb-12",
+              )}
+            >
               <ul className="space-y-0">
+                {report.opportunities.length === 0 && opportunitiesTopicMode ? (
+                  <li className="py-3 text-sm text-muted-foreground">Sem itens — use “Adicionar oportunidade”.</li>
+                ) : null}
                 {report.opportunities.map((o, i) => (
                   <li
                     key={i}
                     className={cn(
-                      "relative flex items-center gap-3 py-3.5 text-sm leading-relaxed text-foreground/90 sm:py-4",
+                      "relative flex items-start gap-2 py-3.5 text-sm leading-relaxed text-foreground/90 sm:gap-3 sm:py-4",
                       i > 0 &&
                         "before:pointer-events-none before:absolute before:left-0 before:right-[8%] before:top-0 before:h-px before:rounded-full before:bg-gradient-to-r before:from-[color:var(--rota-sev-b-border)]/45 before:via-[color:var(--rota-sev-b-bar)]/28 before:to-transparent before:content-[''] dark:before:from-[color:var(--rota-sev-b-border)]/38 dark:before:via-[color:var(--rota-sev-b-bar)]/22 print:before:hidden",
                     )}
                   >
-                    <Star size={16} className="shrink-0 text-[color:var(--rota-sev-b-border)]/68" />
-                    <span>{o}</span>
+                    <Star size={16} className="mt-1 shrink-0 text-[color:var(--rota-sev-b-border)]/68" />
+                    <div className="min-w-0 flex-1">
+                      {opportunitiesTopicMode ? (
+                        <DashboardEditableRegion
+                          density="compact"
+                          enabled
+                          isEditing={editingField === `opportunities:${i}`}
+                          onStartEdit={() => beginTextEdit(`opportunities:${i}`, o)}
+                          onCancel={cancelFieldEdit}
+                          onSave={() => void patchSwotItem("opportunities", i, editDraft)}
+                          saving={fieldSaving}
+                          error={editingField === `opportunities:${i}` ? fieldError : null}
+                          draft={editDraft}
+                          onDraftChange={setEditDraft}
+                          ariaLabel={`Editar oportunidade ${i + 1}`}
+                          onDelete={() => {
+                            cancelFieldEdit();
+                            void removeSwotItem("opportunities", i);
+                          }}
+                          deleteAriaLabel="Remover oportunidade"
+                        >
+                          <span className="block">{o}</span>
+                        </DashboardEditableRegion>
+                      ) : (
+                        <span>{o}</span>
+                      )}
+                    </div>
                   </li>
                 ))}
               </ul>
+              {opportunitiesTopicMode ? (
+                <div className="no-print mt-3 flex flex-wrap items-center justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    disabled={fieldSaving}
+                    onClick={() => void appendSwotItem("opportunities")}
+                  >
+                    <Plus className="size-4" aria-hidden />
+                    Adicionar oportunidade
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={fieldSaving}
+                    onClick={closeListSectionEdit}
+                    aria-label="Concluir edição desta secção"
+                  >
+                    Concluir
+                  </Button>
+                </div>
+              ) : null}
             </CardContent>
+            {isDashboard && !opportunitiesTopicMode ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                disabled={fieldSaving}
+                onClick={() => openListSectionEdit("opportunities")}
+                className="no-print absolute bottom-3 right-3 z-[6] size-8 rounded-md border border-border/70 bg-background/95 text-muted-foreground shadow-sm backdrop-blur-sm hover:bg-muted hover:text-foreground sm:bottom-4 sm:right-4"
+                aria-label="Editar oportunidades"
+              >
+                <Pencil className="size-3.5" aria-hidden />
+              </Button>
+            ) : null}
           </Card>
         </BorderGlow>
       </div>
@@ -2459,7 +3338,12 @@ export function RotaDigitalReportView({
         <CardContent className="overflow-visible">
           <div className="grid grid-cols-1 gap-10 md:auto-rows-fr md:grid-cols-2 md:items-stretch md:gap-5">
             {sortedChannels.map((channel, i) => (
-              <ChannelCard key={i} channel={channel} />
+              <ChannelCard
+                key={`${channel.name}-${i}`}
+                channel={channel}
+                channelIndex={i}
+                dashboardChannelEdit={dashboardChannelEdit}
+              />
             ))}
           </div>
         </CardContent>
@@ -2469,7 +3353,7 @@ export function RotaDigitalReportView({
       <div className="grid min-w-0 grid-cols-1 gap-5 md:grid-cols-2">
         <Card
           className={cn(
-            "min-w-0 gap-2 overflow-hidden",
+            "relative min-w-0 gap-2 overflow-hidden",
             ROTA_REPORT_SURFACE_SECTION,
             "print-white",
             ROTA_REPORT_CARD_BOX_FLUSH_TOP,
@@ -2485,30 +3369,98 @@ export function RotaDigitalReportView({
               </CardTitle>
             </div>
           </header>
-          <CardContent>
+          <CardContent
+            className={cn(isDashboard && !quickWinsTopicMode && "pb-12")}
+          >
             <ul className="space-y-0">
+              {report.quickWins.length === 0 && quickWinsTopicMode ? (
+                <li className="py-3 text-sm text-muted-foreground">Sem itens — use “Adicionar”.</li>
+              ) : null}
               {report.quickWins.map((win, i) => (
                 <li
                   key={i}
                   className={cn(
-                    "relative flex items-center gap-4 py-3.5 text-[14px] leading-relaxed text-foreground sm:py-4 dark:text-zinc-200/95",
+                    "relative flex items-start gap-3 py-3.5 text-[14px] leading-relaxed text-foreground sm:gap-4 sm:py-4 dark:text-zinc-200/95",
                     i > 0 &&
                       "before:pointer-events-none before:absolute before:left-0 before:right-[8%] before:top-0 before:h-px before:rounded-full before:bg-gradient-to-r before:from-border before:via-border/70 before:to-transparent before:content-[''] dark:before:from-white/22 dark:before:via-white/12 print:before:hidden",
                   )}
                 >
-                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-border bg-background text-[11px] font-semibold tabular-nums text-foreground/90 ring-1 ring-border/80 dark:border-border dark:bg-background dark:text-zinc-300 dark:ring-border">
+                  <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-border bg-background text-[11px] font-semibold tabular-nums text-foreground/90 ring-1 ring-border/80 dark:border-border dark:bg-background dark:text-zinc-300 dark:ring-border">
                     {i + 1}
                   </div>
-                  <span>{win}</span>
+                  <div className="min-w-0 flex-1">
+                    {quickWinsTopicMode ? (
+                      <DashboardEditableRegion
+                        density="compact"
+                        enabled
+                        isEditing={editingField === `quickWins:${i}`}
+                        onStartEdit={() => beginTextEdit(`quickWins:${i}`, win)}
+                        onCancel={cancelFieldEdit}
+                        onSave={() => void patchReportStringListItem("quickWins", i, editDraft)}
+                        saving={fieldSaving}
+                        error={editingField === `quickWins:${i}` ? fieldError : null}
+                        draft={editDraft}
+                        onDraftChange={setEditDraft}
+                        ariaLabel={`Editar item ${i + 1}`}
+                        onDelete={() => {
+                          cancelFieldEdit();
+                          void removeReportStringListItem("quickWins", i);
+                        }}
+                        deleteAriaLabel="Remover item"
+                      >
+                        <span className="block">{win}</span>
+                      </DashboardEditableRegion>
+                    ) : (
+                      <span>{win}</span>
+                    )}
+                  </div>
                 </li>
               ))}
             </ul>
+            {quickWinsTopicMode ? (
+              <div className="no-print mt-3 flex flex-wrap items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  disabled={fieldSaving}
+                  onClick={() => void appendReportStringListItem("quickWins")}
+                >
+                  <Plus className="size-4" aria-hidden />
+                  Adicionar
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={fieldSaving}
+                  onClick={closeListSectionEdit}
+                  aria-label="Concluir edição desta secção"
+                >
+                  Concluir
+                </Button>
+              </div>
+            ) : null}
           </CardContent>
+          {isDashboard && !quickWinsTopicMode ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              disabled={fieldSaving}
+              onClick={() => openListSectionEdit("quickWins")}
+              className="no-print absolute bottom-3 right-3 z-[6] size-8 rounded-md border border-border/70 bg-background/95 text-muted-foreground shadow-sm backdrop-blur-sm hover:bg-muted hover:text-foreground sm:bottom-4 sm:right-4"
+              aria-label="Editar o que fazer primeiro"
+            >
+              <Pencil className="size-3.5" aria-hidden />
+            </Button>
+          ) : null}
         </Card>
 
         <Card
           className={cn(
-            "min-w-0 gap-2 overflow-hidden",
+            "relative min-w-0 gap-2 overflow-hidden",
             ROTA_REPORT_SURFACE_SECTION,
             "print-white",
             ROTA_REPORT_CARD_BOX_FLUSH_TOP,
@@ -2524,25 +3476,93 @@ export function RotaDigitalReportView({
               </CardTitle>
             </div>
           </header>
-          <CardContent>
+          <CardContent
+            className={cn(isDashboard && !longTermTopicMode && "pb-12")}
+          >
             <ul className="space-y-0">
+              {report.longTermActions.length === 0 && longTermTopicMode ? (
+                <li className="py-3 text-sm text-muted-foreground">Sem itens — use “Adicionar”.</li>
+              ) : null}
               {report.longTermActions.map((action, i) => (
                 <li
                   key={i}
                   className={cn(
-                    "relative flex items-center gap-4 py-3.5 text-[14px] leading-relaxed text-foreground sm:py-4 dark:text-zinc-200/95",
+                    "relative flex items-start gap-3 py-3.5 text-[14px] leading-relaxed text-foreground sm:gap-4 sm:py-4 dark:text-zinc-200/95",
                     i > 0 &&
                       "before:pointer-events-none before:absolute before:left-0 before:right-[8%] before:top-0 before:h-px before:rounded-full before:bg-gradient-to-r before:from-border before:via-border/70 before:to-transparent before:content-[''] dark:before:from-white/22 dark:before:via-white/12 print:before:hidden",
                   )}
                 >
-                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-border bg-background text-[11px] font-semibold tabular-nums text-foreground/90 ring-1 ring-border/80 dark:border-border dark:bg-background dark:text-zinc-300 dark:ring-border">
+                  <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-border bg-background text-[11px] font-semibold tabular-nums text-foreground/90 ring-1 ring-border/80 dark:border-border dark:bg-background dark:text-zinc-300 dark:ring-border">
                     {i + 1}
                   </div>
-                  <span>{action}</span>
+                  <div className="min-w-0 flex-1">
+                    {longTermTopicMode ? (
+                      <DashboardEditableRegion
+                        density="compact"
+                        enabled
+                        isEditing={editingField === `longTermActions:${i}`}
+                        onStartEdit={() => beginTextEdit(`longTermActions:${i}`, action)}
+                        onCancel={cancelFieldEdit}
+                        onSave={() => void patchReportStringListItem("longTermActions", i, editDraft)}
+                        saving={fieldSaving}
+                        error={editingField === `longTermActions:${i}` ? fieldError : null}
+                        draft={editDraft}
+                        onDraftChange={setEditDraft}
+                        ariaLabel={`Editar ação de longo prazo ${i + 1}`}
+                        onDelete={() => {
+                          cancelFieldEdit();
+                          void removeReportStringListItem("longTermActions", i);
+                        }}
+                        deleteAriaLabel="Remover ação"
+                      >
+                        <span className="block">{action}</span>
+                      </DashboardEditableRegion>
+                    ) : (
+                      <span>{action}</span>
+                    )}
+                  </div>
                 </li>
               ))}
             </ul>
+            {longTermTopicMode ? (
+              <div className="no-print mt-3 flex flex-wrap items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  disabled={fieldSaving}
+                  onClick={() => void appendReportStringListItem("longTermActions")}
+                >
+                  <Plus className="size-4" aria-hidden />
+                  Adicionar
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={fieldSaving}
+                  onClick={closeListSectionEdit}
+                  aria-label="Concluir edição desta secção"
+                >
+                  Concluir
+                </Button>
+              </div>
+            ) : null}
           </CardContent>
+          {isDashboard && !longTermTopicMode ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              disabled={fieldSaving}
+              onClick={() => openListSectionEdit("longTermActions")}
+              className="no-print absolute bottom-3 right-3 z-[6] size-8 rounded-md border border-border/70 bg-background/95 text-muted-foreground shadow-sm backdrop-blur-sm hover:bg-muted hover:text-foreground sm:bottom-4 sm:right-4"
+              aria-label="Editar ações de longo prazo"
+            >
+              <Pencil className="size-3.5" aria-hidden />
+            </Button>
+          ) : null}
         </Card>
       </div>
 
@@ -2551,33 +3571,101 @@ export function RotaDigitalReportView({
         <Card
           id="report-proximos-passos"
           className={cn(
-            "border-0 !bg-transparent shadow-none ring-0 print-white",
+            "relative border-0 !bg-transparent shadow-none ring-0 print-white",
             "py-0 gap-0",
           )}
         >
-          <CardHeader className="px-4 pb-6 pt-0 sm:px-7 sm:pb-7 sm:pt-0">
-            <div className="flex items-center gap-2.5">
-              <SectionHeaderIcon Icon={ArrowRight} tone="indigo" />
-              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-foreground/78 dark:text-muted-foreground">
-                Próximos Passos
-              </CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="px-4 pb-0 sm:px-7">
+          <div className={cn(isDashboard && !nextStepsTopicMode && "relative pb-12")}>
+            <CardHeader className="px-4 pb-6 pt-0 sm:px-7 sm:pb-7 sm:pt-0">
+              <div className="flex items-center gap-2.5">
+                <SectionHeaderIcon Icon={ArrowRight} tone="indigo" />
+                <CardTitle className="text-xs font-semibold uppercase tracking-wider text-foreground/78 dark:text-muted-foreground">
+                  Próximos Passos
+                </CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="px-4 pb-0 sm:px-7">
             <div className="space-y-3">
+              {report.nextSteps.length === 0 && nextStepsTopicMode ? (
+                <p className="text-sm text-muted-foreground">Sem passos — use “Adicionar passo”.</p>
+              ) : null}
               {report.nextSteps.map((step, i) => (
                 <div
                   key={i}
-                  className="flex min-w-0 w-full items-center gap-4 rounded-xl border border-border/90 bg-card/75 p-4 transition-colors hover:border-brand/40 dark:border-border dark:bg-secondary/55"
+                  className="relative flex min-w-0 w-full items-start gap-3 rounded-xl border border-border/90 bg-card/75 p-4 transition-colors hover:border-brand/40 dark:border-border dark:bg-secondary/55 sm:gap-4"
                 >
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-brand/40 bg-brand/10">
+                  <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-brand/40 bg-brand/10">
                     <span className="text-[11px] font-bold text-brand dark:text-brand">{i + 1}</span>
                   </div>
-                  <p className="min-w-0 flex-1 text-[14.5px] leading-relaxed text-foreground">{step}</p>
+                  <div className="min-w-0 flex-1">
+                    {nextStepsTopicMode ? (
+                      <DashboardEditableRegion
+                        density="compact"
+                        enabled
+                        isEditing={editingField === `nextSteps:${i}`}
+                        onStartEdit={() => beginTextEdit(`nextSteps:${i}`, step)}
+                        onCancel={cancelFieldEdit}
+                        onSave={() => void patchReportStringListItem("nextSteps", i, editDraft)}
+                        saving={fieldSaving}
+                        error={editingField === `nextSteps:${i}` ? fieldError : null}
+                        draft={editDraft}
+                        onDraftChange={setEditDraft}
+                        ariaLabel={`Editar passo ${i + 1}`}
+                        onDelete={() => {
+                          cancelFieldEdit();
+                          void removeReportStringListItem("nextSteps", i);
+                        }}
+                        deleteAriaLabel="Remover passo"
+                      >
+                        <p className="m-0 text-[14.5px] leading-relaxed text-foreground">{step}</p>
+                      </DashboardEditableRegion>
+                    ) : (
+                      <p className="m-0 text-[14.5px] leading-relaxed text-foreground">{step}</p>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
-          </CardContent>
+            {nextStepsTopicMode ? (
+              <div className="no-print mt-4 flex flex-wrap items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  disabled={fieldSaving}
+                  onClick={() => void appendReportStringListItem("nextSteps")}
+                >
+                  <Plus className="size-4" aria-hidden />
+                  Adicionar passo
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={fieldSaving}
+                  onClick={closeListSectionEdit}
+                  aria-label="Concluir edição desta secção"
+                >
+                  Concluir
+                </Button>
+              </div>
+            ) : null}
+            </CardContent>
+            {isDashboard && !nextStepsTopicMode ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                disabled={fieldSaving}
+                onClick={() => openListSectionEdit("nextSteps")}
+                className="no-print absolute bottom-2 right-4 z-[6] size-8 rounded-md border border-border/70 bg-background/95 text-muted-foreground shadow-sm backdrop-blur-sm hover:bg-muted hover:text-foreground sm:bottom-3 sm:right-7"
+                aria-label="Editar próximos passos"
+              >
+                <Pencil className="size-3.5" aria-hidden />
+              </Button>
+            ) : null}
+          </div>
           {/*
             CTA fora do CardContent: o relatório aplica [&_[data-slot=card-content]]:!px-* ao slot;
             manter o mesmo alinhamento horizontal (px-5 sm:px-7) e largura total até md (tablets estreitos).
