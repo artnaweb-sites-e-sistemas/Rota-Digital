@@ -424,3 +424,93 @@
     0 0 0 1px color-mix(in srgb, var(--foreground) 6%, transparent),
     0 0 0 4px color-mix(in srgb, var(--ring) 45%, transparent);
 }
+
+/**
+ * Troca de tema (View Transitions API): instantâneos reais da página.
+ * Circular: curva ease-out repartida em vários passos + `linear` = movimento contínuo (menos “seco”).
+ * Fade: cruzamento de opacidade suave (~900 ms).
+ */
+@media (prefers-reduced-motion: no-preference) {
+  html[data-theme-switch-vt="circular"]::view-transition-old(root) {
+    z-index: 1;
+    animation: none;
+  }
+
+  html[data-theme-switch-vt="circular"]::view-transition-new(root) {
+    z-index: 2;
+    animation: theme-switch-vt-circular-reveal var(--theme-switch-vt-duration, 900ms) linear both;
+  }
+
+  /**
+   * Raios em `vmax` alinhados a uma ease-out (~quint): mais passos no início,
+   * desaceleração natural no fim (sem depender só de um único cubic-bezier no clip-path).
+   */
+  @keyframes theme-switch-vt-circular-reveal {
+    0% {
+      clip-path: circle(0.001vmax at var(--theme-switch-vt-cx, 50%) var(--theme-switch-vt-cy, 50%));
+    }
+    4% {
+      clip-path: circle(7vmax at var(--theme-switch-vt-cx, 50%) var(--theme-switch-vt-cy, 50%));
+    }
+    10% {
+      clip-path: circle(18vmax at var(--theme-switch-vt-cx, 50%) var(--theme-switch-vt-cy, 50%));
+    }
+    18% {
+      clip-path: circle(34vmax at var(--theme-switch-vt-cx, 50%) var(--theme-switch-vt-cy, 50%));
+    }
+    28% {
+      clip-path: circle(54vmax at var(--theme-switch-vt-cx, 50%) var(--theme-switch-vt-cy, 50%));
+    }
+    40% {
+      clip-path: circle(78vmax at var(--theme-switch-vt-cx, 50%) var(--theme-switch-vt-cy, 50%));
+    }
+    54% {
+      clip-path: circle(104vmax at var(--theme-switch-vt-cx, 50%) var(--theme-switch-vt-cy, 50%));
+    }
+    70% {
+      clip-path: circle(128vmax at var(--theme-switch-vt-cx, 50%) var(--theme-switch-vt-cy, 50%));
+    }
+    84% {
+      clip-path: circle(146vmax at var(--theme-switch-vt-cx, 50%) var(--theme-switch-vt-cy, 50%));
+    }
+    94% {
+      clip-path: circle(156vmax at var(--theme-switch-vt-cx, 50%) var(--theme-switch-vt-cy, 50%));
+    }
+    100% {
+      clip-path: circle(165vmax at var(--theme-switch-vt-cx, 50%) var(--theme-switch-vt-cy, 50%));
+    }
+  }
+
+  html[data-theme-switch-vt="fade"]::view-transition-old(root) {
+    z-index: 1;
+    animation: theme-switch-vt-fade-out var(--theme-switch-vt-duration, 900ms) cubic-bezier(0.22, 0.99, 0.36, 1) both;
+  }
+
+  html[data-theme-switch-vt="fade"]::view-transition-new(root) {
+    z-index: 2;
+    animation: theme-switch-vt-fade-in var(--theme-switch-vt-duration, 900ms) cubic-bezier(0.22, 0.99, 0.36, 1) both;
+  }
+
+  @keyframes theme-switch-vt-fade-out {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+
+  @keyframes theme-switch-vt-fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}
+
+/* Necessário para o browser expor `::view-transition-* (root)` no documento. */
+html {
+  view-transition-name: root;
+}

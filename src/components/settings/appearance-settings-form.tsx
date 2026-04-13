@@ -1,14 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useState, type MouseEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useTheme } from "next-themes";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth-context";
+import switchTheme, {
+  THEME_SWITCH_CIRCULAR_DURATION_MS,
+  themeSwitchCircularOrigin,
+} from "@/lib/theme-switch-animation";
 import { getUserUiTheme, saveUserUiTheme } from "@/lib/user-settings";
 import type { UserUiTheme } from "@/types/user-settings";
-import { Check, Loader2, Monitor, Moon, Sun } from "lucide-react";
+import { Loader2, Monitor, Moon, Sun } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { switchThemeWithCircularReveal } from "@/lib/theme-switch-circular";
 
 const OPTIONS: { id: UserUiTheme; label: string; icon: typeof Sun }[] = [
   { id: "light", label: "Claro", icon: Sun },
@@ -24,7 +27,7 @@ function ThemeChip({
 }: {
   active: boolean;
   disabled?: boolean;
-  onClick: (e: MouseEvent<HTMLButtonElement>) => void;
+  onClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
   children: ReactNode;
 }) {
   return (
@@ -33,13 +36,15 @@ function ThemeChip({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        "relative flex flex-1 flex-col items-center gap-1.5 rounded-md border px-3 py-3 text-center transition-all sm:flex-row sm:justify-start sm:text-left disabled:pointer-events-none disabled:opacity-60",
+        "relative flex flex-1 flex-col items-center gap-1.5 overflow-hidden rounded-md border px-3 py-3 text-center sm:flex-row sm:justify-start sm:text-left disabled:pointer-events-none disabled:opacity-60",
         active
           ? "border-brand/45 bg-brand/12 text-foreground ring-1 ring-brand/30 dark:border-brand/50 dark:bg-brand/15 dark:text-white dark:ring-brand/25"
           : "border-border bg-background text-foreground hover:border-input hover:bg-muted dark:border-white/10 dark:bg-white/[0.03] dark:text-zinc-400 dark:hover:border-white/15 dark:hover:bg-white/[0.06] dark:hover:text-zinc-200",
       )}
     >
-      {children}
+      <span className="relative z-[1] flex w-full flex-col items-center gap-1.5 sm:flex-row sm:justify-start sm:text-left">
+        {children}
+      </span>
     </button>
   );
 }
@@ -47,11 +52,11 @@ function ThemeChip({
 export function AppearanceSettingsForm() {
   const { user } = useAuth();
   const { setTheme } = useTheme();
+  const [reduceMotion, setReduceMotion] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [preference, setPreference] = useState<UserUiTheme>("dark");
   const [error, setError] = useState<string | null>(null);
-  const [savedAt, setSavedAt] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -77,30 +82,40 @@ export function AppearanceSettingsForm() {
   }, [load]);
 
   useEffect(() => {
-    if (savedAt == null) return;
-    const id = window.setTimeout(() => setSavedAt(null), 3200);
-    return () => window.clearTimeout(id);
-  }, [savedAt]);
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const sync = () => setReduceMotion(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
 
-  const selectTheme = async (mode: UserUiTheme, originEl?: HTMLElement | null) => {
+  const selectTheme = async (mode: UserUiTheme, origin?: { cx: number; cy: number }) => {
     if (loading || saving) return;
     if (mode === preference && !error) return;
-    const applyLocal = () => {
+
+    const apply = () => {
       setPreference(mode);
       setTheme(mode);
     };
-    if ((mode === "light" || mode === "dark") && originEl) {
-      await switchThemeWithCircularReveal(originEl, mode, applyLocal);
+
+    if (reduceMotion || !origin) {
+      apply();
     } else {
-      applyLocal();
+      switchTheme({
+        switchThemeFunction: apply,
+        animationConfig: {
+          type: "circular",
+          duration: THEME_SWITCH_CIRCULAR_DURATION_MS,
+          startingPoint: origin,
+        },
+      });
     }
+
     setError(null);
-    setSavedAt(null);
     if (!user) return;
     setSaving(true);
     try {
       await saveUserUiTheme(user.uid, mode);
-      setSavedAt(Date.now());
     } catch (e) {
       console.error(e);
       setError("Não foi possível salvar. Escolha outra vez.");
@@ -142,11 +157,20 @@ export function AppearanceSettingsForm() {
                     key={opt.id}
                     active={active}
                     disabled={saving}
-                    onClick={(e) => void selectTheme(opt.id, e.currentTarget)}
+                    onClick={(e) => void selectTheme(opt.id, themeSwitchCircularOrigin(e.currentTarget))}
                   >
-                    <Icon className="size-4 shrink-0 text-brand dark:text-brand" aria-hidden />
+                    <span className="inline-flex shrink-0 text-brand dark:text-brand">
+                      <Icon className="size-4" aria-hidden />
+                    </span>
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold">{opt.label}</p>
+                      <p
+                        className={cn(
+                          "text-sm font-semibold",
+                          active ? "opacity-100" : "opacity-[0.82]",
+                        )}
+                      >
+                        {opt.label}
+                      </p>
                     </div>
                   </ThemeChip>
                 );
@@ -166,16 +190,6 @@ export function AppearanceSettingsForm() {
                 <Loader2 className="size-3.5 shrink-0 animate-spin text-brand" aria-hidden />
                 A guardar…
               </p>
-            ) : null}
-            {savedAt && !error && !saving ? (
-              <span
-                className="inline-flex max-w-full items-center gap-1.5 text-xs text-muted-foreground motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
-                role="status"
-                aria-live="polite"
-              >
-                <Check className="size-3.5 shrink-0 opacity-50 text-emerald-700 dark:text-emerald-500/80" aria-hidden />
-                Preferência salva.
-              </span>
             ) : null}
           </>
         )}
