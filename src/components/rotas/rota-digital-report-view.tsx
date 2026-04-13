@@ -1650,12 +1650,18 @@ function sortDiagnosticScoresByScoreAsc(scores: DiagnosticScore[]): DiagnosticSc
   );
 }
 
-function clampTimelineMonth(n: number): number {
-  if (!Number.isFinite(n)) return 1;
-  return Math.min(120, Math.max(1, Math.round(n)));
+function clampTimelineMonth(n: unknown): number {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return 1;
+  return Math.min(120, Math.max(1, Math.round(v)));
 }
 
-function monthsFromTimelineDraft(draft: string, fallback: number): number {
+/** Dados públicos/API podem trazer o valor como string (`"1"`); `=== 1` falhava no singular. */
+function isTimelineMonthSingular(months: unknown): boolean {
+  return Number(months) === 1;
+}
+
+function monthsFromTimelineDraft(draft: string, fallback: unknown): number {
   const digits = draft.replace(/\D/g, "");
   if (digits === "") return clampTimelineMonth(fallback);
   return clampTimelineMonth(parseInt(digits, 10));
@@ -1669,7 +1675,7 @@ function TimelineMonthsEditPanel({
   onDraftChange,
 }: {
   editDraft: string;
-  fallbackMonths: number;
+  fallbackMonths: unknown;
   fieldSaving: boolean;
   onDraftChange: (next: string) => void;
 }) {
@@ -1703,7 +1709,7 @@ function TimelineMonthsEditPanel({
             className="h-[3.25rem] min-w-0 max-w-[7rem] border-0 bg-transparent px-1 text-center text-4xl font-bold tabular-nums tracking-tight text-brand shadow-none ring-0 outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand/40 dark:text-brand sm:text-5xl sm:leading-none"
           />
           <span className="text-[10px] font-medium tracking-wide text-muted-foreground/90">
-            {n === 1 ? "Mês" : "meses"}
+            {isTimelineMonthSingular(n) ? "Mês" : "meses"}
           </span>
         </div>
         <Button
@@ -2446,6 +2452,40 @@ export function RotaDigitalReportView({
         </Card>
       ) : null}
 
+      {isDashboard ? (
+        <Card className={cn("no-print", ROTA_REPORT_SURFACE_SECTION, ROTA_REPORT_CARD_BOX)}>
+          <CardHeader className="pb-4">
+            <div className="flex items-center gap-2.5">
+              <SectionHeaderIcon Icon={FileText} tone="indigo" />
+              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-foreground/78 dark:text-muted-foreground">
+                Perfil da empresa
+              </CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <DashboardEditableRegion
+              enabled
+              isEditing={editingField === "companyProfile"}
+              onStartEdit={() => beginTextEdit("companyProfile", report.companyProfile || "")}
+              onCancel={cancelFieldEdit}
+              onSave={() => void applyReportPatch({ companyProfile: editDraft.trim() })}
+              saving={fieldSaving}
+              error={editingField === "companyProfile" ? fieldError : null}
+              draft={editDraft}
+              onDraftChange={setEditDraft}
+              ariaLabel="Editar perfil da empresa"
+            >
+              <ReportProseBlocks
+                text={report.companyProfile?.trim() ? report.companyProfile : "—"}
+                size="md"
+                collapseToTwoParagraphs
+                firstProminent={false}
+              />
+            </DashboardEditableRegion>
+          </CardContent>
+        </Card>
+      ) : null}
+
       {/* Executive Summary */}
       <div className="grid min-w-0 grid-cols-1 gap-5 md:grid-cols-12">
         <Card
@@ -2538,40 +2578,6 @@ export function RotaDigitalReportView({
           </CardContent>
         </Card>
       </div>
-
-      {isDashboard ? (
-        <Card className={cn("no-print", ROTA_REPORT_SURFACE_SECTION, ROTA_REPORT_CARD_BOX)}>
-          <CardHeader className="pb-4">
-            <div className="flex items-center gap-2.5">
-              <SectionHeaderIcon Icon={FileText} tone="indigo" />
-              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-foreground/78 dark:text-muted-foreground">
-                Perfil da empresa
-              </CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <DashboardEditableRegion
-              enabled
-              isEditing={editingField === "companyProfile"}
-              onStartEdit={() => beginTextEdit("companyProfile", report.companyProfile || "")}
-              onCancel={cancelFieldEdit}
-              onSave={() => void applyReportPatch({ companyProfile: editDraft.trim() })}
-              saving={fieldSaving}
-              error={editingField === "companyProfile" ? fieldError : null}
-              draft={editDraft}
-              onDraftChange={setEditDraft}
-              ariaLabel="Editar perfil da empresa"
-            >
-              <ReportProseBlocks
-                text={report.companyProfile?.trim() ? report.companyProfile : "—"}
-                size="md"
-                collapseToTwoParagraphs
-                firstProminent={false}
-              />
-            </DashboardEditableRegion>
-          </CardContent>
-        </Card>
-      ) : null}
 
       {/* KPIs: Layout Bento com hierarquia e profundidade */}
       <div className="grid min-w-0 grid-cols-1 gap-5 md:grid-cols-12">
@@ -2709,7 +2715,7 @@ export function RotaDigitalReportView({
                     {report.estimatedTimelineMonths}
                   </span>
                   <span className="text-lg font-medium text-muted-foreground print:text-muted-foreground">
-                    {report.estimatedTimelineMonths === 1 ? "Mês" : "meses"}
+                    {isTimelineMonthSingular(report.estimatedTimelineMonths) ? "Mês" : "meses"}
                   </span>
                 </div>
                 <p className="border-l-2 border-brand/45 pl-2.5 text-[11px] leading-snug text-foreground/90 antialiased print:border-l-brand/50 print:text-zinc-800 dark:border-brand/40">
@@ -2719,7 +2725,9 @@ export function RotaDigitalReportView({
                   </span>
                   {" "}no seu negócio, em{" "}
                   <span className="font-semibold text-brand dark:text-brand print:text-zinc-900">
-                    {report.estimatedTimelineMonths === 1 ? "mês corrido" : "meses corridos"}
+                    {isTimelineMonthSingular(report.estimatedTimelineMonths)
+                      ? "mês corrido"
+                      : "meses corridos"}
                   </span>
                   .
                   <span className="text-muted-foreground print:text-muted-foreground">
