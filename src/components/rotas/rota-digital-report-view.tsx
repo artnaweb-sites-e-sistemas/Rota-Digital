@@ -12,6 +12,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { updateReport } from "@/lib/reports";
+import { uploadUserEvidenceImageForReport } from "@/lib/evidence-storage";
 import { maturityFromDiagnosticScores } from "@/lib/maturity-from-diagnostics";
 import { getUserReportCtaSettings } from "@/lib/user-settings";
 import { resolveReportCtas } from "@/lib/report-cta";
@@ -40,12 +41,14 @@ import {
   Target,
   Zap,
   Calendar,
+  Check,
   CheckCircle2,
   AlertCircle,
   Star,
   ArrowRight,
   ExternalLink,
   Globe,
+  ImageUp,
   X,
   Bot,
   Compass,
@@ -58,7 +61,9 @@ import {
   Copy,
   Link2,
   Plus,
+  Minus,
   Pencil,
+  Trash2,
   FileText,
   Images,
   type LucideIcon,
@@ -789,6 +794,46 @@ function alignInstagramNoteForDisplay(
   return result;
 }
 
+function EvidenceReplaceToolbar({
+  ariaLabel,
+  busy,
+  onPickFile,
+}: {
+  ariaLabel: string;
+  busy: boolean;
+  onPickFile: (file: File) => void | Promise<void>;
+}) {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  return (
+    <>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif"
+        className="sr-only"
+        tabIndex={-1}
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          e.target.value = "";
+          if (f) void onPickFile(f);
+        }}
+      />
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        disabled={busy}
+        className="no-print absolute right-2 top-2 z-[35] size-8 rounded-md border border-border/70 bg-background/95 text-muted-foreground shadow-sm backdrop-blur-sm hover:bg-muted hover:text-foreground"
+        aria-label={ariaLabel}
+        title={ariaLabel}
+        onClick={() => inputRef.current?.click()}
+      >
+        {busy ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <ImageUp className="size-3.5" aria-hidden />}
+      </Button>
+    </>
+  );
+}
+
 function EvidenceImage({
   src,
   alt,
@@ -798,6 +843,7 @@ function EvidenceImage({
   initialOffsetRatio = 0,
   fitContain = false,
   fitContainMode = "width",
+  replaceToolbar,
 }: {
   src?: string;
   alt: string;
@@ -810,6 +856,8 @@ function EvidenceImage({
   fitContain?: boolean;
   /** `contain`: imagem inteira visível; `cover`: preenche a box (pode cortar bordas). */
   fitContainMode?: "width" | "height" | "cover";
+  /** Só dashboard: ícone para substituir a imagem por ficheiro local. */
+  replaceToolbar?: { ariaLabel: string; busy: boolean; onPickFile: (file: File) => void | Promise<void> };
 }) {
   const [failed, setFailed] = useState(false);
   const [hovered, setHovered] = useState(false);
@@ -902,11 +950,21 @@ function EvidenceImage({
     return () => ro.disconnect();
   }, [scrollMeasureActive, recalcScroll]);
 
-  if (!resolvedSrc || failed) {
+  const wrapReplace = (node: ReactNode) => {
+    if (!replaceToolbar) return node;
     return (
+      <div className="relative w-full">
+        {node}
+        <EvidenceReplaceToolbar {...replaceToolbar} />
+      </div>
+    );
+  };
+
+  if (!resolvedSrc || failed) {
+    return wrapReplace(
       <div className="flex h-full w-full items-center justify-center rounded-md border border-dashed border-border bg-muted/45 px-3 text-center text-xs text-muted-foreground">
         Sem imagem disponível
-      </div>
+      </div>,
     );
   }
 
@@ -921,7 +979,7 @@ function EvidenceImage({
   if (fitContain) {
     if (fitContainMode === "cover") {
       if (panInteractive) {
-        return (
+        return wrapReplace(
           <div
             ref={containerRef}
             className={cn(
@@ -955,11 +1013,11 @@ function EvidenceImage({
                 <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-background/85 dark:from-zinc-950/80 to-transparent opacity-80 transition-opacity duration-300 group-hover:opacity-20 group-data-[pan-active=true]:opacity-20" />
               </>
             ) : null}
-          </div>
+          </div>,
         );
       }
 
-      return (
+      return wrapReplace(
         <div className={`${frameClassName || ""} relative min-h-0 overflow-hidden`}>
           <img
             key={`${resolvedSrc || "img"}-cover`}
@@ -973,7 +1031,7 @@ function EvidenceImage({
               objectPosition: "center top",
             }}
           />
-        </div>
+        </div>,
       );
     }
 
@@ -982,7 +1040,7 @@ function EvidenceImage({
         ? "h-full w-full object-contain object-top"
         : "h-auto w-full max-w-full object-contain object-top";
 
-    return (
+    return wrapReplace(
       <div
         className={`${frameClassName || ""} relative flex min-h-0 items-start justify-center overflow-hidden`}
       >
@@ -998,22 +1056,17 @@ function EvidenceImage({
             objectPosition: "top center",
           }}
         />
-      </div>
+      </div>,
     );
   }
 
   if (!panInteractive) {
-    return (
-      <img
-        src={resolvedSrc}
-        alt={alt}
-        className={className}
-        onError={() => setFailed(true)}
-      />
+    return wrapReplace(
+      <img src={resolvedSrc} alt={alt} className={className} onError={() => setFailed(true)} />,
     );
   }
 
-  return (
+  return wrapReplace(
     <div
       ref={containerRef}
       className={cn(
@@ -1047,7 +1100,7 @@ function EvidenceImage({
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-background/85 dark:from-zinc-950/80 to-transparent opacity-80 transition-opacity duration-300 group-hover:opacity-20 group-data-[pan-active=true]:opacity-20" />
         </>
       ) : null}
-    </div>
+    </div>,
   );
 }
 
@@ -1139,9 +1192,17 @@ function DiagnosticTopicPill({ topic }: { topic: string }) {
 function TopicEvidence({
   item,
   report,
+  isDashboard,
+  replaceToolbarSite,
+  replaceToolbarInstagram,
+  replaceToolbarSingle,
 }: {
   item: DiagnosticScore;
   report: RotaDigitalReport;
+  isDashboard?: boolean;
+  replaceToolbarSite?: { ariaLabel: string; busy: boolean; onPickFile: (file: File) => void | Promise<void> };
+  replaceToolbarInstagram?: { ariaLabel: string; busy: boolean; onPickFile: (file: File) => void | Promise<void> };
+  replaceToolbarSingle?: { ariaLabel: string; busy: boolean; onPickFile: (file: File) => void | Promise<void> };
 }) {
   const topic = item.topic.toLowerCase();
   const siteFooterFocus = isFunilOrCtaDiagnosticTopic(topic);
@@ -1168,6 +1229,7 @@ function TopicEvidence({
           initialOffsetRatio={combinedGridIdleRatio}
           frameClassName="h-56 w-full rounded-md border border-border bg-muted/55"
           className="h-auto"
+          replaceToolbar={isDashboard ? replaceToolbarSite : undefined}
         />
         <EvidenceImage
           src={withSnapshotParams(instagramSrc, {
@@ -1181,6 +1243,7 @@ function TopicEvidence({
           initialOffsetRatio={combinedGridIdleRatio}
           frameClassName="h-56 w-full rounded-md border border-border bg-muted/55"
           className="h-auto"
+          replaceToolbar={isDashboard ? replaceToolbarInstagram : undefined}
         />
       </div>
     );
@@ -1230,6 +1293,7 @@ function TopicEvidence({
       initialOffsetRatio={evidenceScrollInitialRatio}
       frameClassName="h-56 w-full rounded-md border border-border bg-muted/55"
       className="h-auto"
+      replaceToolbar={isDashboard ? replaceToolbarSingle : undefined}
     />
   );
 }
@@ -1251,11 +1315,66 @@ type DashboardChannelEdit = {
   setEditDraft: (v: string) => void;
   beginTextEdit: (field: string, initial: string) => void;
   cancelFieldEdit: () => void;
-  onSaveChannelDescription: (sortedIndex: number) => Promise<void>;
-  onSaveChannelActionItem: (sortedIndex: number, actionIndex: number) => Promise<void>;
+  onSaveChannelDescription: (sortedIndex: number) => Promise<boolean>;
+  onSaveChannelActionItem: (sortedIndex: number, actionIndex: number) => Promise<boolean>;
   appendChannelAction: (sortedIndex: number) => Promise<void>;
   removeChannelAction: (sortedIndex: number, actionIndex: number) => Promise<void>;
 };
+
+/** Rodapé das listas em modo tópico: + compacto, Salvar (igual ao bloco editável) e Cancelar (sai da secção). */
+function DashboardListSectionEditFooter({
+  fieldSaving,
+  onAdd,
+  addAriaLabel,
+  onSaveClose,
+  onCancel,
+  className,
+}: {
+  fieldSaving: boolean;
+  onAdd: () => void | Promise<void>;
+  addAriaLabel: string;
+  onSaveClose: () => void | Promise<void>;
+  onCancel: () => void;
+  className?: string;
+}) {
+  return (
+    <div className={cn("no-print flex flex-wrap items-center justify-end gap-2", className ?? "mt-3")}>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        disabled={fieldSaving}
+        onClick={() => void onAdd()}
+        className="shrink-0 text-muted-foreground/75 hover:bg-muted/50 hover:text-foreground"
+        aria-label={addAriaLabel}
+      >
+        <Plus className="size-3.5" aria-hidden />
+      </Button>
+      <Button
+        type="button"
+        variant="cta"
+        size="sm"
+        className="gap-1.5"
+        disabled={fieldSaving}
+        onClick={() => void onSaveClose()}
+      >
+        {fieldSaving ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Check className="size-4" aria-hidden />}
+        Salvar
+      </Button>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="gap-1.5"
+        disabled={fieldSaving}
+        onClick={onCancel}
+      >
+        <X className="size-4" aria-hidden />
+        Cancelar
+      </Button>
+    </div>
+  );
+}
 
 function ChannelCard({
   channel,
@@ -1290,6 +1409,26 @@ function ChannelCard({
   const d = dashboardChannelEdit;
   const descKey = `channel-${channelIndex}-description`;
   const [actionsSectionOpen, setActionsSectionOpen] = useState(false);
+
+  const saveChannelActionsSectionAndClose = async () => {
+    if (!d || d.fieldSaving) return;
+    const actionPrefix = `channel-${channelIndex}-action-`;
+    let ok = true;
+    if (d.editingField === descKey) {
+      ok = await d.onSaveChannelDescription(channelIndex);
+    } else if (d.editingField?.startsWith(actionPrefix)) {
+      const i = parseInt(d.editingField.slice(actionPrefix.length), 10);
+      if (Number.isFinite(i)) ok = await d.onSaveChannelActionItem(channelIndex, i);
+    }
+    if (ok) setActionsSectionOpen(false);
+  };
+
+  const cancelChannelActionsSection = () => {
+    if (!d) return;
+    d.cancelFieldEdit();
+    setActionsSectionOpen(false);
+  };
+
   return (
     <div className="relative flex h-full min-h-0 flex-col pt-1 md:self-stretch">
       {/*
@@ -1343,7 +1482,9 @@ function ChannelCard({
               isEditing={d.editingField === descKey}
               onStartEdit={() => d.beginTextEdit(descKey, channel.description)}
               onCancel={d.cancelFieldEdit}
-              onSave={() => d.onSaveChannelDescription(channelIndex)}
+              onSave={async () => {
+                await d.onSaveChannelDescription(channelIndex);
+              }}
               saving={d.fieldSaving}
               error={d.editingField === descKey ? d.fieldError : null}
               draft={d.editDraft}
@@ -1437,11 +1578,14 @@ function ChannelCard({
                             <div className="min-w-0 flex-1">
                               <DashboardEditableRegion
                                 density="compact"
+                                readToolbarPlacement="top-right"
                                 enabled
                                 isEditing={d.editingField === actionKey}
                                 onStartEdit={() => d.beginTextEdit(actionKey, action)}
                                 onCancel={d.cancelFieldEdit}
-                                onSave={() => d.onSaveChannelActionItem(channelIndex, i)}
+                                onSave={async () => {
+                                  await d.onSaveChannelActionItem(channelIndex, i);
+                                }}
                                 saving={d.fieldSaving}
                                 error={d.editingField === actionKey ? d.fieldError : null}
                                 draft={d.editDraft}
@@ -1463,32 +1607,13 @@ function ChannelCard({
                   ) : (
                     <p className="text-sm text-muted-foreground">Sem ações listadas.</p>
                   )}
-                  <div className="no-print mt-3 flex flex-wrap items-center justify-end gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="gap-1.5"
-                      disabled={d.fieldSaving}
-                      onClick={() => void d.appendChannelAction(channelIndex)}
-                    >
-                      <Plus className="size-4" aria-hidden />
-                      Adicionar ação
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={d.fieldSaving}
-                      onClick={() => {
-                        d.cancelFieldEdit();
-                        setActionsSectionOpen(false);
-                      }}
-                      aria-label="Concluir edição desta secção"
-                    >
-                      Concluir
-                    </Button>
-                  </div>
+                  <DashboardListSectionEditFooter
+                    fieldSaving={d.fieldSaving}
+                    onAdd={() => void d.appendChannelAction(channelIndex)}
+                    addAriaLabel="Adicionar ação"
+                    onSaveClose={() => void saveChannelActionsSectionAndClose()}
+                    onCancel={cancelChannelActionsSection}
+                  />
                 </div>
               )
             ) : (
@@ -1517,6 +1642,94 @@ function ChannelCard({
     </div>
   );
 }
+
+/** Diagnóstico por tópico: menor nota primeiro; empate estável pelo nome (igual à vista pública). */
+function sortDiagnosticScoresByScoreAsc(scores: DiagnosticScore[]): DiagnosticScore[] {
+  return [...scores].sort(
+    (a, b) => a.score - b.score || a.topic.localeCompare(b.topic, "pt", { sensitivity: "base" }),
+  );
+}
+
+function clampTimelineMonth(n: number): number {
+  if (!Number.isFinite(n)) return 1;
+  return Math.min(120, Math.max(1, Math.round(n)));
+}
+
+function monthsFromTimelineDraft(draft: string, fallback: number): number {
+  const digits = draft.replace(/\D/g, "");
+  if (digits === "") return clampTimelineMonth(fallback);
+  return clampTimelineMonth(parseInt(digits, 10));
+}
+
+/** Edição do prazo (meses): stepper + número grande. */
+function TimelineMonthsEditPanel({
+  editDraft,
+  fallbackMonths,
+  fieldSaving,
+  onDraftChange,
+}: {
+  editDraft: string;
+  fallbackMonths: number;
+  fieldSaving: boolean;
+  onDraftChange: (next: string) => void;
+}) {
+  const n = monthsFromTimelineDraft(editDraft, fallbackMonths);
+  return (
+    <div className="rounded-xl border border-border/50 bg-muted/15 px-3 py-3 dark:border-white/[0.06] dark:bg-zinc-950/40 sm:px-4 sm:py-3.5">
+      <div className="flex items-center justify-center gap-2 sm:gap-3">
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="size-10 shrink-0 rounded-full border-border/70 bg-background/80 transition hover:bg-muted/70 dark:bg-zinc-900/90 sm:size-11"
+          aria-label="Menos um mês"
+          disabled={fieldSaving || n <= 1}
+          onClick={() => onDraftChange(String(n - 1))}
+        >
+          <Minus className="size-4" aria-hidden />
+        </Button>
+        <div className="flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5">
+          <Input
+            id="report-timeline-months-edit"
+            type="text"
+            inputMode="numeric"
+            autoComplete="off"
+            autoFocus
+            value={editDraft}
+            onChange={(e) => {
+              const v = e.target.value.replace(/\D/g, "").slice(0, 3);
+              onDraftChange(v);
+            }}
+            className="h-[3.25rem] min-w-0 max-w-[7rem] border-0 bg-transparent px-1 text-center text-4xl font-bold tabular-nums tracking-tight text-brand shadow-none ring-0 outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand/40 dark:text-brand sm:text-5xl sm:leading-none"
+          />
+          <span className="text-[10px] font-medium tracking-wide text-muted-foreground/90">
+            {n === 1 ? "Mês" : "meses"}
+          </span>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="size-10 shrink-0 rounded-full border-border/70 bg-background/80 transition hover:bg-muted/70 dark:bg-zinc-900/90 sm:size-11"
+          aria-label="Mais um mês"
+          disabled={fieldSaving || n >= 120}
+          onClick={() => onDraftChange(String(n + 1))}
+        >
+          <Plus className="size-4" aria-hidden />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/** Chave para substituição manual de imagens de evidência (dashboard). */
+type EvidenceManualSlot =
+  | "logo"
+  | "instagramProfile"
+  | "instagramSnapshot"
+  | "siteHero"
+  | "instagramBioLink"
+  | `diagnostic:${number}`;
 
 export type RotaDigitalReportViewVariant = "dashboard" | "public";
 
@@ -1559,6 +1772,7 @@ export function RotaDigitalReportView({
   );
   /** Modo tópico-a-tópico só depois de abrir a secção com o lápis da caixa. */
   const [listSectionEditOpen, setListSectionEditOpen] = useState<DashboardListSectionKey | null>(null);
+  const [evidenceReplaceSlot, setEvidenceReplaceSlot] = useState<EvidenceManualSlot | null>(null);
 
   const reportCta = useMemo(
     () => resolveReportCtas(ctaSettings, process.env.NEXT_PUBLIC_ROTA_REPORT_CTA_URL),
@@ -1616,7 +1830,7 @@ export function RotaDigitalReportView({
   }, [cancelFieldEdit]);
 
   const applyReportPatch = useCallback(
-    async (patch: Partial<RotaDigitalReport>) => {
+    async (patch: Partial<RotaDigitalReport>): Promise<boolean> => {
       setFieldSaving(true);
       setFieldError(null);
       try {
@@ -1634,13 +1848,75 @@ export function RotaDigitalReportView({
           return next;
         });
         cancelFieldEdit();
+        return true;
       } catch (err: unknown) {
         setFieldError(err instanceof Error ? err.message : "Erro ao guardar.");
+        return false;
       } finally {
         setFieldSaving(false);
       }
     },
     [report.id, onReportChange, cancelFieldEdit],
+  );
+
+  const handleReplaceEvidenceImage = useCallback(
+    async (slot: EvidenceManualSlot, file: File) => {
+      if (!isDashboard) return;
+      setEvidenceReplaceSlot(slot);
+      setFieldError(null);
+      try {
+        const url = await uploadUserEvidenceImageForReport({
+          file,
+          userId: report.userId,
+          leadId: report.leadId,
+          reportId: report.id,
+          slotLabel: slot,
+        });
+        if (!url) {
+          setFieldError(
+            "Não foi possível enviar a imagem. Use JPG, PNG ou WebP (máx. 15 MB) ou confira permissões do Storage.",
+          );
+          return;
+        }
+        const baseEv = { ...(report.evidences || {}) };
+        if (slot === "logo") {
+          await applyReportPatch({ evidences: { ...baseEv, logoImageUrl: url } });
+          return;
+        }
+        if (slot === "instagramProfile") {
+          await applyReportPatch({ evidences: { ...baseEv, instagramProfileImageUrl: url } });
+          return;
+        }
+        if (slot === "instagramSnapshot") {
+          await applyReportPatch({ evidences: { ...baseEv, instagramSnapshotUrl: url } });
+          return;
+        }
+        if (slot === "siteHero") {
+          await applyReportPatch({ evidences: { ...baseEv, siteHeroSnapshotUrl: url } });
+          return;
+        }
+        if (slot === "instagramBioLink") {
+          await applyReportPatch({ evidences: { ...baseEv, instagramBioLinkSnapshotUrl: url } });
+          return;
+        }
+        if (slot.startsWith("diagnostic:")) {
+          const i = Number.parseInt(slot.slice("diagnostic:".length), 10);
+          const arr = [...(report.diagnosticScores || [])];
+          if (!Number.isFinite(i) || arr[i] === undefined) return;
+          arr[i] = { ...arr[i]!, evidenceImageUrl: url };
+          const ordered = sortDiagnosticScoresByScoreAsc(arr);
+          const maturityPatch = maturityFromDiagnosticScores(ordered);
+          await applyReportPatch(
+            maturityPatch
+              ? { diagnosticScores: ordered, ...maturityPatch }
+              : { diagnosticScores: ordered },
+          );
+        }
+      } finally {
+        setEvidenceReplaceSlot(null);
+      }
+    },
+    [isDashboard, report, applyReportPatch],
   );
 
   const beginTextEdit = useCallback((field: string, initial: string) => {
@@ -1710,12 +1986,11 @@ export function RotaDigitalReportView({
       ),
     [report.recommendedChannels],
   );
-  /** No dashboard mantém a ordem do array (novo tópico fica no fim). Na vista pública ordena por nota crescente. */
-  const sortedDiagnosticScores = useMemo(() => {
-    const list = [...(report.diagnosticScores || [])];
-    if (isDashboard) return list;
-    return list.sort((a, b) => a.score - b.score);
-  }, [report.diagnosticScores, isDashboard]);
+  /** Sempre por nota crescente (igual à vista pública); o array guardado é reordenado ao gravar. */
+  const sortedDiagnosticScores = useMemo(
+    () => sortDiagnosticScoresByScoreAsc(report.diagnosticScores || []),
+    [report.diagnosticScores],
+  );
 
   const headlineMaturity = useMemo(() => {
     const fromTopics = maturityFromDiagnosticScores(report.diagnosticScores);
@@ -1727,25 +2002,25 @@ export function RotaDigitalReportView({
   }, [report.diagnosticScores, report.digitalMaturityScore, report.digitalMaturityLevel]);
 
   const onSaveChannelDescription = useCallback(
-    async (sortedIndex: number) => {
+    async (sortedIndex: number): Promise<boolean> => {
       const list = [...sortedChannels];
       const row = list[sortedIndex];
-      if (!row) return;
+      if (!row) return false;
       list[sortedIndex] = { ...row, description: editDraft.trim() };
-      await applyReportPatch({ recommendedChannels: list });
+      return await applyReportPatch({ recommendedChannels: list });
     },
     [sortedChannels, editDraft, applyReportPatch],
   );
 
   const onSaveChannelActionItem = useCallback(
-    async (sortedIndex: number, actionIndex: number) => {
+    async (sortedIndex: number, actionIndex: number): Promise<boolean> => {
       const list = [...sortedChannels];
       const row = list[sortedIndex];
-      if (!row || row.actions[actionIndex] === undefined) return;
+      if (!row || row.actions[actionIndex] === undefined) return false;
       const actions = [...row.actions];
       actions[actionIndex] = editDraft.trim();
       list[sortedIndex] = { ...row, actions };
-      await applyReportPatch({ recommendedChannels: list });
+      return await applyReportPatch({ recommendedChannels: list });
     },
     [sortedChannels, editDraft, applyReportPatch],
   );
@@ -1779,11 +2054,11 @@ export function RotaDigitalReportView({
   type SwotListKey = "strengths" | "weaknesses" | "opportunities";
 
   const patchSwotItem = useCallback(
-    async (key: SwotListKey, index: number, value: string) => {
+    async (key: SwotListKey, index: number, value: string): Promise<boolean> => {
       const arr = [...report[key]];
-      if (arr[index] === undefined) return;
+      if (arr[index] === undefined) return false;
       arr[index] = value.trim();
-      await applyReportPatch({ [key]: arr });
+      return await applyReportPatch({ [key]: arr });
     },
     [report, applyReportPatch],
   );
@@ -1807,11 +2082,11 @@ export function RotaDigitalReportView({
   type ReportStringListKey = "quickWins" | "longTermActions" | "nextSteps";
 
   const patchReportStringListItem = useCallback(
-    async (key: ReportStringListKey, index: number, value: string) => {
+    async (key: ReportStringListKey, index: number, value: string): Promise<boolean> => {
       const arr = [...report[key]];
-      if (arr[index] === undefined) return;
+      if (arr[index] === undefined) return false;
       arr[index] = value.trim();
-      await applyReportPatch({ [key]: arr });
+      return await applyReportPatch({ [key]: arr });
     },
     [report, applyReportPatch],
   );
@@ -1831,6 +2106,34 @@ export function RotaDigitalReportView({
     },
     [report, applyReportPatch],
   );
+
+  /** Guarda a linha em edição (se houver) e fecha o modo tópico da secção. */
+  const saveListSectionFooterAndClose = useCallback(async () => {
+    if (fieldSaving || !listSectionEditOpen) return;
+    const section = listSectionEditOpen;
+    const prefix = `${section}:`;
+    if (editingField?.startsWith(prefix)) {
+      const index = parseInt(editingField.slice(prefix.length), 10);
+      if (Number.isFinite(index)) {
+        let ok = true;
+        if (section === "strengths" || section === "weaknesses" || section === "opportunities") {
+          ok = await patchSwotItem(section, index, editDraft);
+        } else if (section === "quickWins" || section === "longTermActions" || section === "nextSteps") {
+          ok = await patchReportStringListItem(section, index, editDraft);
+        }
+        if (!ok) return;
+      }
+    }
+    closeListSectionEdit();
+  }, [
+    fieldSaving,
+    listSectionEditOpen,
+    editingField,
+    editDraft,
+    patchSwotItem,
+    patchReportStringListItem,
+    closeListSectionEdit,
+  ]);
 
   const dashboardChannelEdit: DashboardChannelEdit | undefined = isDashboard
     ? {
@@ -1872,11 +2175,12 @@ export function RotaDigitalReportView({
     const next = (report.diagnosticScores || []).map((d) =>
       d === ref ? { ...d, topic, score, comment: diagCommentDraft.trim() } : d,
     );
-    const maturityPatch = maturityFromDiagnosticScores(next);
+    const ordered = sortDiagnosticScoresByScoreAsc(next);
+    const maturityPatch = maturityFromDiagnosticScores(ordered);
     await applyReportPatch(
       maturityPatch
-        ? { diagnosticScores: next, ...maturityPatch }
-        : { diagnosticScores: next },
+        ? { diagnosticScores: ordered, ...maturityPatch }
+        : { diagnosticScores: ordered },
     );
   }, [
     diagEditSortedIndex,
@@ -1898,18 +2202,20 @@ export function RotaDigitalReportView({
           "Primeiro parágrafo: descreva o que foi observado.\n\nSegundo parágrafo: indique uma prioridade ou próximo passo.",
       },
     ];
-    const maturityPatch = maturityFromDiagnosticScores(next)!;
-    await applyReportPatch({ diagnosticScores: next, ...maturityPatch });
+    const ordered = sortDiagnosticScoresByScoreAsc(next);
+    const maturityPatch = maturityFromDiagnosticScores(ordered)!;
+    await applyReportPatch({ diagnosticScores: ordered, ...maturityPatch });
   }, [report.diagnosticScores, applyReportPatch]);
 
   const removeDiagnosticItem = useCallback(
     async (item: DiagnosticScore) => {
       const next = (report.diagnosticScores || []).filter((d) => d !== item);
-      const maturityPatch = maturityFromDiagnosticScores(next);
+      const ordered = sortDiagnosticScoresByScoreAsc(next);
+      const maturityPatch = maturityFromDiagnosticScores(ordered);
       await applyReportPatch(
         maturityPatch
-          ? { diagnosticScores: next, ...maturityPatch }
-          : { diagnosticScores: next },
+          ? { diagnosticScores: ordered, ...maturityPatch }
+          : { diagnosticScores: ordered },
       );
     },
     [report.diagnosticScores, applyReportPatch],
@@ -2201,6 +2507,21 @@ export function RotaDigitalReportView({
                       ? "h-28 w-28 rounded-xl bg-white p-3 object-contain shadow-lg"
                       : "h-28 w-28 rounded-full border-2 border-border object-cover shadow-lg"
                   }
+                  replaceToolbar={
+                    isDashboard
+                      ? {
+                          ariaLabel: isWebsiteLogo ? "Substituir logo" : "Substituir foto de perfil",
+                          busy:
+                            evidenceReplaceSlot ===
+                            (isWebsiteLogo ? "logo" : "instagramProfile"),
+                          onPickFile: (file) =>
+                            void handleReplaceEvidenceImage(
+                              isWebsiteLogo ? "logo" : "instagramProfile",
+                              file,
+                            ),
+                        }
+                      : undefined
+                  }
                 />
               </div>
             ) : (
@@ -2368,14 +2689,28 @@ export function RotaDigitalReportView({
               draft={editDraft}
               onDraftChange={setEditDraft}
               ariaLabel="Editar prazo estimado (meses)"
-              textAreaClassName="min-h-[72px] font-mono text-sm"
+              editStackClassName="space-y-4"
+              editActionsClassName="mt-1 justify-end gap-2 border-t border-border/50 pt-4 dark:border-white/[0.08]"
+              editSlot={
+                <TimelineMonthsEditPanel
+                  editDraft={editDraft}
+                  fallbackMonths={report.estimatedTimelineMonths}
+                  fieldSaving={fieldSaving}
+                  onDraftChange={(v) => {
+                    setEditDraft(v);
+                    setFieldError(null);
+                  }}
+                />
+              }
             >
               <div className="space-y-2.5">
                 <div className="flex items-baseline gap-1.5">
                   <span className="text-5xl font-bold tracking-tight tabular-nums text-brand dark:text-brand">
                     {report.estimatedTimelineMonths}
                   </span>
-                  <span className="text-lg font-medium text-muted-foreground print:text-muted-foreground">meses</span>
+                  <span className="text-lg font-medium text-muted-foreground print:text-muted-foreground">
+                    {report.estimatedTimelineMonths === 1 ? "Mês" : "meses"}
+                  </span>
                 </div>
                 <p className="border-l-2 border-brand/45 pl-2.5 text-[11px] leading-snug text-foreground/90 antialiased print:border-l-brand/50 print:text-zinc-800 dark:border-brand/40">
                   Tempo previsto para{" "}
@@ -2383,7 +2718,10 @@ export function RotaDigitalReportView({
                     colocar este plano em prática
                   </span>
                   {" "}no seu negócio, em{" "}
-                  <span className="font-semibold text-brand dark:text-brand print:text-zinc-900">meses corridos</span>.
+                  <span className="font-semibold text-brand dark:text-brand print:text-zinc-900">
+                    {report.estimatedTimelineMonths === 1 ? "mês corrido" : "meses corridos"}
+                  </span>
+                  .
                   <span className="text-muted-foreground print:text-muted-foreground">
                     {" "}Serve para você entender o caminho, planejar o investimento e avançar com mais segurança.
                   </span>
@@ -2608,9 +2946,9 @@ export function RotaDigitalReportView({
                 restingBorderColor={topicGlow.restingBorderColor}
                 className="overflow-hidden rounded-xl print-white ring-1 ring-foreground/10"
               >
-                <div className={cn("rounded-[10px] p-6 sm:p-7", ROTA_REPORT_SURFACE_GLOW_INNER)}>
+                <div className={cn("relative rounded-[10px] p-6 sm:p-7", ROTA_REPORT_SURFACE_GLOW_INNER)}>
                   <div className="grid gap-5 md:grid-cols-[360px_minmax(0,1fr)] md:items-start md:gap-6">
-                    <TopicEvidence item={item} report={report} />
+                    <TopicEvidence item={item} report={report} isDashboard={isDashboard} />
                     <div className="space-y-4">
                       <div className="flex items-center justify-between gap-2 pb-2">
                         <div className="space-y-1.5">
@@ -2624,6 +2962,7 @@ export function RotaDigitalReportView({
                       </div>
                       <DashboardEditableRegion
                         enabled={isDashboard}
+                        hideReadToolbar={isDashboard}
                         isEditing={editingField === `diagnostic:${idx}`}
                         onStartEdit={() => beginDiagnosticEdit(idx, sortedDiagnosticScores)}
                         onCancel={cancelFieldEdit}
@@ -2665,6 +3004,32 @@ export function RotaDigitalReportView({
                       </DashboardEditableRegion>
                     </div>
                   </div>
+                  {isDashboard && editingField !== `diagnostic:${idx}` ? (
+                    <div className="no-print absolute bottom-4 right-4 z-[5] flex flex-row items-center gap-0.5 sm:bottom-5 sm:right-5">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => void removeDiagnosticItem(item)}
+                        disabled={fieldSaving}
+                        className="size-8 rounded-md border border-border/70 bg-background/95 text-muted-foreground shadow-sm backdrop-blur-sm hover:bg-muted hover:text-destructive"
+                        aria-label={`Remover tópico ${item.topic}`}
+                      >
+                        <Trash2 className="size-3.5" aria-hidden />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => beginDiagnosticEdit(idx, sortedDiagnosticScores)}
+                        disabled={fieldSaving}
+                        className="size-8 rounded-md border border-border/70 bg-background/95 text-muted-foreground shadow-sm backdrop-blur-sm hover:bg-muted hover:text-foreground"
+                        aria-label={`Editar comentário: ${item.topic}`}
+                      >
+                        <Pencil className="size-3.5" aria-hidden />
+                      </Button>
+                    </div>
+                  ) : null}
                 </div>
               </BorderGlow>
               );
@@ -2767,6 +3132,15 @@ export function RotaDigitalReportView({
                 hoverScroll
                 frameClassName="h-64 w-full rounded-md border border-border bg-muted"
                 className="h-auto"
+                replaceToolbar={
+                  isDashboard
+                    ? {
+                        ariaLabel: "Substituir imagem do Instagram",
+                        busy: evidenceReplaceSlot === "instagramSnapshot",
+                        onPickFile: (file) => void handleReplaceEvidenceImage("instagramSnapshot", file),
+                      }
+                    : undefined
+                }
               />
             </div>
 
@@ -2781,6 +3155,15 @@ export function RotaDigitalReportView({
                 initialOffsetRatio={FULL_PAGE_SNAPSHOT_IDLE_FROM_TOP_RATIO}
                 frameClassName="h-64 w-full rounded-md border border-border bg-muted"
                 className="h-auto"
+                replaceToolbar={
+                  isDashboard
+                    ? {
+                        ariaLabel: "Substituir captura da página do site",
+                        busy: evidenceReplaceSlot === "siteHero",
+                        onPickFile: (file) => void handleReplaceEvidenceImage("siteHero", file),
+                      }
+                    : undefined
+                }
               />
             </div>
 
@@ -2796,6 +3179,16 @@ export function RotaDigitalReportView({
                   initialOffsetRatio={FULL_PAGE_SNAPSHOT_IDLE_FROM_TOP_RATIO}
                   frameClassName="h-64 w-full rounded-md border border-border bg-muted"
                   className="h-auto"
+                  replaceToolbar={
+                    isDashboard
+                      ? {
+                          ariaLabel: "Substituir captura do destino do link da bio",
+                          busy: evidenceReplaceSlot === "instagramBioLink",
+                          onPickFile: (file) =>
+                            void handleReplaceEvidenceImage("instagramBioLink", file),
+                        }
+                      : undefined
+                  }
                 />
               </div>
             ) : null}
@@ -2999,6 +3392,7 @@ export function RotaDigitalReportView({
                       {strengthsTopicMode ? (
                         <DashboardEditableRegion
                           density="compact"
+                          readToolbarPlacement="top-right"
                           enabled
                           isEditing={editingField === `strengths:${i}`}
                           onStartEdit={() => beginTextEdit(`strengths:${i}`, s)}
@@ -3025,29 +3419,13 @@ export function RotaDigitalReportView({
                 ))}
               </ul>
               {strengthsTopicMode ? (
-                <div className="no-print mt-3 flex flex-wrap items-center justify-end gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="gap-1.5"
-                    disabled={fieldSaving}
-                    onClick={() => void appendSwotItem("strengths")}
-                  >
-                    <Plus className="size-4" aria-hidden />
-                    Adicionar força
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={fieldSaving}
-                    onClick={closeListSectionEdit}
-                    aria-label="Concluir edição desta secção"
-                  >
-                    Concluir
-                  </Button>
-                </div>
+                <DashboardListSectionEditFooter
+                  fieldSaving={fieldSaving}
+                  onAdd={() => void appendSwotItem("strengths")}
+                  addAriaLabel="Adicionar força"
+                  onSaveClose={saveListSectionFooterAndClose}
+                  onCancel={closeListSectionEdit}
+                />
               ) : null}
             </CardContent>
             {isDashboard && !strengthsTopicMode ? (
@@ -3126,6 +3504,7 @@ export function RotaDigitalReportView({
                       {weaknessesTopicMode ? (
                         <DashboardEditableRegion
                           density="compact"
+                          readToolbarPlacement="top-right"
                           enabled
                           isEditing={editingField === `weaknesses:${i}`}
                           onStartEdit={() => beginTextEdit(`weaknesses:${i}`, w)}
@@ -3152,29 +3531,13 @@ export function RotaDigitalReportView({
                 ))}
               </ul>
               {weaknessesTopicMode ? (
-                <div className="no-print mt-3 flex flex-wrap items-center justify-end gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="gap-1.5"
-                    disabled={fieldSaving}
-                    onClick={() => void appendSwotItem("weaknesses")}
-                  >
-                    <Plus className="size-4" aria-hidden />
-                    Adicionar fraqueza
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={fieldSaving}
-                    onClick={closeListSectionEdit}
-                    aria-label="Concluir edição desta secção"
-                  >
-                    Concluir
-                  </Button>
-                </div>
+                <DashboardListSectionEditFooter
+                  fieldSaving={fieldSaving}
+                  onAdd={() => void appendSwotItem("weaknesses")}
+                  addAriaLabel="Adicionar fraqueza"
+                  onSaveClose={saveListSectionFooterAndClose}
+                  onCancel={closeListSectionEdit}
+                />
               ) : null}
             </CardContent>
             {isDashboard && !weaknessesTopicMode ? (
@@ -3250,6 +3613,7 @@ export function RotaDigitalReportView({
                       {opportunitiesTopicMode ? (
                         <DashboardEditableRegion
                           density="compact"
+                          readToolbarPlacement="top-right"
                           enabled
                           isEditing={editingField === `opportunities:${i}`}
                           onStartEdit={() => beginTextEdit(`opportunities:${i}`, o)}
@@ -3276,29 +3640,13 @@ export function RotaDigitalReportView({
                 ))}
               </ul>
               {opportunitiesTopicMode ? (
-                <div className="no-print mt-3 flex flex-wrap items-center justify-end gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="gap-1.5"
-                    disabled={fieldSaving}
-                    onClick={() => void appendSwotItem("opportunities")}
-                  >
-                    <Plus className="size-4" aria-hidden />
-                    Adicionar oportunidade
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={fieldSaving}
-                    onClick={closeListSectionEdit}
-                    aria-label="Concluir edição desta secção"
-                  >
-                    Concluir
-                  </Button>
-                </div>
+                <DashboardListSectionEditFooter
+                  fieldSaving={fieldSaving}
+                  onAdd={() => void appendSwotItem("opportunities")}
+                  addAriaLabel="Adicionar oportunidade"
+                  onSaveClose={saveListSectionFooterAndClose}
+                  onCancel={closeListSectionEdit}
+                />
               ) : null}
             </CardContent>
             {isDashboard && !opportunitiesTopicMode ? (
@@ -3392,6 +3740,7 @@ export function RotaDigitalReportView({
                     {quickWinsTopicMode ? (
                       <DashboardEditableRegion
                         density="compact"
+                        readToolbarPlacement="top-right"
                         enabled
                         isEditing={editingField === `quickWins:${i}`}
                         onStartEdit={() => beginTextEdit(`quickWins:${i}`, win)}
@@ -3418,29 +3767,13 @@ export function RotaDigitalReportView({
               ))}
             </ul>
             {quickWinsTopicMode ? (
-              <div className="no-print mt-3 flex flex-wrap items-center justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5"
-                  disabled={fieldSaving}
-                  onClick={() => void appendReportStringListItem("quickWins")}
-                >
-                  <Plus className="size-4" aria-hidden />
-                  Adicionar
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={fieldSaving}
-                  onClick={closeListSectionEdit}
-                  aria-label="Concluir edição desta secção"
-                >
-                  Concluir
-                </Button>
-              </div>
+              <DashboardListSectionEditFooter
+                fieldSaving={fieldSaving}
+                onAdd={() => void appendReportStringListItem("quickWins")}
+                addAriaLabel="Adicionar item"
+                onSaveClose={saveListSectionFooterAndClose}
+                onCancel={closeListSectionEdit}
+              />
             ) : null}
           </CardContent>
           {isDashboard && !quickWinsTopicMode ? (
@@ -3499,6 +3832,7 @@ export function RotaDigitalReportView({
                     {longTermTopicMode ? (
                       <DashboardEditableRegion
                         density="compact"
+                        readToolbarPlacement="top-right"
                         enabled
                         isEditing={editingField === `longTermActions:${i}`}
                         onStartEdit={() => beginTextEdit(`longTermActions:${i}`, action)}
@@ -3525,29 +3859,13 @@ export function RotaDigitalReportView({
               ))}
             </ul>
             {longTermTopicMode ? (
-              <div className="no-print mt-3 flex flex-wrap items-center justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5"
-                  disabled={fieldSaving}
-                  onClick={() => void appendReportStringListItem("longTermActions")}
-                >
-                  <Plus className="size-4" aria-hidden />
-                  Adicionar
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={fieldSaving}
-                  onClick={closeListSectionEdit}
-                  aria-label="Concluir edição desta secção"
-                >
-                  Concluir
-                </Button>
-              </div>
+              <DashboardListSectionEditFooter
+                fieldSaving={fieldSaving}
+                onAdd={() => void appendReportStringListItem("longTermActions")}
+                addAriaLabel="Adicionar ação"
+                onSaveClose={saveListSectionFooterAndClose}
+                onCancel={closeListSectionEdit}
+              />
             ) : null}
           </CardContent>
           {isDashboard && !longTermTopicMode ? (
@@ -3575,7 +3893,7 @@ export function RotaDigitalReportView({
             "py-0 gap-0",
           )}
         >
-          <div className={cn(isDashboard && !nextStepsTopicMode && "relative pb-12")}>
+          <div>
             <CardHeader className="px-4 pb-6 pt-0 sm:px-7 sm:pb-7 sm:pt-0">
               <div className="flex items-center gap-2.5">
                 <SectionHeaderIcon Icon={ArrowRight} tone="indigo" />
@@ -3601,6 +3919,7 @@ export function RotaDigitalReportView({
                     {nextStepsTopicMode ? (
                       <DashboardEditableRegion
                         density="compact"
+                        readToolbarPlacement="top-right"
                         enabled
                         isEditing={editingField === `nextSteps:${i}`}
                         onStartEdit={() => beginTextEdit(`nextSteps:${i}`, step)}
@@ -3627,44 +3946,16 @@ export function RotaDigitalReportView({
               ))}
             </div>
             {nextStepsTopicMode ? (
-              <div className="no-print mt-4 flex flex-wrap items-center justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5"
-                  disabled={fieldSaving}
-                  onClick={() => void appendReportStringListItem("nextSteps")}
-                >
-                  <Plus className="size-4" aria-hidden />
-                  Adicionar passo
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={fieldSaving}
-                  onClick={closeListSectionEdit}
-                  aria-label="Concluir edição desta secção"
-                >
-                  Concluir
-                </Button>
-              </div>
+              <DashboardListSectionEditFooter
+                className="mt-4"
+                fieldSaving={fieldSaving}
+                onAdd={() => void appendReportStringListItem("nextSteps")}
+                addAriaLabel="Adicionar passo"
+                onSaveClose={saveListSectionFooterAndClose}
+                onCancel={closeListSectionEdit}
+              />
             ) : null}
             </CardContent>
-            {isDashboard && !nextStepsTopicMode ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                disabled={fieldSaving}
-                onClick={() => openListSectionEdit("nextSteps")}
-                className="no-print absolute bottom-2 right-4 z-[6] size-8 rounded-md border border-border/70 bg-background/95 text-muted-foreground shadow-sm backdrop-blur-sm hover:bg-muted hover:text-foreground sm:bottom-3 sm:right-7"
-                aria-label="Editar próximos passos"
-              >
-                <Pencil className="size-3.5" aria-hidden />
-              </Button>
-            ) : null}
           </div>
           {/*
             CTA fora do CardContent: o relatório aplica [&_[data-slot=card-content]]:!px-* ao slot;
@@ -3704,6 +3995,19 @@ export function RotaDigitalReportView({
               {reportCta.bottom.label}
             </a>
           </div>
+          {isDashboard && !nextStepsTopicMode ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              disabled={fieldSaving}
+              onClick={() => openListSectionEdit("nextSteps")}
+              className="no-print absolute bottom-5 right-5 z-[6] size-8 rounded-md border border-border/70 bg-background/95 text-muted-foreground shadow-sm backdrop-blur-sm hover:bg-muted hover:text-foreground sm:bottom-6 sm:right-7"
+              aria-label="Editar próximos passos"
+            >
+              <Pencil className="size-3.5" aria-hidden />
+            </Button>
+          ) : null}
         </Card>
       </CardSpotlight>
 

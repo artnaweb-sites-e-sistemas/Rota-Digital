@@ -26,13 +26,20 @@ type DashboardEditableRegionProps = {
   ariaLabel?: string;
   /** `compact`: menos padding e textarea menor — listas com um tópico por linha. */
   density?: "default" | "compact";
-  /** Remoção opcional: aparece a lixeira ao lado do lápis (canto inferior direito), só em leitura. */
+  /** Remoção opcional: aparece a lixeira ao lado do lápis, só em leitura. */
   onDelete?: () => void;
   deleteAriaLabel?: string;
   /** Se true, em leitura não mostra lápis/lixeira (controlo externo, ex.: cartão de canal com um só lápis). */
   hideReadToolbar?: boolean;
-  /** Onde desenhar lápis/lixeira em modo leitura (por defeito: canto inferior direito). */
+  /**
+   * Onde desenhar lápis/lixeira em leitura.
+   * `top-right`: só reserva espaço à direita (o texto alinha na mesma linha que o ícone da lista).
+   */
   readToolbarPlacement?: "bottom-right" | "top-right";
+  /** Classes extra no contentor interno em modo edição (ex.: mais espaço antes dos botões). */
+  editStackClassName?: string;
+  /** Classes extra na linha dos botões Salvar / Cancelar. */
+  editActionsClassName?: string;
 };
 
 /**
@@ -58,6 +65,8 @@ export function DashboardEditableRegion({
   deleteAriaLabel = "Remover",
   hideReadToolbar = false,
   readToolbarPlacement = "bottom-right",
+  editStackClassName,
+  editActionsClassName,
 }: DashboardEditableRegionProps) {
   if (!enabled) {
     return <div className={className}>{children}</div>;
@@ -73,11 +82,11 @@ export function DashboardEditableRegion({
       ? cn(
           isCompact
             ? hasDelete
-              ? "pt-10 pr-[3.75rem]"
-              : "pt-8 pr-10"
+              ? "pr-[3.75rem]"
+              : "pr-10"
             : hasDelete
-              ? "pt-11 pr-11"
-              : "pt-10 pr-10",
+              ? "pr-[4.5rem]"
+              : "pr-11",
         )
       : cn(
           isCompact ? (hasDelete ? "pb-9" : "pb-8") : hasDelete ? "pb-11" : "pb-10",
@@ -90,7 +99,7 @@ export function DashboardEditableRegion({
       className={cn("relative", readPaddingForToolbar, className)}
     >
       {isEditing ? (
-        <div className="space-y-2 pr-1">
+        <div className={cn("space-y-2 pr-1", editStackClassName)}>
           {editSlot ?? (
             <Textarea
               value={draft}
@@ -102,7 +111,7 @@ export function DashboardEditableRegion({
             />
           )}
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
-          <div className="flex flex-wrap gap-2">
+          <div className={cn("flex flex-wrap gap-2", editActionsClassName)}>
             <Button
               type="button"
               size="sm"

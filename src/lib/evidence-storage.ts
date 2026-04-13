@@ -293,6 +293,47 @@ async function deleteStorageFolderRecursive(folderRef: ReturnType<typeof ref>): 
   await Promise.all(list.prefixes.map((prefix) => deleteStorageFolderRecursive(prefix)));
 }
 
+const USER_EVIDENCE_REPLACE_MAX_BYTES = 15 * 1024 * 1024;
+
+/**
+ * Upload no Storage de uma imagem escolhida no dashboard para substituir uma evidência do relatório.
+ * Caminho: `users/{userId}/reports/{leadId}/replace/{reportId}/...`
+ */
+export async function uploadUserEvidenceImageForReport(params: {
+  file: File;
+  userId: string;
+  leadId: string;
+  reportId: string;
+  slotLabel: string;
+}): Promise<string | null> {
+  const { file, userId, leadId, reportId, slotLabel } = params;
+  if (!file.type.startsWith("image/")) return null;
+  if (file.size > USER_EVIDENCE_REPLACE_MAX_BYTES) return null;
+  if (storageWritesBlocked) return null;
+
+  const ext = file.type.includes("png")
+    ? "png"
+    : file.type.includes("jpeg") || file.type.includes("jpg")
+      ? "jpg"
+      : "webp";
+  const safeSlot = slotLabel.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 48);
+  const path = `users/${userId}/reports/${leadId}/replace/${reportId}/${safeSlot}-${Date.now()}.${ext}`;
+  const storageRef = ref(storage, path);
+  try {
+    await uploadBytes(storageRef, file, {
+      contentType: file.type || "image/jpeg",
+      cacheControl: "public,max-age=3600",
+    });
+    return await getDownloadURL(storageRef);
+  } catch (error) {
+    if (isStoragePermissionError(error)) {
+      storageWritesBlocked = true;
+    }
+    console.error("[evidence-storage] Falha no upload manual de evidência.", serializeUnknownError(error));
+    return null;
+  }
+}
+
 /** Remove imagens de evidência do Storage para o lead (pastas por timestamp). */
 export async function deleteReportEvidenceForLead(
   userId: string,
