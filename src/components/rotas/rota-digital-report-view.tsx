@@ -17,6 +17,7 @@ import { maturityFromDiagnosticScores } from "@/lib/maturity-from-diagnostics";
 import { getUserReportCtaSettings } from "@/lib/user-settings";
 import { resolveReportCtas } from "@/lib/report-cta";
 import { PublicReportFloatingCta } from "@/components/rotas/public-report-floating-cta";
+import { GenerateRouteProgressOverlay } from "@/components/rotas/generate-route-progress-overlay";
 import { DashboardEditableRegion } from "@/components/rotas/dashboard-editable-region";
 import { DiagnosticScoreSlider } from "@/components/rotas/diagnostic-score-slider";
 import { RotaDigitalReport, DigitalChannel, DiagnosticScore } from "@/types/report";
@@ -794,6 +795,37 @@ function alignInstagramNoteForDisplay(
   return result;
 }
 
+const REANALYZE_PROGRESS_TO_88_MS = 90 * 1000;
+const REANALYZE_FINAL_PROGRESS_MS = 2200;
+
+function easeOutCubicReanalyze(t: number): number {
+  return 1 - (1 - t) ** 3;
+}
+
+/** Anima de `from` até 100% em `durationMs` (requestAnimationFrame). */
+function runProgressTo100Reanalyze(
+  from: number,
+  durationMs: number,
+  onFrame: (pct: number) => void,
+): Promise<void> {
+  return new Promise((resolve) => {
+    const start = Math.min(100, Math.max(0, from));
+    const t0 = performance.now();
+    const step = (now: number) => {
+      const u = Math.min(1, (now - t0) / durationMs);
+      const pct = start + (100 - start) * easeOutCubicReanalyze(u);
+      onFrame(Math.min(100, Math.round(pct * 100) / 100));
+      if (u < 1) {
+        requestAnimationFrame(step);
+      } else {
+        onFrame(100);
+        resolve();
+      }
+    };
+    requestAnimationFrame(step);
+  });
+}
+
 function EvidenceReplaceToolbar({
   ariaLabel,
   busy,
@@ -1179,6 +1211,15 @@ function formatDiagnosticTopicPillLabel(topic: string): string {
   return topic.replace(/\s+geral\s*$/i, "").trim();
 }
 
+/** Alinhado ao `generate-route`: só Instagram/rede, exceto “consistência … comunicação” (cruzado). */
+function isInstagramOnlyDiagnosticTopic(topicLower: string): boolean {
+  const ascii = topicLower
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  const crossChannel = ascii.includes("consistencia") && ascii.includes("comunicacao");
+  return (topicLower.includes("instagram") || topicLower.includes("rede")) && !crossChannel;
+}
+
 function DiagnosticTopicPill({ topic }: { topic: string }) {
   const { Icon, iconClass } = getDiagnosticTopicPillVisual(topic);
   return (
@@ -1217,11 +1258,12 @@ function TopicEvidence({
     const combinedGridIdleRatio = topic.includes("clareza da proposta")
       ? FULL_PAGE_SNAPSHOT_IDLE_FROM_TOP_RATIO
       : POSICIONAMENTO_COMBINED_SNAPSHOT_IDLE_CENTER_RATIO;
+    const siteCellSrc = siteSrc || item.evidenceImageUrl;
 
     return (
       <div className="grid h-56 w-full grid-cols-2 gap-2">
         <EvidenceImage
-          src={siteSrc}
+          src={siteCellSrc}
           alt={`Site em ${item.topic}`}
           fitContain
           fitContainMode="cover"
@@ -1249,20 +1291,23 @@ function TopicEvidence({
     );
   }
 
+  const siteFallback =
+    siteSrc && !isInstagramOnlyDiagnosticTopic(topic) ? siteSrc : undefined;
+
   const evidenceSrc = (() => {
     if (topic.includes("identidade visual")) {
-      return withSnapshotParams(instagramSrc || item.evidenceImageUrl, {
+      return withSnapshotParams(instagramSrc || item.evidenceImageUrl || siteFallback, {
         variant: "feed",
         start: 6,
       });
     }
     if (topic.includes("consist")) {
-      return withSnapshotParams(instagramSrc || item.evidenceImageUrl, {
+      return withSnapshotParams(instagramSrc || item.evidenceImageUrl || siteFallback, {
         variant: "profile",
         start: 1,
       });
     }
-    return item.evidenceImageUrl;
+    return item.evidenceImageUrl || siteFallback;
   })();
 
   const siteHeroUrl = report.evidences?.siteHeroSnapshotUrl;
@@ -1771,6 +1816,12 @@ export function RotaDigitalReportView({
   const [reanalyzeNotes, setReanalyzeNotes] = useState("");
   const [reanalyzing, setReanalyzing] = useState(false);
   const [reanalyzeError, setReanalyzeError] = useState<string | null>(null);
+  const [reanalyzeProgressOpen, setReanalyzeProgressOpen] = useState(false);
+  const [reanalyzeProgress, setReanalyzeProgress] = useState(0);
+  const [reanalyzeProgressCompleting, setReanalyzeProgressCompleting] = useState(false);
+  const reanalyzeProgressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const reanalyzeProgressRef = useRef(0);
+  const reanalyzeProgressStartedAtRef = useRef(0);
   const [publicLinkOrigin, setPublicLinkOrigin] = useState("");
   const [publicLinkCopied, setPublicLinkCopied] = useState(false);
   const [ctaSettings, setCtaSettings] = useState<UserReportCtaSettings | null>(
@@ -1788,6 +1839,20 @@ export function RotaDigitalReportView({
   useEffect(() => {
     setReport(initialReport);
   }, [initialReport]);
+
+  const clearReanalyzeProgressTimer = useCallback(() => {
+    if (reanalyzeProgressIntervalRef.current) {
+      clearInterval(reanalyzeProgressIntervalRef.current);
+      reanalyzeProgressIntervalRef.current = null;
+    }
+  }, []);
+
+  useEffect(
+    () => () => {
+      clearReanalyzeProgressTimer();
+    },
+    [clearReanalyzeProgressTimer],
+  );
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1898,7 +1963,33 @@ export function RotaDigitalReportView({
           return;
         }
         if (slot === "siteHero") {
-          await applyReportPatch({ evidences: { ...baseEv, siteHeroSnapshotUrl: url } });
+          const prevHero = baseEv.siteHeroSnapshotUrl?.trim() || "";
+          const existing = report.diagnosticScores || [];
+          let relinkedScores: DiagnosticScore[] | null = null;
+          if (existing.length > 0 && prevHero) {
+            let touched = false;
+            const mapped = existing.map((it) => {
+              const ev = it.evidenceImageUrl?.trim() || "";
+              if (ev === prevHero) {
+                touched = true;
+                return { ...it, evidenceImageUrl: url };
+              }
+              return it;
+            });
+            if (touched) relinkedScores = sortDiagnosticScoresByScoreAsc(mapped);
+          }
+          const patch: Partial<RotaDigitalReport> = {
+            evidences: { ...baseEv, siteHeroSnapshotUrl: url },
+          };
+          if (relinkedScores) {
+            patch.diagnosticScores = relinkedScores;
+            const maturityPatch = maturityFromDiagnosticScores(relinkedScores);
+            if (maturityPatch) {
+              patch.digitalMaturityScore = maturityPatch.digitalMaturityScore;
+              patch.digitalMaturityLevel = maturityPatch.digitalMaturityLevel;
+            }
+          }
+          await applyReportPatch(patch);
           return;
         }
         if (slot === "instagramBioLink") {
@@ -1952,8 +2043,37 @@ export function RotaDigitalReportView({
       return;
     }
 
+    clearReanalyzeProgressTimer();
+    setReanalyzeProgressCompleting(false);
+    reanalyzeProgressRef.current = 0;
+    reanalyzeProgressStartedAtRef.current = Date.now();
+    setReanalyzeProgress(0);
+    setReanalyzeOpen(false);
+    setReanalyzeProgressOpen(true);
     setReanalyzing(true);
     setReanalyzeError(null);
+
+    reanalyzeProgressIntervalRef.current = setInterval(() => {
+      setReanalyzeProgress((p) => {
+        if (p >= 88) return p;
+        const elapsedMs = Math.max(0, Date.now() - reanalyzeProgressStartedAtRef.current);
+        const ratio = Math.min(1, elapsedMs / REANALYZE_PROGRESS_TO_88_MS);
+        const target = ratio * 88;
+        const gapToTarget = target - p;
+        let inc: number;
+        if (gapToTarget > 1.2) {
+          inc = 0.3 + Math.random() * 0.16;
+        } else if (gapToTarget > 0.25) {
+          inc = 0.12 + Math.random() * 0.1;
+        } else {
+          inc = 0.04 + Math.random() * 0.05;
+        }
+        const next = Math.min(88, Math.round((p + inc) * 10) / 10);
+        reanalyzeProgressRef.current = next;
+        return next;
+      });
+    }, 250);
+
     try {
       const res = await fetch("/api/reanalyze-route", {
         method: "POST",
@@ -1974,10 +2094,27 @@ export function RotaDigitalReportView({
       await updateReport(report.id, data.report);
       setReport(updatedReport);
       onReportChange?.(updatedReport);
+
+      clearReanalyzeProgressTimer();
+      setReanalyzeProgressCompleting(true);
+      await runProgressTo100Reanalyze(reanalyzeProgressRef.current, REANALYZE_FINAL_PROGRESS_MS, (pct) => {
+        reanalyzeProgressRef.current = pct;
+        setReanalyzeProgress(pct);
+      });
+      setReanalyzeProgressCompleting(false);
+      setReanalyzeProgressOpen(false);
+      setReanalyzeProgress(0);
+      reanalyzeProgressRef.current = 0;
       setReanalyzeOpen(false);
       setReanalyzeNotes("");
     } catch (err: unknown) {
+      clearReanalyzeProgressTimer();
+      setReanalyzeProgressCompleting(false);
+      setReanalyzeProgressOpen(false);
+      setReanalyzeProgress(0);
+      reanalyzeProgressRef.current = 0;
       setReanalyzeError(err instanceof Error ? err.message : "Erro desconhecido.");
+      setReanalyzeOpen(true);
     } finally {
       setReanalyzing(false);
     }
@@ -2329,6 +2466,7 @@ export function RotaDigitalReportView({
             <Button
               type="button"
               variant="ctaMotion"
+              disabled={reanalyzing || reanalyzeProgressOpen}
               onClick={() => {
                 setReanalyzeOpen(true);
                 setReanalyzeError(null);
@@ -2351,38 +2489,47 @@ export function RotaDigitalReportView({
       </div>
 
       {isDashboard ? (
-      <Dialog open={reanalyzeOpen} onOpenChange={setReanalyzeOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Reanalisar com IA</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">
-              Escreva o que deseja ajustar. A IA vai usar este relatório como contexto.
-            </p>
-            <Textarea
-              value={reanalyzeNotes}
-              onChange={(e) => setReanalyzeNotes(e.target.value)}
-              className="min-h-[120px]"
-              placeholder="Ex.: não recomendar e-mail marketing; foque em Instagram e WhatsApp."
-            />
-            {reanalyzeError ? (
-              <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-sm text-destructive">
-                {reanalyzeError}
+        <>
+          <Dialog open={reanalyzeOpen} onOpenChange={setReanalyzeOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Reanalisar com IA</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">
+                  Escreva o que deseja ajustar. A IA vai usar este relatório como contexto.
+                </p>
+                <Textarea
+                  value={reanalyzeNotes}
+                  onChange={(e) => setReanalyzeNotes(e.target.value)}
+                  className="min-h-[120px]"
+                  placeholder="Ex.: não recomendar e-mail marketing; foque em Instagram e WhatsApp."
+                />
+                {reanalyzeError ? (
+                  <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-sm text-destructive">
+                    {reanalyzeError}
+                  </div>
+                ) : null}
               </div>
-            ) : null}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setReanalyzeOpen(false)} disabled={reanalyzing}>
-              Cancelar
-            </Button>
-            <Button variant="cta" onClick={handleReanalyze} disabled={reanalyzing} className="gap-2">
-              {reanalyzing ? <Loader2 size={16} className="animate-spin" /> : <Bot size={16} />}
-              {reanalyzing ? "Reanalisando..." : "Reanalisar"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setReanalyzeOpen(false)} disabled={reanalyzing}>
+                  Cancelar
+                </Button>
+                <Button variant="cta" onClick={() => void handleReanalyze()} disabled={reanalyzing} className="gap-2">
+                  {reanalyzing ? <Loader2 size={16} className="animate-spin" /> : <Bot size={16} />}
+                  {reanalyzing ? "Reanalisando..." : "Reanalisar"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          <GenerateRouteProgressOverlay
+            open={reanalyzeProgressOpen}
+            progress={reanalyzeProgress}
+            companyName={report.leadCompany}
+            instantBarWidth={reanalyzeProgressCompleting}
+            mode="reanalyze"
+          />
+        </>
       ) : null}
 
       {/* Print Header (only on print) */}
@@ -3087,14 +3234,38 @@ export function RotaDigitalReportView({
                     "shadow-none",
                   )}
                 >
-                  {/* Bio: manter quebras de linha como no Instagram (`\\n` na coleta), sem normalizar em frases. */}
-                  <p className="text-[14px] leading-relaxed text-foreground whitespace-pre-line break-words [overflow-wrap:anywhere]">
-                    {report.evidences.instagramBioExcerpt?.trim()
-                      ? report.evidences.instagramBioExcerpt
-                      : report.evidences.instagramSnapshotUrl
-                        ? "A bio não foi extraída em texto na coleta automática — confira a captura do perfil ao lado para ler a bio e as métricas na imagem."
-                        : "Bio não disponível na coleta automática."}
-                  </p>
+                  <DashboardEditableRegion
+                    enabled={isDashboard}
+                    isEditing={editingField === "evidence-instagram-bio-excerpt"}
+                    onStartEdit={() => {
+                      const bio = report.evidences?.instagramBioExcerpt;
+                      beginTextEdit("evidence-instagram-bio-excerpt", bio?.trim() ? bio : "");
+                    }}
+                    onCancel={cancelFieldEdit}
+                    onSave={() =>
+                      void applyReportPatch({
+                        evidences: {
+                          ...(report.evidences || {}),
+                          instagramBioExcerpt: editDraft.trim(),
+                        },
+                      })
+                    }
+                    saving={fieldSaving}
+                    error={editingField === "evidence-instagram-bio-excerpt" ? fieldError : null}
+                    draft={editDraft}
+                    onDraftChange={setEditDraft}
+                    ariaLabel="Editar texto da bio do Instagram"
+                    textAreaClassName="min-h-[160px] whitespace-pre-wrap break-words font-sans text-[14px] leading-relaxed [overflow-wrap:anywhere]"
+                  >
+                    {/* Bio: manter quebras de linha como no Instagram (`\\n` na coleta), sem normalizar em frases. */}
+                    <p className="text-[14px] leading-relaxed text-foreground whitespace-pre-line break-words [overflow-wrap:anywhere]">
+                      {report.evidences.instagramBioExcerpt?.trim()
+                        ? report.evidences.instagramBioExcerpt
+                        : report.evidences.instagramSnapshotUrl
+                          ? "A bio não foi extraída em texto na coleta automática — confira a captura do perfil ao lado para ler a bio e as métricas na imagem."
+                          : "Bio não disponível na coleta automática."}
+                    </p>
+                  </DashboardEditableRegion>
                 </div>
               </div>
               {briefWebsiteHref || briefInstagramHref ? (

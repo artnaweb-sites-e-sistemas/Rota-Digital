@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { RotaDigitalReportView } from "@/components/rotas/rota-digital-report-view";
+import { PublicRouteThemeReveal } from "@/components/rotas/public-route-theme-reveal";
 import { getCachedPublicProposalReportBySlug } from "@/lib/public-report-cache";
 import { getCachedUserReportCtaSettingsAdmin } from "@/lib/user-settings-admin";
 import {
@@ -99,19 +100,21 @@ export default async function PublicProposalPage({
     : null;
 
   return (
-    <div className="flex h-dvh max-h-dvh min-h-0 w-full min-w-0 flex-col overflow-hidden bg-background text-foreground">
-      <main
-        id="rota-report-scroll-root"
-        className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-background"
-      >
-        <div className="mx-auto w-full min-h-0 min-w-0 max-w-[1760px] px-6 py-8 sm:px-8 md:px-10">
-          <RotaDigitalReportView
-            variant="public"
-            report={report}
-            initialCtaSettings={initialCtaSettings}
-          />
-        </div>
-      </main>
-    </div>
+    <PublicRouteThemeReveal>
+      <div className="flex h-dvh max-h-dvh min-h-0 w-full min-w-0 flex-col overflow-hidden bg-background text-foreground">
+        <main
+          id="rota-report-scroll-root"
+          className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-background"
+        >
+          <div className="mx-auto w-full min-h-0 min-w-0 max-w-[1760px] px-6 py-8 sm:px-8 md:px-10">
+            <RotaDigitalReportView
+              variant="public"
+              report={report}
+              initialCtaSettings={initialCtaSettings}
+            />
+          </div>
+        </main>
+      </div>
+    </PublicRouteThemeReveal>
   );
 }

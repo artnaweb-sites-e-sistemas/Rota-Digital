@@ -10,6 +10,8 @@ type Props = {
   companyName?: string;
   /** Sem transição CSS na largura (uso com animação frame a frame até 100%). */
   instantBarWidth?: boolean;
+  /** `reanalyze`: textos para reanálise com IA (relatório já existente). */
+  mode?: "generate" | "reanalyze";
 };
 
 const STATUS_BY_PROGRESS = [
@@ -21,11 +23,19 @@ const STATUS_BY_PROGRESS = [
   { max: 101, text: "Concluindo — abrindo seu relatório…" },
 ];
 
-function statusLabel(p: number): string {
-  for (const row of STATUS_BY_PROGRESS) {
+const STATUS_BY_PROGRESS_REANALYZE = [
+  { max: 22, text: "A enviar o relatório e a sua observação…" },
+  { max: 48, text: "A pedir à IA para refinar o diagnóstico…" },
+  { max: 72, text: "A atualizar textos, tópicos e canais…" },
+  { max: 92, text: "A guardar alterações no relatório…" },
+  { max: 101, text: "A concluir…" },
+];
+
+function statusLabel(p: number, rows: { max: number; text: string }[]): string {
+  for (const row of rows) {
     if (p < row.max) return row.text;
   }
-  return STATUS_BY_PROGRESS[STATUS_BY_PROGRESS.length - 1]!.text;
+  return rows[rows.length - 1]!.text;
 }
 
 export function GenerateRouteProgressOverlay({
@@ -33,8 +43,11 @@ export function GenerateRouteProgressOverlay({
   progress,
   companyName,
   instantBarWidth = false,
+  mode = "generate",
 }: Props) {
   const [mounted, setMounted] = useState(false);
+  const statusRows = mode === "reanalyze" ? STATUS_BY_PROGRESS_REANALYZE : STATUS_BY_PROGRESS;
+  const title = mode === "reanalyze" ? "Reanalisando com IA" : "Gerando Rota Digital";
 
   useEffect(() => {
     setMounted(true);
@@ -52,7 +65,7 @@ export function GenerateRouteProgressOverlay({
   if (!mounted || !open) return null;
 
   const clamped = Math.min(100, Math.max(0, progress));
-  const label = statusLabel(clamped);
+  const label = statusLabel(clamped, statusRows);
 
   return createPortal(
     <div
@@ -87,7 +100,7 @@ export function GenerateRouteProgressOverlay({
             id="rd-generate-progress-title"
             className="text-lg font-semibold tracking-tight text-foreground"
           >
-            Gerando Rota Digital
+            {title}
           </h2>
           {companyName ? (
             <p className="mt-1 text-sm text-muted-foreground">{companyName}</p>

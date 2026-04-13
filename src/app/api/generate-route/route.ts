@@ -35,6 +35,10 @@ import {
   sanitizeInstagramAssetUrl,
 } from "@/lib/instagram-public-profile";
 import { parseModelJson } from "@/lib/model-json-parse";
+import {
+  type GeminiInlineImagePart,
+  downloadImageAsInlinePart,
+} from "@/lib/gemini-inline-image";
 import { maturityFromDiagnosticScores } from "@/lib/maturity-from-diagnostics";
 
 export const runtime = "nodejs";
@@ -212,13 +216,6 @@ type PreparedEvidencePayload = {
   websiteCandidateUrls: Array<string | undefined>;
   instagramSnapshotCandidates: Array<string | undefined>;
   bioLinkCandidateUrls: Array<string | undefined>;
-};
-
-type GeminiInlineImagePart = {
-  inlineData: {
-    mimeType: string;
-    data: string;
-  };
 };
 
 type GeminiUsageMetadata = {
@@ -435,54 +432,6 @@ async function downloadFirstAvailableImagePart(
     }
   }
   return {};
-}
-
-async function downloadImageAsInlinePart(
-  imageUrl?: string,
-  timeoutMsOverride?: number
-): Promise<GeminiInlineImagePart | undefined> {
-  if (!imageUrl) return undefined;
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    const ctrl = new AbortController();
-    const isInstagramSnapshot = imageUrl.includes("/api/instagram-profile-snapshot");
-    const isInternalApi = imageUrl.includes("/api/");
-    const timeoutMs =
-      typeof timeoutMsOverride === "number"
-        ? timeoutMsOverride
-        : isInstagramSnapshot
-          ? /* Rota /api/instagram-profile-snapshot pode levar 40–50s no cold start (maxDuration 120). */
-            110000
-          : isInternalApi
-            ? 18000
-            : 10000;
-    timer = setTimeout(() => ctrl.abort(), timeoutMs);
-    const res = await fetch(imageUrl, {
-      method: "GET",
-      headers: {
-        "User-Agent": "Mozilla/5.0 (RotaDigitalBot/1.0)",
-      },
-      signal: ctrl.signal,
-      cache: "no-store",
-    });
-    if (!res.ok) return undefined;
-    const contentType = (res.headers.get("content-type") || "").split(";")[0].trim();
-    if (!contentType.startsWith("image/")) return undefined;
-    const bytes = await res.arrayBuffer();
-    if (!bytes.byteLength || bytes.byteLength > 4 * 1024 * 1024) return undefined;
-    const base64 = Buffer.from(bytes).toString("base64");
-    if (!base64) return undefined;
-    return {
-      inlineData: {
-        mimeType: contentType || "image/jpeg",
-        data: base64,
-      },
-    };
-  } catch {
-    return undefined;
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
 }
 
 function buildGenerateContentInput(

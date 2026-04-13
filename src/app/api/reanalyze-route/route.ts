@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 import type { DiagnosticScore, RotaDigitalReport } from "@/types/report";
+import {
+  type GeminiInlineImagePart,
+  downloadImageAsInlinePart,
+} from "@/lib/gemini-inline-image";
 import type { AiRecommendedChannelsPolicy, AiServicesFocusPolicy } from "@/types/user-settings";
 import {
   buildRecommendedChannelsPolicyPromptSection,
@@ -22,6 +26,75 @@ import { getUserAiPromptSettingsAdmin } from "@/lib/user-settings-admin";
 import { buildReportCopyVoicePromptSection } from "@/lib/report-copy-voice-prompt";
 import { parseModelJson } from "@/lib/model-json-parse";
 import { maturityFromDiagnosticScores } from "@/lib/maturity-from-diagnostics";
+
+export const runtime = "nodejs";
+/** Download das capturas guardadas + Gemini multimodal pode ultrapassar o default da Vercel. */
+export const maxDuration = 120;
+
+const GEMINI_REANALYZE_TIMEOUT_MS = 120_000;
+
+async function withGeminiCallTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`Tempo limite (${timeoutMs}ms) na chamada do Gemini.`)),
+          timeoutMs,
+        );
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/** URL de evidência: absoluta ou relativa à origem do pedido (ex.: `/api/image-proxy`). */
+function absolutizeEvidenceUrl(origin: string, url?: string): string | undefined {
+  const t = url?.trim();
+  if (!t) return undefined;
+  if (/^https?:\/\//i.test(t)) return t;
+  if (t.startsWith("/")) return `${origin.replace(/\/$/, "")}${t}`;
+  return undefined;
+}
+
+/**
+ * Mesma ordem e rótulos que `buildGenerateContentInput` em `generate-route`:
+ * anexa as capturas **já guardadas** no relatório (podem ter sido substituídas manualmente).
+ */
+function buildReanalyzeGenerateContentInput(
+  promptText: string,
+  options: {
+    websiteImagePart?: GeminiInlineImagePart;
+    instagramImagePart?: GeminiInlineImagePart;
+    instagramBioLinkImagePart?: GeminiInlineImagePart;
+  },
+): string | Array<{ text: string } | GeminiInlineImagePart> {
+  const parts: Array<{ text: string } | GeminiInlineImagePart> = [{ text: promptText }];
+  if (options.websiteImagePart) {
+    parts.push({
+      text:
+        "CAPTURA 1 (Website - página completa): use esta imagem como fonte principal para análise visual do site como um todo, incluindo estrutura da página, paleta, contraste, hierarquia, prova social e clareza de CTA. É a versão **atual** guardada no relatório (pode ter sido substituída depois da geração).",
+    });
+    parts.push(options.websiteImagePart);
+  }
+  if (options.instagramImagePart) {
+    parts.push({
+      text:
+        "CAPTURA 2 (Instagram): esta é a captura **atual** do perfil guardada no relatório. ANALISE DETALHADAMENTE esta imagem. Extraia o que for legível (nome, bio, métricas, feed, link da bio, estética). É a versão que o utilizador vê hoje no painel (pode ter sido substituída manualmente).",
+    });
+    parts.push(options.instagramImagePart);
+  }
+  if (options.instagramBioLinkImagePart) {
+    parts.push({
+      text:
+        "CAPTURA 3 (Destino do link da bio): página aberta após o link da bio — versão **atual** guardada no relatório. Use para validar clareza do destino e CTA.",
+    });
+    parts.push(options.instagramBioLinkImagePart);
+  }
+  return parts.length > 1 ? parts : promptText;
+}
 
 type GeminiUsageMetadata = {
   promptTokenCount?: number;
@@ -133,6 +206,12 @@ Tom por campo:
 - Em "Identidade Visual", comente harmonia visual, paleta, contraste, hierarquia, espaçamento, alinhamento, legibilidade e coerência entre site e Instagram.
 - "websiteResearchNote" e "instagramResearchNote": **exatamente 2 parágrafos curtos cada** (\\n\\n); meta total ~520–780 caracteres por campo; em Instagram não comece com seguidores/posts e não transcreva a bio entre aspas — sintetize.
 
+Evidências visuais (multimodal):
+- Após este texto, quando o servidor conseguir descarregar, serão anexadas as capturas **já guardadas** em \`report.evidences\` (**site**, **Instagram** e, se existir, **destino do link da bio**), **incluindo ficheiros que o utilizador substituiu manualmente** no painel depois da geração.
+- **Não** há nova captura por Playwright neste pedido: trate as imagens anexadas como a verdade visual atual.
+- Se alguma imagem não vier anexada (falha de download), mencione a limitação com naturalidade e use o JSON e as notas de pesquisa.
+- Em \`diagnosticScores\`, preserve \`evidenceImageUrl\` (e correlatos) alinhados às mesmas evidências do JSON quando forem as mesmas URLs de captura.
+
 Observação do usuário:
 ${observation}
 
@@ -172,6 +251,26 @@ Retorne SOMENTE um JSON válido com os campos atualizados:
   "proposalPageHtml": "string"
 }`;
 
+    const requestOrigin = req.nextUrl.origin;
+    const siteFetchUrl = absolutizeEvidenceUrl(requestOrigin, report.evidences?.siteHeroSnapshotUrl);
+    const instagramFetchUrl = absolutizeEvidenceUrl(requestOrigin, report.evidences?.instagramSnapshotUrl);
+    const bioLinkFetchUrl = absolutizeEvidenceUrl(
+      requestOrigin,
+      report.evidences?.instagramBioLinkSnapshotUrl,
+    );
+
+    const [websiteImagePart, instagramImagePart, instagramBioLinkImagePart] = await Promise.all([
+      downloadImageAsInlinePart(siteFetchUrl, 70_000),
+      downloadImageAsInlinePart(instagramFetchUrl, 130_000),
+      downloadImageAsInlinePart(bioLinkFetchUrl, 55_000),
+    ]);
+
+    const generateContentInput = buildReanalyzeGenerateContentInput(prompt, {
+      websiteImagePart,
+      instagramImagePart,
+      instagramBioLinkImagePart,
+    });
+
     let responseText = "";
     let selectedModelName = "";
     let selectedUsage: GeminiUsageMetadata | undefined;
@@ -180,7 +279,10 @@ Retorne SOMENTE um JSON válido com os campos atualizados:
     for (const modelName of models) {
       try {
         const model = genAI.getGenerativeModel({ model: modelName }, { apiVersion: "v1" });
-        const result = await model.generateContent(prompt);
+        const result = await withGeminiCallTimeout(
+          model.generateContent(generateContentInput),
+          GEMINI_REANALYZE_TIMEOUT_MS,
+        );
         responseText = result.response.text();
         selectedModelName = modelName;
         selectedUsage = result.response.usageMetadata as GeminiUsageMetadata | undefined;

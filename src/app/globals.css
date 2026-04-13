@@ -424,3 +424,67 @@
     0 0 0 1px color-mix(in srgb, var(--foreground) 6%, transparent),
     0 0 0 4px color-mix(in srgb, var(--ring) 45%, transparent);
 }
+
+/* ── Rota pública `/r/…` (mobile): véu “oposto” sobe e revela o tema real */
+@keyframes rd-public-theme-veil-lift {
+  0% {
+    transform: translate3d(0, 0, 0);
+    box-shadow:
+      0 -28px 56px -18px color-mix(in srgb, var(--brand) 35%, transparent),
+      inset 0 -1px 0 0 color-mix(in srgb, var(--foreground) 8%, transparent);
+  }
+  100% {
+    transform: translate3d(0, -100%, 0);
+    box-shadow: none;
+  }
+}
+
+@keyframes rd-public-theme-veil-lift-light {
+  0% {
+    transform: translate3d(0, 0, 0);
+    box-shadow:
+      0 -24px 48px -16px rgba(255, 255, 255, 0.12),
+      inset 0 -1px 0 0 color-mix(in srgb, var(--foreground) 12%, transparent);
+  }
+  100% {
+    transform: translate3d(0, -100%, 0);
+    box-shadow: none;
+  }
+}
+
+.rd-public-theme-veil {
+  animation: rd-public-theme-veil-lift 1.06s cubic-bezier(0.33, 1, 0.68, 1) forwards;
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+.rd-public-theme-veil--to-light {
+  animation: rd-public-theme-veil-lift-light 1.04s cubic-bezier(0.28, 0.9, 0.32, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rd-public-theme-veil,
+  .rd-public-theme-veil--to-light {
+    animation: none;
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+
+/* Micro-feedback no toggle tema (relatório público) */
+@keyframes rd-theme-toggle-ring {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--brand) 55%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 10px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+.rd-theme-toggle-pulse {
+  animation: rd-theme-toggle-ring 0.65s ease-out;
+}
