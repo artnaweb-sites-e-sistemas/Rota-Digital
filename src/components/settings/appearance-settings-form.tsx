@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type MouseEvent, type ReactNode } from "react";
 import { useTheme } from "next-themes";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth-context";
@@ -8,6 +8,7 @@ import { getUserUiTheme, saveUserUiTheme } from "@/lib/user-settings";
 import type { UserUiTheme } from "@/types/user-settings";
 import { Check, Loader2, Monitor, Moon, Sun } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { switchThemeWithCircularReveal } from "@/lib/theme-switch-circular";
 
 const OPTIONS: { id: UserUiTheme; label: string; icon: typeof Sun }[] = [
   { id: "light", label: "Claro", icon: Sun },
@@ -23,7 +24,7 @@ function ThemeChip({
 }: {
   active: boolean;
   disabled?: boolean;
-  onClick: () => void;
+  onClick: (e: MouseEvent<HTMLButtonElement>) => void;
   children: ReactNode;
 }) {
   return (
@@ -81,11 +82,18 @@ export function AppearanceSettingsForm() {
     return () => window.clearTimeout(id);
   }, [savedAt]);
 
-  const selectTheme = async (mode: UserUiTheme) => {
+  const selectTheme = async (mode: UserUiTheme, originEl?: HTMLElement | null) => {
     if (loading || saving) return;
     if (mode === preference && !error) return;
-    setPreference(mode);
-    setTheme(mode);
+    const applyLocal = () => {
+      setPreference(mode);
+      setTheme(mode);
+    };
+    if ((mode === "light" || mode === "dark") && originEl) {
+      await switchThemeWithCircularReveal(originEl, mode, applyLocal);
+    } else {
+      applyLocal();
+    }
     setError(null);
     setSavedAt(null);
     if (!user) return;
@@ -134,7 +142,7 @@ export function AppearanceSettingsForm() {
                     key={opt.id}
                     active={active}
                     disabled={saving}
-                    onClick={() => void selectTheme(opt.id)}
+                    onClick={(e) => void selectTheme(opt.id, e.currentTarget)}
                   >
                     <Icon className="size-4 shrink-0 text-brand dark:text-brand" aria-hidden />
                     <div className="min-w-0">
