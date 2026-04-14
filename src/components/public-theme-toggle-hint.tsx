@@ -6,11 +6,16 @@ import { PUBLIC_REPORT_THEME_TOGGLE_ID } from "@/lib/theme-switch-animation";
 import { cn } from "@/lib/utils";
 
 const SHOW_DELAY_MS = 640;
-const VISIBLE_MS = 5400;
-const EXIT_MS = 320;
-const MIN_SPACE_BESIDE_PX = 220;
+const VISIBLE_MS = 5200;
+const EXIT_MS = 280;
+const MIN_SPACE_BESIDE_PX = 200;
 const INSET_PX = 16;
-const ARROW_W = 20;
+const ARROW_W = 18;
+
+const shell = cn(
+  "rounded-md border border-zinc-200/50 bg-white/82 backdrop-blur-md",
+  "shadow-sm ring-1 ring-black/[0.04]",
+);
 
 type Phase = "idle" | "enter" | "shown" | "exit" | "gone";
 
@@ -19,14 +24,13 @@ type AnchorBelow = {
   mode: "below";
   top: number;
   insetInline: number;
-  /** `left` da seta dentro do painel (já com clamp para não sair das margens) */
   arrowLeftInPanel: number;
 };
 type AnchorState = AnchorBeside | AnchorBelow;
 
 /**
- * Dica na página partilhada: ao lado do botão com espaço; em ecrã estreito fica por baixo,
- * largura útil entre margens — texto por inteiro, sem espremido.
+ * Dica compacta na página partilhada: `rounded-md` como o sistema, fundo translúcido;
+ * ponta fundida ao balão (mesmo fill/borda, metade do quadrado por cima da borda).
  */
 export function PublicThemeToggleHint() {
   const [phase, setPhase] = useState<Phase>("idle");
@@ -48,7 +52,7 @@ export function PublicThemeToggleHint() {
     const btn = document.getElementById(PUBLIC_REPORT_THEME_TOGGLE_ID);
     if (!btn) return;
     const rect = btn.getBoundingClientRect();
-    const gap = 10;
+    const gap = 8;
     const centerX = rect.left + rect.width / 2;
 
     if (rect.left >= MIN_SPACE_BESIDE_PX + INSET_PX) {
@@ -63,7 +67,7 @@ export function PublicThemeToggleHint() {
       const arrowLeftInPanel = Math.max(6, Math.min(ideal, parentInnerW - ARROW_W - 6));
       setAnchor({
         mode: "below",
-        top: rect.bottom + 10,
+        top: rect.bottom + 8,
         insetInline: INSET_PX,
         arrowLeftInPanel,
       });
@@ -129,39 +133,17 @@ export function PublicThemeToggleHint() {
     "will-change-[opacity,transform]",
     phase === "enter" &&
       (isBeside
-        ? "opacity-0 motion-safe:translate-x-4 motion-safe:scale-[0.94]"
-        : "opacity-0 motion-safe:translate-y-4 motion-safe:scale-[0.96]"),
+        ? "opacity-0 motion-safe:translate-x-2 motion-safe:scale-[0.98]"
+        : "opacity-0 motion-safe:translate-y-2 motion-safe:scale-[0.98]"),
     phase === "shown" &&
-      "opacity-100 motion-safe:translate-x-0 motion-safe:translate-y-0 motion-safe:scale-100 motion-safe:transition-[opacity,transform] motion-safe:duration-[520ms] motion-safe:ease-[cubic-bezier(0.16,1,0.3,1)]",
+      "opacity-100 motion-safe:translate-x-0 motion-safe:translate-y-0 motion-safe:scale-100 motion-safe:transition-[opacity,transform] motion-safe:duration-[440ms] motion-safe:ease-[cubic-bezier(0.22,1,0.36,1)]",
     phase === "exit" &&
       (isBeside
-        ? "opacity-0 motion-safe:translate-x-2 motion-safe:scale-[0.97] motion-safe:transition-[opacity,transform] motion-safe:duration-[300ms] motion-safe:ease-[cubic-bezier(0.4,0,1,1)]"
-        : "opacity-0 motion-safe:translate-y-2 motion-safe:scale-[0.98] motion-safe:transition-[opacity,transform] motion-safe:duration-[300ms] motion-safe:ease-[cubic-bezier(0.4,0,1,1)]"),
+        ? "opacity-0 motion-safe:translate-x-1 motion-safe:scale-[0.99] motion-safe:transition-[opacity,transform] motion-safe:duration-[240ms] motion-safe:ease-out"
+        : "opacity-0 motion-safe:translate-y-1 motion-safe:scale-[0.99] motion-safe:transition-[opacity,transform] motion-safe:duration-[240ms] motion-safe:ease-out"),
   );
 
-  const cardBody = (
-    <div
-      className={cn(
-        "relative overflow-hidden rounded-[13px] bg-white px-4 py-3.5 sm:py-3",
-        "shadow-[0_2px_8px_-2px_rgba(0,0,0,0.06),0_16px_44px_-12px_rgba(0,0,0,0.16)]",
-        "ring-1 ring-zinc-900/[0.06]",
-      )}
-    >
-      <div
-        className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-brand/0 via-brand/45 to-brand/0"
-        aria-hidden
-      />
-      <p className="text-center text-[15px] font-semibold leading-snug tracking-tight text-zinc-800 antialiased sm:text-left sm:text-[14px]">
-        Modo claro? Clique aqui
-      </p>
-    </div>
-  );
-
-  const gradientFrame = (
-    <div className="rounded-2xl bg-gradient-to-br from-zinc-200/80 via-white to-zinc-100/60 p-[1px] shadow-sm">
-      {cardBody}
-    </div>
-  );
+  const tipDiamond = "pointer-events-none absolute z-[2] h-[7px] w-[7px] rotate-45 border-zinc-200/50 bg-white/82 backdrop-blur-md";
 
   return (
     <div
@@ -186,42 +168,32 @@ export function PublicThemeToggleHint() {
         className={cn("w-full max-w-md", isBeside ? "" : "max-w-none sm:max-w-md", shellMotion)}
       >
         {isBeside ? (
-          <div className="flex items-center">
-            <div className="min-w-[13.5rem] max-w-[min(19rem,calc(100vw-4.5rem))] shrink-0">{gradientFrame}</div>
-            <svg
-              width="9"
-              height="24"
-              viewBox="0 0 9 24"
-              className="-ml-px h-6 w-[9px] shrink-0 text-zinc-200/95"
+          <div className={cn("relative inline-flex max-w-[min(14rem,calc(100vw-4rem))]", shell)}>
+            <p className="relative z-[1] max-w-[12.5rem] px-2.5 py-1.5 pr-4 text-center text-[11px] font-medium leading-snug tracking-tight text-zinc-700 antialiased sm:text-left sm:text-[11.5px]">
+              Modo claro? Clique aqui
+            </p>
+            <span
               aria-hidden
-            >
-              <path
-                d="M0.5 1.75 L0.5 22.25 L8 12 Z"
-                fill="white"
-                stroke="currentColor"
-                strokeWidth="1"
-                strokeLinejoin="round"
-              />
-            </svg>
+              className={cn(
+                tipDiamond,
+                "top-1/2 right-0 border-t border-r",
+                "translate-x-1/2 -translate-y-1/2",
+              )}
+            />
           </div>
         ) : (
-          <div className="relative w-full">
-            <div
-              className="pointer-events-none absolute -top-[7px] z-10"
-              style={{ left: `${anchor.arrowLeftInPanel}px` }}
+          <div className={cn("relative w-full", shell)}>
+            <span
               aria-hidden
-            >
-              <svg width={ARROW_W} height="9" viewBox="0 0 20 9" className="text-zinc-200/95">
-                <path
-                  d="M10 0.75 L18.75 8.25 H1.25 Z"
-                  fill="white"
-                  stroke="currentColor"
-                  strokeWidth="1"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </div>
-            <div className="w-full">{gradientFrame}</div>
+              className={cn(tipDiamond, "top-0 border-l border-t")}
+              style={{
+                left: `${anchor.arrowLeftInPanel + ARROW_W / 2}px`,
+                transform: "translate(-50%, -50%)",
+              }}
+            />
+            <p className="relative z-[1] px-3 pb-2 pt-2.5 text-center text-[11px] font-medium leading-snug text-zinc-700 antialiased sm:text-xs">
+              Modo claro? Clique aqui
+            </p>
           </div>
         )}
       </div>
