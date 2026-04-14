@@ -12,7 +12,7 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { Lead, normalizeLeadStatus, type LeadStatus } from "@/types/lead";
-import { shouldResetFollowupOnStatus, shouldTrackFollowupStatus } from "@/lib/lead-followup";
+import { shouldTrackFollowupStatus } from "@/lib/lead-followup";
 
 const LEADS_COLLECTION = "leads";
 
@@ -97,13 +97,8 @@ export const updateLead = async (leadId: string, leadData: Partial<Omit<Lead, "i
     if (currentSnap.exists()) {
       const currentData = currentSnap.data();
       const currentStatus = normalizeLeadStatus(currentData.status);
-      const currentFollowupStartedAt = toMillisIfTimestampLike(currentData.followupStartedAt);
       if (currentStatus !== nextStatus) {
-        if (shouldResetFollowupOnStatus(nextStatus)) {
-          patch.followupStartedAt = Date.now();
-        } else if (nextStatus === "Em Contato" && typeof currentFollowupStartedAt !== "number") {
-          patch.followupStartedAt = Date.now();
-        }
+        patch.followupStartedAt = Date.now();
       }
     }
   }
