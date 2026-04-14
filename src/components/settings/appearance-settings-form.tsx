@@ -4,10 +4,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useTheme } from "next-themes";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth-context";
-import switchTheme, {
-  buildSharedCircularThemeAnimation,
-  themeSwitchCircularOrigin,
-} from "@/lib/theme-switch-animation";
+import { switchThemeCircularFromElement } from "@/lib/theme-switch-animation";
 import { getUserUiTheme, saveUserUiTheme } from "@/lib/user-settings";
 import type { UserUiTheme } from "@/types/user-settings";
 import { Loader2, Monitor, Moon, Sun } from "lucide-react";
@@ -89,7 +86,7 @@ export function AppearanceSettingsForm() {
     return () => mq.removeEventListener("change", sync);
   }, []);
 
-  const selectTheme = async (mode: UserUiTheme, origin?: { cx: number; cy: number }) => {
+  const selectTheme = async (mode: UserUiTheme, trigger?: Element) => {
     if (loading || saving) return;
     if (mode === preference && !error) return;
 
@@ -98,12 +95,12 @@ export function AppearanceSettingsForm() {
       setTheme(mode);
     };
 
-    if (reduceMotion || !origin) {
+    if (reduceMotion || !trigger) {
       apply();
     } else {
-      switchTheme({
+      switchThemeCircularFromElement({
         switchThemeFunction: apply,
-        animationConfig: buildSharedCircularThemeAnimation(origin),
+        element: trigger,
         disableAnimation: reduceMotion,
       });
     }
@@ -154,7 +151,7 @@ export function AppearanceSettingsForm() {
                     key={opt.id}
                     active={active}
                     disabled={saving}
-                    onClick={(e) => void selectTheme(opt.id, themeSwitchCircularOrigin(e.currentTarget))}
+                    onClick={(e) => void selectTheme(opt.id, e.currentTarget)}
                   >
                     <span className="inline-flex shrink-0 text-brand dark:text-brand">
                       <Icon className="size-4" aria-hidden />

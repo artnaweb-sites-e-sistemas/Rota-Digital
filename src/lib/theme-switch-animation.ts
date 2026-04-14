@@ -40,6 +40,25 @@ export function buildSharedCircularThemeAnimation(startingPoint: {
   };
 }
 
+/**
+ * Mesma pipeline que Aparência (chips): `switchTheme` + origem no centro do elemento.
+ * Usar em qualquer botão de troca de tema para não haver divergência de animação.
+ */
+export function switchThemeCircularFromElement(options: {
+  switchThemeFunction: () => void;
+  element: Element;
+  disableAnimation?: boolean;
+}): void {
+  switchTheme({
+    switchThemeFunction: options.switchThemeFunction,
+    animationConfig: buildSharedCircularThemeAnimation(themeSwitchCircularOrigin(options.element)),
+    disableAnimation: options.disableAnimation,
+  });
+}
+
+/** `id` no botão de tema do relatório público — o intro automático usa o mesmo centro que o clique. */
+export const PUBLIC_REPORT_THEME_TOGGLE_ID = "public-report-theme-toggle";
+
 /** Centro do alvo (equivalente a `measure` + metade da largura/altura no RN). */
 export function themeSwitchCircularOrigin(element: Element): { cx: number; cy: number } {
   const r = element.getBoundingClientRect();
@@ -50,6 +69,13 @@ export function themeSwitchCircularOrigin(element: Element): { cx: number; cy: n
 export function themeSwitchViewportCenter(): { cx: number; cy: number } {
   if (typeof window === "undefined") return { cx: 0, cy: 0 };
   return { cx: window.innerWidth / 2, cy: window.innerHeight / 2 };
+}
+
+/** Centro do toggle público, ou centro do ecrã se o botão ainda não existir (fallback). */
+export function getPublicReportCircularOriginOrViewport(): { cx: number; cy: number } {
+  if (typeof document === "undefined") return { cx: 0, cy: 0 };
+  const el = document.getElementById(PUBLIC_REPORT_THEME_TOGGLE_ID);
+  return el ? themeSwitchCircularOrigin(el) : themeSwitchViewportCenter();
 }
 
 type ViewTransitionHandle = { finished: Promise<void> };

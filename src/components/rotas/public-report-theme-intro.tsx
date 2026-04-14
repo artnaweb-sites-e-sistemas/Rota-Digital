@@ -6,7 +6,7 @@ import { useTheme } from "next-themes";
 
 import switchTheme, {
   buildSharedCircularThemeAnimation,
-  themeSwitchViewportCenter,
+  getPublicReportCircularOriginOrViewport,
 } from "@/lib/theme-switch-animation";
 
 /**
@@ -50,15 +50,15 @@ export function PublicReportThemeIntro() {
       setTheme(opposite);
     });
 
-    const center = themeSwitchViewportCenter();
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
+        const origin = getPublicReportCircularOriginOrViewport();
         switchTheme({
           switchThemeFunction: () => {
             if (savedPreference === "system") setTheme("system");
             else setTheme(savedPreference);
           },
-          animationConfig: buildSharedCircularThemeAnimation(center),
+          animationConfig: buildSharedCircularThemeAnimation(origin),
         });
       });
     });

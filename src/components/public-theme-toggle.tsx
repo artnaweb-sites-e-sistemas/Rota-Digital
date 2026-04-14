@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { Moon, Sun } from "lucide-react";
 
-import switchTheme, {
-  buildSharedCircularThemeAnimation,
-  themeSwitchCircularOrigin,
+import {
+  PUBLIC_REPORT_THEME_TOGGLE_ID,
+  switchThemeCircularFromElement,
 } from "@/lib/theme-switch-animation";
 import { cn } from "@/lib/utils";
 
@@ -48,15 +48,16 @@ export function PublicThemeToggle({ className }: PublicThemeToggleProps) {
 
   return (
     <button
+      id={PUBLIC_REPORT_THEME_TOGGLE_ID}
       type="button"
       className={cn(
         "inline-flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-md border border-border/80 bg-background shadow-sm outline-none transition-[border-color,box-shadow,background-color] hover:border-border hover:bg-muted/80 focus-visible:ring-2 focus-visible:ring-brand/45 focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:border-white/12 dark:bg-zinc-950 dark:shadow-[0_1px_0_rgba(255,255,255,0.04)_inset] dark:hover:border-white/18 dark:hover:bg-zinc-900 sm:h-9 sm:w-9",
         className,
       )}
       onClick={(e) =>
-        switchTheme({
+        switchThemeCircularFromElement({
           switchThemeFunction: () => setTheme(isDark ? "light" : "dark"),
-          animationConfig: buildSharedCircularThemeAnimation(themeSwitchCircularOrigin(e.currentTarget)),
+          element: e.currentTarget,
           disableAnimation: reduceMotion,
         })
       }

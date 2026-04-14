@@ -101,7 +101,6 @@ export default async function PublicProposalPage({
 
   return (
     <div className="flex h-dvh max-h-dvh min-h-0 w-full min-w-0 flex-col overflow-hidden bg-background text-foreground">
-      <PublicReportThemeIntro />
       <main
         id="rota-report-scroll-root"
         className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-background"
@@ -114,6 +113,7 @@ export default async function PublicProposalPage({
           />
         </div>
       </main>
+      <PublicReportThemeIntro />
     </div>
   );
 }
