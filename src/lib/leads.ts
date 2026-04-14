@@ -12,7 +12,7 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { Lead, normalizeLeadStatus, type LeadStatus } from "@/types/lead";
-import { shouldResetFollowupOnStatus } from "@/lib/lead-followup";
+import { shouldResetFollowupOnStatus, shouldTrackFollowupStatus } from "@/lib/lead-followup";
 
 const LEADS_COLLECTION = "leads";
 
@@ -36,7 +36,7 @@ function toMillisIfTimestampLike(value: unknown): number | undefined {
 }
 
 function shouldStartFollowup(status: LeadStatus): boolean {
-  return shouldResetFollowupOnStatus(status);
+  return shouldTrackFollowupStatus(status);
 }
 
 export const getLeads = async (userId: string): Promise<Lead[]> => {
@@ -95,9 +95,15 @@ export const updateLead = async (leadId: string, leadData: Partial<Omit<Lead, "i
     patch.status = nextStatus;
     const currentSnap = await getDoc(docRef);
     if (currentSnap.exists()) {
-      const currentStatus = normalizeLeadStatus(currentSnap.data().status);
-      if (currentStatus !== nextStatus && shouldStartFollowup(nextStatus)) {
-        patch.followupStartedAt = Date.now();
+      const currentData = currentSnap.data();
+      const currentStatus = normalizeLeadStatus(currentData.status);
+      const currentFollowupStartedAt = toMillisIfTimestampLike(currentData.followupStartedAt);
+      if (currentStatus !== nextStatus) {
+        if (shouldResetFollowupOnStatus(nextStatus)) {
+          patch.followupStartedAt = Date.now();
+        } else if (nextStatus === "Em Contato" && typeof currentFollowupStartedAt !== "number") {
+          patch.followupStartedAt = Date.now();
+        }
       }
     }
   }

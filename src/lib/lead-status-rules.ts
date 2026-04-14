@@ -11,6 +11,7 @@ export function leadHasGeneratedRoute(params: {
 /** Se o utilizador pode escolher este status para o lead neste momento. */
 export function isLeadStatusSelectable(status: LeadStatus, hasRoute: boolean): boolean {
   if (status === "Novo Lead" && hasRoute) return false;
+  if (status === "Em Contato" && hasRoute) return false;
   if (status === "Rota Gerada" && !hasRoute) return false;
   return true;
 }

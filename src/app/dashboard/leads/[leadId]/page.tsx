@@ -162,7 +162,7 @@ export default function LeadDetailPage() {
     if (!isLeadStatusSelectable(editStatus, hasRouteNow)) {
       setEditError(
         hasRouteNow
-          ? "Com rota gerada não é possível voltar o status para Novo Lead."
+          ? "Com rota gerada não é possível voltar o status para Novo Lead ou Em Contato."
           : "O status Rota Gerada só fica disponível depois de gerar o relatório para este lead.",
       );
       return;

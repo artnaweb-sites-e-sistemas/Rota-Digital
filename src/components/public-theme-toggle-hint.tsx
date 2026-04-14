@@ -201,7 +201,7 @@ export function PublicThemeToggleHint() {
               className={cn(tipBelow, "top-0")}
               style={{
                 left: `${anchor.arrowLeftInBubble}px`,
-                transform: "translate(-50%, -50%)",
+                transform: "translate(-50%, -42%)",
               }}
             />
             <p className="relative z-[1] px-3 pb-2 pt-2.5 text-center text-[11px] font-medium leading-snug text-zinc-800 antialiased sm:text-xs">

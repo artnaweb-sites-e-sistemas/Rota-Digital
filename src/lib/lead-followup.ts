@@ -4,7 +4,11 @@ const FOLLOWUP_COLOR_STATUSES: LeadStatus[] = ["Em Contato", "Rota Gerada"];
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export function shouldResetFollowupOnStatus(nextStatus: LeadStatus): boolean {
-  return nextStatus === "Em Contato" || nextStatus === "Rota Gerada";
+  return nextStatus === "Rota Gerada";
+}
+
+export function shouldTrackFollowupStatus(status: LeadStatus): boolean {
+  return status === "Em Contato" || status === "Rota Gerada";
 }
 
 export function statusUsesFollowupUrgencyColor(status: LeadStatus): boolean {
@@ -19,9 +23,6 @@ function toLocalDayStart(ms: number): number {
 function fallbackFollowupStart(lead: Lead): number {
   if (typeof lead.followupStartedAt === "number" && Number.isFinite(lead.followupStartedAt)) {
     return lead.followupStartedAt;
-  }
-  if (statusUsesFollowupUrgencyColor(lead.status) && typeof lead.updatedAt === "number") {
-    return lead.updatedAt;
   }
   return lead.createdAt;
 }

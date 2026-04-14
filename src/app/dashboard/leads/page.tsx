@@ -471,7 +471,7 @@ function LeadsPageContent() {
     if (!isLeadStatusSelectable(status, hasRoute)) {
       setSaveError(
         hasRoute
-          ? "Com rota gerada não é possível voltar o status para Novo Lead."
+          ? "Com rota gerada não é possível voltar o status para Novo Lead ou Em Contato."
           : "O status Rota Gerada só fica disponível depois de gerar o relatório para este lead.",
       );
       return;
@@ -1072,10 +1072,27 @@ function LeadsPageContent() {
                   <SelectValue placeholder="Todos os status">{statusFilterLabel(statusFilter)}</SelectValue>
                 </SelectTrigger>
                 <SelectContent align="start" className="max-h-72">
-                  <SelectItem value={STATUS_FILTER_TODOS}>Todos os status</SelectItem>
+                  <SelectItem value={STATUS_FILTER_TODOS}>
+                    <span className="inline-flex items-center gap-2">
+                      <span
+                        className="size-2 shrink-0 rounded-full bg-zinc-400/80 ring-1 ring-black/8 dark:bg-zinc-500 dark:ring-white/10"
+                        aria-hidden
+                      />
+                      Todos os status
+                    </span>
+                  </SelectItem>
                   {ALL_STATUSES.map((s) => (
                     <SelectItem key={s} value={s}>
-                      {s}
+                      <span className="inline-flex items-center gap-2">
+                        <span
+                          className={cn(
+                            "size-2 shrink-0 rounded-full ring-1 ring-black/8 dark:ring-white/10",
+                            LEAD_STATUS_MENU_DOT_CLASSES[s],
+                          )}
+                          aria-hidden
+                        />
+                        {s}
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectContent>
