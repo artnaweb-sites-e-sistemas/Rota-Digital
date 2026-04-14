@@ -2479,16 +2479,14 @@ export function RotaDigitalReportView({
             </Button>
           </div>
         ) : (
-          <div className="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center sm:justify-end sm:gap-5">
-            <p className="hidden max-w-[min(100%,32rem)] text-right text-sm leading-snug text-muted-foreground sm:block sm:min-w-0">
-              Gerado para{" "}
-              <span className="font-medium text-foreground">{report.leadCompany}</span>
-            </p>
-            <div className="flex max-w-full items-center gap-2">
+            <div className="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center sm:justify-end sm:gap-5">
+              <p className="hidden max-w-[min(100%,32rem)] text-right text-sm leading-snug text-muted-foreground sm:block sm:min-w-0">
+                Gerado para{" "}
+                <span className="font-medium text-foreground">{report.leadCompany}</span>
+              </p>
               {variant === "public" ? <PublicThemeToggleHint /> : null}
               <PublicThemeToggle className="no-print shrink-0" />
             </div>
-          </div>
         )}
       </div>
 
