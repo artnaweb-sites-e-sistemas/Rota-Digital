@@ -237,6 +237,7 @@ function LeadTableSharedRouteLink({
 }
 
 function LeadTablePhoneCell({ phone }: { phone: string | undefined }) {
+  const [copied, setCopied] = useState(false);
   const trimmed = phone?.trim() ?? "";
   if (!trimmed) {
     return <span className="block truncate text-sm text-muted-foreground">Sem telefone</span>;
@@ -251,18 +252,32 @@ function LeadTablePhoneCell({ phone }: { phone: string | undefined }) {
         {displayPlus55 || trimmed}
       </span>
       {copyDigits ? (
-        <button
-          type="button"
-          className="inline-flex size-[22px] shrink-0 items-center justify-center rounded-md border border-border bg-background/70 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/40"
-          aria-label={`Copiar telefone ${displayPlus55}`}
-          title="Copiar telefone sem +55"
-          onClick={(e) => {
-            e.stopPropagation();
-            void navigator.clipboard.writeText(copyDigits);
-          }}
-        >
-          <Copy className="size-3" aria-hidden />
-        </button>
+        <span className="relative inline-flex shrink-0 items-center">
+          <span
+            className={cn(
+              "pointer-events-none absolute -top-6 left-1/2 -translate-x-1/2 rounded-md border border-emerald-500/40 bg-emerald-500/12 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-emerald-200 transition-all duration-200",
+              copied ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0",
+            )}
+            aria-hidden
+          >
+            Copiado
+          </span>
+          <button
+            type="button"
+            className="inline-flex size-[22px] items-center justify-center rounded-md border border-border bg-background/70 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/40"
+            aria-label={`Copiar telefone ${displayPlus55}`}
+            title="Copiar telefone sem +55"
+            onClick={(e) => {
+              e.stopPropagation();
+              void navigator.clipboard.writeText(copyDigits).then(() => {
+                setCopied(true);
+                window.setTimeout(() => setCopied(false), 1200);
+              });
+            }}
+          >
+            <Copy className="size-3" aria-hidden />
+          </button>
+        </span>
       ) : null}
       {waHref ? (
         <a

@@ -13,6 +13,7 @@ const BUBBLE_W_DESKTOP = 208;
 const MIN_SPACE_BESIDE_PX = 200;
 const INSET_PX = 16;
 const MOBILE_MAX_W = 639;
+const MOBILE_ARROW_NUDGE_X_PX = -3;
 
 /** Fundo sólido + borda escura (espessura média) */
 const shell = cn(
@@ -72,7 +73,8 @@ export function PublicThemeToggleHint() {
     } else {
       const width = isMobile ? BUBBLE_W_MOBILE : BUBBLE_W_DESKTOP;
       const left = Math.max(INSET_PX, Math.min(rect.right - width, vw - width - INSET_PX));
-      const arrowLeftInBubble = Math.max(12, Math.min(centerX - left, width - 12));
+      const idealArrowX = centerX - left + (isMobile ? MOBILE_ARROW_NUDGE_X_PX : 0);
+      const arrowLeftInBubble = Math.max(12, Math.min(idealArrowX, width - 12));
       setAnchor({
         mode: "below",
         top: rect.bottom + 8,
@@ -145,7 +147,9 @@ export function PublicThemeToggleHint() {
     phase === "shown" &&
       "opacity-100 motion-safe:translate-x-0 motion-safe:transition-[opacity,transform] motion-safe:duration-500 motion-safe:ease-out",
     phase === "exit" &&
-      "opacity-0 motion-safe:translate-x-6 motion-safe:transition-[opacity,transform] motion-safe:duration-300 motion-safe:ease-in",
+      (isBeside
+        ? "opacity-0 motion-safe:translate-x-6 motion-safe:transition-[opacity,transform] motion-safe:duration-300 motion-safe:ease-in"
+        : "opacity-0 motion-safe:transition-opacity motion-safe:duration-260 motion-safe:ease-out"),
   );
 
   const tipBeside = cn(
