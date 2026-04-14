@@ -2422,8 +2422,9 @@ export function RotaDigitalReportView({
         }
       `}</style>
 
-      {/* Header */}
+      {/* Header — `data-public-report-header` usado pelo hint de tema na página pública (mobile) */}
       <div
+        data-public-report-header={!isDashboard ? "1" : undefined}
         className={cn(
           "no-print justify-between gap-4 sm:gap-6",
           isDashboard
