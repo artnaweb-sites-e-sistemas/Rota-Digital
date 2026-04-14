@@ -1,127 +1,147 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+
 import { PUBLIC_REPORT_THEME_TOGGLE_ID } from "@/lib/theme-switch-animation";
 import { cn } from "@/lib/utils";
 
-const VISIBLE_MS = 6000;
-const EXIT_MS = 400;
+const SHOW_DELAY_MS = 640;
+const VISIBLE_MS = 5200;
+const EXIT_MS = 220;
+
+type Phase = "idle" | "enter" | "shown" | "exit" | "gone";
 
 /**
- * Tooltip flutuante (overlay) que aparece sobre o botão de tema na página compartilhada.
- * Design refinado: fundo branco puro, sombra profunda, animação de entrada elástica
- * e pulso sutil enquanto visível. Não empurra o layout (absolute/fixed).
+ * Dica flutuante (fixed) ao lado do botão de tema — só na página partilhada.
+ * Visual discreto; seta SVG alinhada ao centro vertical; anima só entrada e saída.
  */
 export function PublicThemeToggleHint() {
-  const [phase, setPhase] = useState<"hidden" | "enter" | "visible" | "exit">("hidden");
-  const [coords, setCoords] = useState<{ top: number; right: number } | null>(null);
-  const exitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const removeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [phase, setPhase] = useState<Phase>("idle");
+  const [anchor, setAnchor] = useState<{ top: number; left: number } | null>(null);
+  const phaseRef = useRef<Phase>("idle");
+  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
-  const updatePosition = useCallback(() => {
+  const clearTimers = () => {
+    timersRef.current.forEach(clearTimeout);
+    timersRef.current = [];
+  };
+
+  const setPhaseTracked = (p: Phase) => {
+    phaseRef.current = p;
+    setPhase(p);
+  };
+
+  const updateAnchor = useCallback(() => {
     const btn = document.getElementById(PUBLIC_REPORT_THEME_TOGGLE_ID);
     if (!btn) return;
     const rect = btn.getBoundingClientRect();
-    // Posiciona à esquerda do botão, centralizado verticalmente
-    setCoords({
+    const gap = 8;
+    setAnchor({
       top: rect.top + rect.height / 2,
-      right: window.innerWidth - rect.left + 12, // 12px de gap
+      left: rect.left - gap,
     });
   }, []);
 
-  const dismiss = useCallback(() => {
-    if (phase === "exit" || phase === "hidden") return;
-    setPhase("exit");
-    removeTimerRef.current = setTimeout(() => {
-      setPhase("hidden");
-    }, EXIT_MS);
-  }, [phase]);
+  const runExit = useCallback(() => {
+    if (phaseRef.current === "exit" || phaseRef.current === "gone") return;
+    setPhaseTracked("exit");
+    timersRef.current.push(
+      setTimeout(() => {
+        setPhaseTracked("gone");
+      }, EXIT_MS),
+    );
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    // Pequeno delay para garantir que o layout estabilizou
-    const startTimer = setTimeout(() => {
-      updatePosition();
-      setPhase("enter");
-      requestAnimationFrame(() => setPhase("visible"));
-      exitTimerRef.current = setTimeout(() => dismiss(), VISIBLE_MS);
-    }, 800);
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-    window.addEventListener("resize", updatePosition);
-    window.addEventListener("scroll", updatePosition, true);
+    timersRef.current.push(
+      setTimeout(() => {
+        if (!document.getElementById(PUBLIC_REPORT_THEME_TOGGLE_ID)) return;
+        updateAnchor();
+        if (reduceMotion) {
+          setPhaseTracked("shown");
+          timersRef.current.push(setTimeout(runExit, VISIBLE_MS));
+          return;
+        }
+        setPhaseTracked("enter");
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            setPhaseTracked("shown");
+            timersRef.current.push(setTimeout(runExit, VISIBLE_MS));
+          });
+        });
+      }, SHOW_DELAY_MS),
+    );
+
+    const onLayout = () => updateAnchor();
+    window.addEventListener("resize", onLayout);
+    window.addEventListener("scroll", onLayout, true);
 
     return () => {
-      clearTimeout(startTimer);
-      window.removeEventListener("resize", updatePosition);
-      window.removeEventListener("scroll", updatePosition, true);
-      if (exitTimerRef.current) clearTimeout(exitTimerRef.current);
-      if (removeTimerRef.current) clearTimeout(removeTimerRef.current);
+      clearTimers();
+      window.removeEventListener("resize", onLayout);
+      window.removeEventListener("scroll", onLayout, true);
     };
-  }, [dismiss, updatePosition]);
+  }, [runExit, updateAnchor]);
 
-  // Fecha se clicar no botão ou em qualquer lugar
   useEffect(() => {
-    const onDocClick = (e: MouseEvent) => {
-      dismiss();
-    };
+    const onDocClick = () => runExit();
     document.addEventListener("click", onDocClick, true);
     return () => document.removeEventListener("click", onDocClick, true);
-  }, [dismiss]);
+  }, [runExit]);
 
-  if (phase === "hidden" || !coords) return null;
+  if (phase === "idle" || phase === "gone" || !anchor) return null;
 
   return (
     <div
-      role="status"
-      aria-live="polite"
-      className={cn(
-        "fixed z-[100] pointer-events-none",
-        "flex items-center justify-end",
-        phase === "enter" && "opacity-0 scale-90 translate-x-4",
-        phase === "visible" && [
-          "opacity-100 scale-100 translate-x-0",
-          "transition-all duration-700 ease-[cubic-bezier(0.34,1.56,0.64,1)]",
-          "animate-hint-float"
-        ],
-        phase === "exit" && "opacity-0 scale-95 -translate-y-2 transition-all duration-400 ease-in",
-      )}
+      className="pointer-events-none fixed z-[100]"
       style={{
-        top: coords.top,
-        right: coords.right,
-        transformOrigin: "right center",
-        marginTop: "-20px", // Metade da altura aproximada para centralizar no eixo Y
+        top: anchor.top,
+        left: anchor.left,
+        transform: "translate(-100%, -50%)",
       }}
     >
-      <div className="relative">
-        {/* Corpo do Tooltip */}
-        <div className={cn(
-          "bg-white text-zinc-900 px-4 py-2.5 rounded-2xl border border-zinc-200/50",
-          "shadow-[0_20px_50px_rgba(0,0,0,0.3),0_0_0_1px_rgba(0,0,0,0.05)]",
-          "flex items-center gap-2 min-w-[160px] whitespace-nowrap"
-        )}>
-          <span className="flex h-2 w-2 rounded-full bg-brand animate-pulse" />
-          <p className="text-[13px] font-bold tracking-tight antialiased">
-            Modo Claro? Clique aqui
+      <div
+        role="status"
+        aria-live="polite"
+        className={cn(
+          "flex items-center",
+          phase === "enter" && "opacity-0 motion-safe:translate-x-1",
+          phase === "shown" &&
+            "opacity-100 motion-safe:translate-x-0 motion-safe:transition-[opacity,transform] motion-safe:duration-300 motion-safe:ease-out",
+          phase === "exit" &&
+            "opacity-0 motion-safe:translate-x-0.5 motion-safe:transition-[opacity,transform] motion-safe:duration-200 motion-safe:ease-in",
+        )}
+      >
+        <div
+          className={cn(
+            "max-w-[min(15.5rem,calc(100vw-5rem))] rounded-lg border border-zinc-200/90 bg-white px-3 py-2",
+            "shadow-[0_6px_24px_rgba(0,0,0,0.07),0_1px_2px_rgba(0,0,0,0.04)]",
+          )}
+        >
+          <p className="text-[13px] font-medium leading-snug tracking-tight text-zinc-600 antialiased">
+            Modo claro? Clique aqui
           </p>
         </div>
-
-        {/* Seta (Arrow) */}
-        <div className={cn(
-          "absolute -right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 rotate-45",
-          "bg-white border-r border-t border-zinc-200/50 shadow-[2px_-2px_5px_rgba(0,0,0,0.05)]"
-        )} />
+        <svg
+          width="7"
+          height="18"
+          viewBox="0 0 7 18"
+          className="-ml-px h-[18px] w-[7px] shrink-0 text-zinc-200/90"
+          aria-hidden
+        >
+          <path
+            d="M0.5 1.25 L0.5 16.75 L6.25 9 Z"
+            fill="white"
+            stroke="currentColor"
+            strokeWidth="1"
+            strokeLinejoin="round"
+          />
+        </svg>
       </div>
-
-      <style jsx global>{`
-        @keyframes hint-float {
-          0%, 100% { transform: translateX(0); }
-          50% { transform: translateX(-6px); }
-        }
-        .animate-hint-float {
-          animation: hint-float 2.5s ease-in-out infinite;
-        }
-      `}</style>
     </div>
   );
 }
