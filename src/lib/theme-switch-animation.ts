@@ -135,15 +135,6 @@ function getStartViewTransition(): ((cb: () => void | Promise<void>) => ViewTran
   return typeof d.startViewTransition === "function" ? d.startViewTransition.bind(document) : undefined;
 }
 
-/**
- * Em `pointer: coarse` (telefone), a View Transition para **claro** costuma falhar ou não animar;
- * o fallback com máscara é estável nos dois sentidos.
- */
-function preferCircularViewTransition(): boolean {
-  if (typeof window === "undefined") return true;
-  return !window.matchMedia("(pointer: coarse)").matches;
-}
-
 /** Garante que o React aplica o tema antes do browser capturar o estado “new”. */
 function runSwitchSynchronously(switchThemeFunction: () => void) {
   try {
@@ -223,7 +214,7 @@ export default function switchTheme(options: SwitchThemeOptions): void {
 
   const isCircularAnimation = animationConfig.type === "circular" || animationConfig.type === "inverted-circular";
 
-  if (isCircularAnimation && startVt && preferCircularViewTransition()) {
+  if (isCircularAnimation && startVt) {
     const html = document.documentElement;
     const { cx, cy } = animationConfig.startingPoint;
     const duration = Math.max(120, animationConfig.duration);
