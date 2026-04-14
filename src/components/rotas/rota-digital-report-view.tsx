@@ -77,6 +77,7 @@ import { cn } from "@/lib/utils";
 import { WhatsAppIcon } from "@/components/icons/whatsapp-icon";
 import type { UserReportCtaSettings } from "@/types/user-settings";
 import { PublicThemeToggle } from "@/components/public-theme-toggle";
+import { PublicThemeToggleHint } from "@/components/public-theme-toggle-hint";
 
 const PRIORITY_COLORS: Record<string, string> = {
   Alta:
@@ -2483,7 +2484,10 @@ export function RotaDigitalReportView({
               Gerado para{" "}
               <span className="font-medium text-foreground">{report.leadCompany}</span>
             </p>
-            <PublicThemeToggle className="no-print shrink-0" />
+            <div className="flex max-w-full items-center gap-2">
+              {variant === "public" ? <PublicThemeToggleHint /> : null}
+              <PublicThemeToggle className="no-print shrink-0" />
+            </div>
           </div>
         )}
       </div>
