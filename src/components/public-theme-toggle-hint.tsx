@@ -13,7 +13,8 @@ const BUBBLE_W_DESKTOP = 208;
 const MIN_SPACE_BESIDE_PX = 200;
 const INSET_PX = 16;
 const MOBILE_MAX_W = 639;
-const MOBILE_ARROW_NUDGE_X_PX = -3;
+const MOBILE_ARROW_NUDGE_X_PX = -7;
+const MOBILE_BUBBLE_GAP_FROM_BUTTON_PX = 12;
 
 /** Fundo sólido + borda escura (espessura média) */
 const shell = cn(
@@ -77,7 +78,7 @@ export function PublicThemeToggleHint() {
       const arrowLeftInBubble = Math.max(12, Math.min(idealArrowX, width - 12));
       setAnchor({
         mode: "below",
-        top: rect.bottom + 8,
+        top: rect.bottom + MOBILE_BUBBLE_GAP_FROM_BUTTON_PX,
         left,
         width,
         arrowLeftInBubble,
@@ -148,7 +149,7 @@ export function PublicThemeToggleHint() {
       "opacity-100 motion-safe:translate-x-0 motion-safe:transition-[opacity,transform] motion-safe:duration-500 motion-safe:ease-out",
     phase === "exit" &&
       (isBeside
-        ? "opacity-0 motion-safe:translate-x-6 motion-safe:transition-[opacity,transform] motion-safe:duration-300 motion-safe:ease-in"
+        ? "opacity-0 motion-safe:transition-opacity motion-safe:duration-300 motion-safe:ease-out"
         : "opacity-0 motion-safe:transition-opacity motion-safe:duration-260 motion-safe:ease-out"),
   );
 

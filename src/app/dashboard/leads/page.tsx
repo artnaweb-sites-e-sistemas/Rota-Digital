@@ -52,6 +52,7 @@ import {
   Plus,
   Search,
   Sparkles,
+  X,
   Users,
 } from "lucide-react";
 import Link from "next/link";
@@ -398,10 +399,12 @@ function LeadsPageContent() {
     () =>
       leads
         .filter((lead) => {
-        if (!leadMatchesSearch(lead, search)) return false;
-        if (statusFilter !== STATUS_FILTER_TODOS && lead.status !== statusFilter) return false;
-        return true;
-      })
+          if (!leadMatchesSearch(lead, search)) return false;
+          // Com busca preenchida, prioriza o termo e ignora o filtro de status.
+          if (search.trim()) return true;
+          if (statusFilter !== STATUS_FILTER_TODOS && lead.status !== statusFilter) return false;
+          return true;
+        })
         .sort((a, b) => {
           const dayDiff = getLeadFollowupDay(b) - getLeadFollowupDay(a);
           if (dayDiff !== 0) return dayDiff;
@@ -1036,7 +1039,7 @@ function LeadsPageContent() {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Buscar por nome, empresa, e-mail ou telefone…"
-                  className="h-10 w-full rounded-md border-input bg-background pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:border-brand/50 focus-visible:ring-brand/20 dark:border-white/10 dark:bg-white/5 dark:text-zinc-100 dark:placeholder:text-zinc-600"
+                  className="h-10 w-full rounded-md border-input bg-background pl-9 pr-10 text-sm text-foreground placeholder:text-muted-foreground focus-visible:border-brand/50 focus-visible:ring-brand/20 dark:border-white/10 dark:bg-white/5 dark:text-zinc-100 dark:placeholder:text-zinc-600"
                   aria-label="Buscar leads"
                   autoComplete="off"
                   autoCorrect="off"
@@ -1044,6 +1047,17 @@ function LeadsPageContent() {
                   data-1p-ignore
                   data-lpignore="true"
                 />
+                {search.trim() ? (
+                  <button
+                    type="button"
+                    onClick={() => setSearch("")}
+                    className="absolute right-2 top-1/2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    aria-label="Limpar busca"
+                    title="Limpar busca"
+                  >
+                    <X className="size-3.5" aria-hidden />
+                  </button>
+                ) : null}
               </div>
               <Select
                 value={statusFilter}
