@@ -18,22 +18,19 @@ const OPTIONS: { id: UserUiTheme; label: string; icon: typeof Sun }[] = [
 
 function ThemeChip({
   active,
-  disabled,
   onClick,
   children,
 }: {
   active: boolean;
-  disabled?: boolean;
   onClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
   children: ReactNode;
 }) {
   return (
     <button
       type="button"
-      disabled={disabled}
       onClick={onClick}
       className={cn(
-        "relative flex flex-1 flex-col items-center gap-1.5 overflow-hidden rounded-md border px-3 py-3 text-center sm:flex-row sm:justify-start sm:text-left disabled:pointer-events-none disabled:opacity-60",
+        "relative flex flex-1 flex-col items-center gap-1.5 overflow-hidden rounded-md border px-3 py-3 text-center sm:flex-row sm:justify-start sm:text-left",
         active
           ? "border-brand/45 bg-brand/12 text-foreground ring-1 ring-brand/30 dark:border-brand/50 dark:bg-brand/15 dark:text-white dark:ring-brand/25"
           : "border-border bg-background text-foreground hover:border-input hover:bg-muted dark:border-white/10 dark:bg-white/[0.03] dark:text-zinc-400 dark:hover:border-white/15 dark:hover:bg-white/[0.06] dark:hover:text-zinc-200",
@@ -51,7 +48,6 @@ export function AppearanceSettingsForm() {
   const { setTheme } = useTheme();
   const [reduceMotion, setReduceMotion] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [preference, setPreference] = useState<UserUiTheme>("dark");
   const [error, setError] = useState<string | null>(null);
 
@@ -86,8 +82,8 @@ export function AppearanceSettingsForm() {
     return () => mq.removeEventListener("change", sync);
   }, []);
 
-  const selectTheme = async (mode: UserUiTheme, trigger?: Element) => {
-    if (loading || saving) return;
+  const selectTheme = (mode: UserUiTheme, trigger?: Element) => {
+    if (loading) return;
     if (mode === preference && !error) return;
 
     const apply = () => {
@@ -107,15 +103,10 @@ export function AppearanceSettingsForm() {
 
     setError(null);
     if (!user) return;
-    setSaving(true);
-    try {
-      await saveUserUiTheme(user.uid, mode);
-    } catch (e) {
+    void saveUserUiTheme(user.uid, mode).catch((e) => {
       console.error(e);
       setError("Não foi possível salvar. Escolha outra vez.");
-    } finally {
-      setSaving(false);
-    }
+    });
   };
 
   return (
@@ -150,8 +141,7 @@ export function AppearanceSettingsForm() {
                   <ThemeChip
                     key={opt.id}
                     active={active}
-                    disabled={saving}
-                    onClick={(e) => void selectTheme(opt.id, e.currentTarget)}
+                    onClick={(e) => selectTheme(opt.id, e.currentTarget)}
                   >
                     <span className="inline-flex shrink-0 text-brand dark:text-brand">
                       <Icon className="size-4" aria-hidden />
@@ -173,16 +163,6 @@ export function AppearanceSettingsForm() {
             {error ? (
               <p className="rounded-md border border-red-500/35 bg-red-500/10 px-3 py-2 text-sm text-red-800 dark:text-red-300">
                 {error}
-              </p>
-            ) : null}
-            {saving ? (
-              <p
-                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"
-                role="status"
-                aria-live="polite"
-              >
-                <Loader2 className="size-3.5 shrink-0 animate-spin text-brand" aria-hidden />
-                A guardar…
               </p>
             ) : null}
           </>

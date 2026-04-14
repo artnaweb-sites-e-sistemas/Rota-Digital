@@ -40,6 +40,29 @@ export function buildSharedCircularThemeAnimation(startingPoint: {
   };
 }
 
+/** Fade 900 ms como no primeiro exemplo do `react-native-theme-switch-animation` (relatório público). */
+export function buildSharedFadeThemeAnimation(): Extract<ThemeSwitchAnimationConfig, { type: "fade" }> {
+  return {
+    type: "fade",
+    duration: THEME_SWITCH_FADE_DURATION_MS,
+  };
+}
+
+/**
+ * Troca de tema com **fade** de ecrã inteiro (referência RN `type: 'fade', duration: 900`).
+ * Usar na página pública partilhada; Aparência continua com `switchThemeCircularFromElement`.
+ */
+export function switchThemeFadeFromSurface(options: {
+  switchThemeFunction: () => void;
+  disableAnimation?: boolean;
+}): void {
+  switchTheme({
+    switchThemeFunction: options.switchThemeFunction,
+    animationConfig: buildSharedFadeThemeAnimation(),
+    disableAnimation: options.disableAnimation,
+  });
+}
+
 /**
  * Mesma pipeline que Aparência (chips): `switchTheme` + origem no centro do elemento.
  * Usar em qualquer botão de troca de tema para não haver divergência de animação.
@@ -150,6 +173,11 @@ function easeOutQuint(t: number): number {
   return 1 - (1 - t) ** 5;
 }
 
+/** Fade do overlay (fallback): início e fim mais suaves, alinhado a crossfades “suaves”. */
+function easeInOutCubic(t: number): number {
+  return t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
+}
+
 function removeNode(el: HTMLElement | null) {
   if (el?.parentNode) el.parentNode.removeChild(el);
 }
@@ -194,15 +222,20 @@ export default function switchTheme(options: SwitchThemeOptions): void {
   if (animationConfig.type === "fade" && startVt) {
     const html = document.documentElement;
     const duration = Math.max(120, animationConfig.duration);
-    html.style.setProperty("--theme-switch-vt-duration", `${duration}ms`);
-    html.setAttribute("data-theme-switch-vt", "fade");
-    const vt = startVt(() => {
-      runSwitchSynchronously(switchThemeFunction);
-    });
-    void vt.finished.finally(() => {
+    try {
+      html.style.setProperty("--theme-switch-vt-duration", `${duration}ms`);
+      html.setAttribute("data-theme-switch-vt", "fade");
+      const vt = startVt(() => {
+        runSwitchSynchronously(switchThemeFunction);
+      });
+      void vt.finished.finally(() => {
+        cleanupThemeSwitchVtVars();
+      });
+      return;
+    } catch (e) {
+      console.warn("[theme-switch] View Transition fade falhou, a usar overlay.", e);
       cleanupThemeSwitchVtVars();
-    });
-    return;
+    }
   }
 
   const oldBg = captureRootBackgroundColor();
@@ -240,7 +273,7 @@ export default function switchTheme(options: SwitchThemeOptions): void {
         const start = performance.now();
         const tick = (now: number) => {
           const t = Math.min(1, (now - start) / duration);
-          const o = 1 - easeOutQuint(t);
+          const o = 1 - easeInOutCubic(t);
           overlay.style.opacity = String(o);
           if (t < 1) {
             requestAnimationFrame(tick);

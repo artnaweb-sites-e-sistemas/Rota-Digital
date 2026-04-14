@@ -4,17 +4,14 @@ import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { Moon, Sun } from "lucide-react";
 
-import {
-  PUBLIC_REPORT_THEME_TOGGLE_ID,
-  switchThemeCircularFromElement,
-} from "@/lib/theme-switch-animation";
+import { PUBLIC_REPORT_THEME_TOGGLE_ID, switchThemeFadeFromSurface } from "@/lib/theme-switch-animation";
 import { cn } from "@/lib/utils";
 
 type PublicThemeToggleProps = {
   className?: string;
 };
 
-/** Botão só com ícone (sem “track” deslizante); a troca de tema continua com a animação circular. */
+/** Fade 900 ms (referência RN `type: 'fade'`) — mais suave no relatório público que o circular no telemóvel. */
 export function PublicThemeToggle({ className }: PublicThemeToggleProps) {
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -51,10 +48,9 @@ export function PublicThemeToggle({ className }: PublicThemeToggleProps) {
         "inline-flex h-11 min-h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-md border border-border/80 bg-background shadow-sm outline-none transition-[border-color,box-shadow,background-color] hover:border-border hover:bg-muted/80 focus-visible:ring-2 focus-visible:ring-brand/45 focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:border-white/12 dark:bg-zinc-950 dark:shadow-[0_1px_0_rgba(255,255,255,0.04)_inset] dark:hover:border-white/18 dark:hover:bg-zinc-900 sm:h-11 sm:min-h-11 sm:w-11",
         className,
       )}
-      onClick={(e) =>
-        switchThemeCircularFromElement({
+      onClick={() =>
+        switchThemeFadeFromSurface({
           switchThemeFunction: () => setTheme(isDark ? "light" : "dark"),
-          element: e.currentTarget,
           disableAnimation: reduceMotion,
         })
       }
@@ -63,9 +59,9 @@ export function PublicThemeToggle({ className }: PublicThemeToggleProps) {
       aria-pressed={isDark}
     >
       {isDark ? (
-        <Sun className="size-[1.45rem] text-amber-500 dark:text-amber-400 sm:size-[1.35rem]" aria-hidden />
+        <Sun className="size-[1.45rem] text-brand sm:size-[1.35rem]" aria-hidden />
       ) : (
-        <Moon className="size-[1.45rem] text-indigo-600 dark:text-indigo-400 sm:size-[1.35rem]" aria-hidden />
+        <Moon className="size-[1.45rem] text-brand sm:size-[1.35rem]" aria-hidden />
       )}
     </button>
   );
