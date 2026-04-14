@@ -9,29 +9,41 @@ import {
   switchThemeInvertedCircularFromPoint,
 } from "@/lib/theme-switch-animation";
 
-const INTRO_ORIGIN_WAIT_MS = 420;
+const INTRO_ORIGIN_MAX_WAIT_MS = 900;
+const STABLE_FRAMES_REQUIRED = 4;
+const STABLE_DRIFT_PX = 1.5;
 
 async function resolveIntroOrigin(): Promise<{ cx: number; cy: number }> {
-  const startedAt = performance.now();
-  let lastStable: { cx: number; cy: number } | null = null;
+  try {
+    await Promise.race([
+      document.fonts.ready,
+      new Promise<void>((r) => setTimeout(r, 500)),
+    ]);
+  } catch { /* ignore */ }
 
-  while (performance.now() - startedAt < INTRO_ORIGIN_WAIT_MS) {
+  const startedAt = performance.now();
+  let stableCount = 0;
+  let last: { cx: number; cy: number } | null = null;
+
+  while (performance.now() - startedAt < INTRO_ORIGIN_MAX_WAIT_MS) {
     const el = document.getElementById(PUBLIC_REPORT_THEME_TOGGLE_ID);
     if (el) {
       const rect = el.getBoundingClientRect();
       if (rect.width > 0 && rect.height > 0) {
         const next = { cx: rect.left + rect.width / 2, cy: rect.top + rect.height / 2 };
-        if (lastStable) {
-          const drift = Math.hypot(next.cx - lastStable.cx, next.cy - lastStable.cy);
-          if (drift < 1.2) return next;
+        if (last && Math.hypot(next.cx - last.cx, next.cy - last.cy) < STABLE_DRIFT_PX) {
+          stableCount++;
+          if (stableCount >= STABLE_FRAMES_REQUIRED) return next;
+        } else {
+          stableCount = 1;
         }
-        lastStable = next;
+        last = next;
       }
     }
     await new Promise<void>((r) => requestAnimationFrame(() => r()));
   }
 
-  return lastStable ?? getPublicReportCircularOriginOrViewport();
+  return last ?? getPublicReportCircularOriginOrViewport();
 }
 
 /**
