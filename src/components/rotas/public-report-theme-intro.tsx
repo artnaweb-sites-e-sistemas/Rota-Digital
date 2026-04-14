@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useState } from "react";
-import { flushSync } from "react-dom";
+import { useEffect, useRef } from "react";
 import { useTheme } from "next-themes";
 
 import {
@@ -10,12 +9,6 @@ import {
   switchThemeInvertedCircularFromPoint,
 } from "@/lib/theme-switch-animation";
 
-/**
- * Na primeira montagem do relatório público: mostra o tema **oposto** ao resolvido
- * e corre sozinha o **circular invertido** 900 ms até ao tema real.
- */
-let lastPublicThemeIntro: { path: string; at: number } | null = null;
-const STRICT_MODE_DEDUP_MS = 2200;
 const INTRO_ORIGIN_WAIT_MS = 420;
 
 async function resolveIntroOrigin(): Promise<{ cx: number; cy: number }> {
@@ -35,52 +28,50 @@ async function resolveIntroOrigin(): Promise<{ cx: number; cy: number }> {
         lastStable = next;
       }
     }
-    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    await new Promise<void>((r) => requestAnimationFrame(() => r()));
   }
 
   return lastStable ?? getPublicReportCircularOriginOrViewport();
 }
 
+/**
+ * Na primeira montagem do relatório público: mostra o tema **oposto** ao resolvido
+ * e corre sozinha o **circular invertido** 900 ms até ao tema real.
+ *
+ * Usa `useRef` para correr uma única vez — sem `theme`/`resolvedTheme` nos deps,
+ * evitando que o React cancele o efeito ao re-renderizar depois do `setTheme(opposite)`.
+ */
 export function PublicReportThemeIntro() {
   const { theme, resolvedTheme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
+  const didRunRef = useRef(false);
+  const themeRef = useRef(theme);
+  const resolvedRef = useRef(resolvedTheme);
+
+  themeRef.current = theme;
+  resolvedRef.current = resolvedTheme;
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useLayoutEffect(() => {
-    if (!mounted) return;
+    if (didRunRef.current) return;
     if (typeof window === "undefined") return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    if (theme === undefined || !resolvedTheme) return;
-    if (resolvedTheme !== "light" && resolvedTheme !== "dark") return;
 
-    const path = window.location.pathname;
-    const now = Date.now();
-    if (
-      lastPublicThemeIntro &&
-      lastPublicThemeIntro.path === path &&
-      now - lastPublicThemeIntro.at < STRICT_MODE_DEDUP_MS
-    ) {
-      return;
-    }
-    lastPublicThemeIntro = { path, at: now };
+    const currentTheme = themeRef.current;
+    const currentResolved = resolvedRef.current;
 
-    const savedPreference = theme;
-    const targetResolved: "light" | "dark" = resolvedTheme;
-    const opposite: "light" | "dark" = targetResolved === "dark" ? "light" : "dark";
+    if (currentTheme === undefined || !currentResolved) return;
+    if (currentResolved !== "light" && currentResolved !== "dark") return;
 
-    flushSync(() => {
-      setTheme(opposite);
-    });
+    didRunRef.current = true;
 
-    let cancelled = false;
+    const savedPreference = currentTheme;
+    const opposite: "light" | "dark" = currentResolved === "dark" ? "light" : "dark";
+
+    setTheme(opposite);
+
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         void (async () => {
           const origin = await resolveIntroOrigin();
-          if (cancelled) return;
           switchThemeInvertedCircularFromPoint({
             switchThemeFunction: () => {
               if (savedPreference === "system") setTheme("system");
@@ -91,11 +82,7 @@ export function PublicReportThemeIntro() {
         })();
       });
     });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [mounted, theme, resolvedTheme, setTheme]);
+  });
 
   return null;
 }

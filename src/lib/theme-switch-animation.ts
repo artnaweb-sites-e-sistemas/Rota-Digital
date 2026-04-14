@@ -127,13 +127,15 @@ export function getPublicReportCircularOriginOrViewport(): { cx: number; cy: num
   return el ? themeSwitchCircularOrigin(el) : themeSwitchViewportCenter();
 }
 
-type ViewTransitionHandle = { finished: Promise<void> };
+type ViewTransitionHandle = { finished: Promise<void>; skipTransition?: () => void };
 
 function getStartViewTransition(): ((cb: () => void | Promise<void>) => ViewTransitionHandle) | undefined {
   if (typeof document === "undefined") return undefined;
   const d = document as Document & { startViewTransition?: (cb: () => void | Promise<void>) => ViewTransitionHandle };
   return typeof d.startViewTransition === "function" ? d.startViewTransition.bind(document) : undefined;
 }
+
+let _vtGeneration = 0;
 
 /** Garante que o React aplica o tema antes do browser capturar o estado “new”. */
 function runSwitchSynchronously(switchThemeFunction: () => void) {
@@ -215,6 +217,7 @@ export default function switchTheme(options: SwitchThemeOptions): void {
   const isCircularAnimation = animationConfig.type === "circular" || animationConfig.type === "inverted-circular";
 
   if (isCircularAnimation && startVt) {
+    const gen = ++_vtGeneration;
     const html = document.documentElement;
     const { cx, cy } = animationConfig.startingPoint;
     const duration = Math.max(120, animationConfig.duration);
@@ -229,7 +232,7 @@ export default function switchTheme(options: SwitchThemeOptions): void {
       });
 
       void vt.finished.finally(() => {
-        cleanupThemeSwitchVtVars();
+        if (_vtGeneration === gen) cleanupThemeSwitchVtVars();
       });
       return;
     } catch (e) {
@@ -239,6 +242,7 @@ export default function switchTheme(options: SwitchThemeOptions): void {
   }
 
   if (animationConfig.type === "fade" && startVt) {
+    const gen = ++_vtGeneration;
     const html = document.documentElement;
     const duration = Math.max(120, animationConfig.duration);
     try {
@@ -248,7 +252,7 @@ export default function switchTheme(options: SwitchThemeOptions): void {
         runSwitchSynchronously(switchThemeFunction);
       });
       void vt.finished.finally(() => {
-        cleanupThemeSwitchVtVars();
+        if (_vtGeneration === gen) cleanupThemeSwitchVtVars();
       });
       return;
     } catch (e) {
