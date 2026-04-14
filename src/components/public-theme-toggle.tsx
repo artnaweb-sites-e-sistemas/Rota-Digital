@@ -39,6 +39,8 @@ export function PublicThemeToggle({ className }: PublicThemeToggleProps) {
   }
 
   const isDark = resolvedTheme === "dark";
+  const getNextTheme = () =>
+    document.documentElement.classList.contains("dark") ? ("light" as const) : ("dark" as const);
 
   return (
     <button
@@ -50,7 +52,7 @@ export function PublicThemeToggle({ className }: PublicThemeToggleProps) {
       )}
       onClick={(event) =>
         switchThemeCircularFromElement({
-          switchThemeFunction: () => setTheme(isDark ? "light" : "dark"),
+          switchThemeFunction: () => setTheme(getNextTheme()),
           element: event.currentTarget,
           disableAnimation: reduceMotion,
         })
