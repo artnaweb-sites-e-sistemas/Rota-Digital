@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { PublicReportThemeIntro } from "@/components/rotas/public-report-theme-intro";
 import { RotaDigitalReportView } from "@/components/rotas/rota-digital-report-view";
 import { getCachedPublicProposalReportBySlug } from "@/lib/public-report-cache";
 import { getCachedUserReportCtaSettingsAdmin } from "@/lib/user-settings-admin";
@@ -113,7 +112,6 @@ export default async function PublicProposalPage({
           />
         </div>
       </main>
-      <PublicReportThemeIntro />
     </div>
   );
 }

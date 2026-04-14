@@ -119,8 +119,7 @@ export function AppearanceSettingsForm() {
           <div>
             <CardTitle className="text-lg font-bold text-foreground dark:text-white">Aparência</CardTitle>
             <CardDescription className="text-sm text-muted-foreground leading-relaxed">
-              Modo claro ou escuro no painel; a escolha guarda-se automaticamente. O link público do relatório
-              também pode ser alternado pelo cliente.
+              Modo claro ou escuro no painel.
             </CardDescription>
           </div>
         </div>
