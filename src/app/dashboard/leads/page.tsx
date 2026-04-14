@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState, type KeyboardEvent, type SVGProps } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { Lead, LEAD_STATUSES, normalizeLeadStatus, type LeadStatus } from "@/types/lead";
@@ -12,7 +12,6 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
@@ -44,6 +43,7 @@ import {
   ChevronRight,
   Copy,
   ExternalLink,
+  Globe,
   Loader2,
   Mail,
   MapPin,
@@ -63,6 +63,7 @@ import { LeadCaptureProgressOverlay } from "@/components/leads/lead-capture-prog
 const DEFAULT_PAGE_SIZE = 10;
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const;
 const LEADS_PAGE_SIZE_STORAGE_KEY = "leads_page_size";
+const LEADS_CAPTURE_FORM_STORAGE_KEY = "leads_capture_form_v1";
 
 const ALL_STATUSES: LeadStatus[] = [...LEAD_STATUSES];
 
@@ -92,6 +93,175 @@ function splitToList(raw: string): string[] {
   return Array.from(new Set(parts)).slice(0, 40);
 }
 
+type CaptureTagInputProps = {
+  id: string;
+  tags: string[];
+  onChange: (next: string[]) => void;
+  placeholder: string;
+  minHeightClassName: string;
+};
+
+function CaptureTagInput({
+  id,
+  tags,
+  onChange,
+  placeholder,
+  minHeightClassName,
+}: CaptureTagInputProps) {
+  const [draft, setDraft] = useState("");
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editingValue, setEditingValue] = useState("");
+
+  const appendTagsFromRaw = useCallback(
+    (raw: string) => {
+      const parsed = splitToList(raw);
+      if (!parsed.length) return;
+      const merged = Array.from(new Set([...tags, ...parsed])).slice(0, 40);
+      onChange(merged);
+    },
+    [onChange, tags],
+  );
+
+  const commitDraft = useCallback(() => {
+    const value = draft.trim();
+    if (!value) return;
+    appendTagsFromRaw(value);
+    setDraft("");
+  }, [appendTagsFromRaw, draft]);
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter" || event.key === ",") {
+      event.preventDefault();
+      commitDraft();
+    }
+    if (event.key === "Backspace" && !draft && tags.length > 0) {
+      onChange(tags.slice(0, -1));
+    }
+  };
+
+  const startEditing = (index: number) => {
+    setEditingIndex(index);
+    setEditingValue(tags[index] ?? "");
+  };
+
+  const cancelEditing = () => {
+    setEditingIndex(null);
+    setEditingValue("");
+  };
+
+  const commitEditing = useCallback(() => {
+    if (editingIndex === null) return;
+    const parsed = splitToList(editingValue);
+    if (!parsed.length) {
+      onChange(tags.filter((_, index) => index !== editingIndex));
+      cancelEditing();
+      return;
+    }
+    const withoutCurrent = tags.filter((_, index) => index !== editingIndex);
+    const dedupedParsed = Array.from(new Set(parsed));
+    const alreadyUsed = new Set(withoutCurrent);
+    const replacement: string[] = [];
+    for (const value of dedupedParsed) {
+      if (alreadyUsed.has(value)) continue;
+      replacement.push(value);
+      alreadyUsed.add(value);
+    }
+    if (!replacement.length) {
+      onChange(withoutCurrent);
+      cancelEditing();
+      return;
+    }
+    const next = [...withoutCurrent];
+    next.splice(editingIndex, 0, ...replacement);
+    onChange(next.slice(0, 40));
+    cancelEditing();
+  }, [editingIndex, editingValue, onChange, tags]);
+
+  return (
+    <div
+      className={cn(
+        "flex w-full flex-wrap items-start gap-2 rounded-md border border-white/15 bg-white/[0.07] px-2.5 py-2 transition-colors focus-within:border-brand/55 focus-within:ring-2 focus-within:ring-brand/25",
+        minHeightClassName,
+      )}
+    >
+      {tags.map((tag, index) => (
+        <span
+          key={`${tag}-${index}`}
+          className="inline-flex items-center gap-1 rounded-full border border-brand/40 bg-brand/15 px-2 py-1 text-xs font-medium text-zinc-100"
+        >
+          {editingIndex === index ? (
+            <input
+              value={editingValue}
+              onChange={(event) => setEditingValue(event.target.value)}
+              onBlur={commitEditing}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  commitEditing();
+                }
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  cancelEditing();
+                }
+              }}
+              className="h-4 w-28 bg-transparent text-xs text-zinc-100 outline-none"
+              autoFocus
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => startEditing(index)}
+              className="rounded px-0.5 text-left transition-colors hover:text-white"
+              title={`Editar ${tag}`}
+            >
+              {tag}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onChange(tags.filter((_, currentIndex) => currentIndex !== index));
+              if (editingIndex === index) {
+                cancelEditing();
+              }
+            }}
+            className="inline-flex size-4 items-center justify-center rounded-full text-zinc-300 transition-colors hover:bg-white/20 hover:text-white"
+            aria-label={`Remover ${tag}`}
+            title={`Remover ${tag}`}
+          >
+            <X className="size-3" aria-hidden />
+          </button>
+        </span>
+      ))}
+      <input
+        id={id}
+        value={draft}
+        onChange={(event) => {
+          const nextValue = event.target.value;
+          if (/[,\n;]/.test(nextValue)) {
+            appendTagsFromRaw(nextValue);
+            setDraft("");
+            return;
+          }
+          setDraft(nextValue);
+        }}
+        onKeyDown={handleKeyDown}
+        onBlur={commitDraft}
+        onPaste={(event) => {
+          const pasted = event.clipboardData.getData("text");
+          if (!/[,\n;]/.test(pasted)) return;
+          event.preventDefault();
+          appendTagsFromRaw(pasted);
+        }}
+        placeholder={tags.length ? "" : placeholder}
+        className="h-6 min-w-[12rem] flex-1 bg-transparent text-sm text-zinc-50 placeholder:text-zinc-400 placeholder:opacity-100 outline-none"
+        autoComplete="off"
+      />
+    </div>
+  );
+}
+
 function formatPhoneBr(value: string): string {
   const digits = value.replace(/\D/g, "").slice(0, 11);
   if (!digits) return "";
@@ -103,6 +273,36 @@ function formatPhoneBr(value: string): string {
   return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
 }
 
+function normalizeWebsiteHref(raw: string | undefined): string | null {
+  const value = raw?.trim();
+  if (!value) return null;
+  if (/^https?:\/\//i.test(value)) return value;
+  return `https://${value}`;
+}
+
+function normalizeInstagramHref(raw: string | undefined): string | null {
+  const value = raw?.trim();
+  if (!value) return null;
+  if (/^https?:\/\//i.test(value)) return value;
+  if (value.startsWith("@")) return `https://instagram.com.br/${value}`;
+  if (/^instagram\.com/i.test(value) || /^www\.instagram\.com/i.test(value)) {
+    return `https://${value.replace(/^https?:\/\//i, "")}`;
+  }
+  return `https://instagram.com.br/@${value.replace(/^@/, "")}`;
+}
+
+function InstagramBrandGlyph(props: SVGProps<SVGSVGElement>) {
+  const { className, ...rest } = props;
+  return (
+    <svg viewBox="0 0 24 24" className={cn("shrink-0", className)} {...rest}>
+      <path
+        fill="currentColor"
+        d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"
+      />
+    </svg>
+  );
+}
+
 /** Dígitos nacionais ou já com 55; remove zeros de tronco (ex.: 011…) para wa.me com +55. */
 function leadPhoneDigitsForWhatsApp(raw: string): string {
   return onlyDigitsPhone(raw).replace(/^0+/, "");
@@ -112,6 +312,17 @@ function leadPhoneDigitsForCopy(raw: string): string {
   const digits = leadPhoneDigitsForWhatsApp(raw);
   if (digits.length > 11 && digits.startsWith("55")) return digits.slice(2);
   return digits;
+}
+
+/** Regra prática BR: WhatsApp costuma estar em celular (DDD + número de 9 dígitos iniciado em 9). */
+function isLikelyWhatsAppBr(raw: string): boolean {
+  const digits = leadPhoneDigitsForWhatsApp(raw);
+  let national = digits;
+  if (national.length > 11 && national.startsWith("55")) {
+    national = national.slice(2);
+  }
+  if (national.length !== 11) return false;
+  return national.charAt(2) === "9";
 }
 
 /** Busca instantânea: qualquer termo deve aparecer em nome, empresa, e-mail ou telefone (trecho ou início de palavra). */
@@ -241,58 +452,96 @@ function LeadTablePhoneCell({ phone }: { phone: string | undefined }) {
   const [copied, setCopied] = useState(false);
   const trimmed = phone?.trim() ?? "";
   if (!trimmed) {
-    return <span className="block truncate text-sm text-muted-foreground">Sem telefone</span>;
+    return (
+      <div className="flex w-full min-w-0 items-center gap-2">
+        <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">Sem telefone</span>
+        <div className="inline-flex shrink-0 items-center gap-1.5">
+          <span
+            className="inline-flex size-[22px] items-center justify-center rounded-md border border-border/50 bg-muted/35 text-muted-foreground/45"
+            aria-hidden
+            title="Telefone indisponível"
+          >
+            <Copy className="size-3" aria-hidden />
+          </span>
+          <span
+            className="inline-flex size-[22px] items-center justify-center rounded-md border border-border/50 bg-muted/35 text-muted-foreground/45"
+            aria-hidden
+            title="WhatsApp indisponível"
+          >
+            <WhatsAppIcon className="size-3" aria-hidden />
+          </span>
+        </div>
+      </div>
+    );
   }
   const waDigits = leadPhoneDigitsForWhatsApp(trimmed);
   const copyDigits = leadPhoneDigitsForCopy(trimmed);
-  const waHref = buildWhatsAppHref(waDigits);
+  const waHref = isLikelyWhatsAppBr(trimmed) ? buildWhatsAppHref(waDigits) : null;
   const displayPlus55 = maskWhatsappBRDisplay(waDigits);
   return (
-    <div className="inline-flex min-w-0 max-w-full items-center gap-2">
-      <span className="min-w-0 truncate text-sm text-muted-foreground" title={displayPlus55}>
+    <div className="flex w-full min-w-0 items-center gap-2">
+      <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground" title={displayPlus55}>
         {displayPlus55 || trimmed}
       </span>
-      {copyDigits ? (
-        <span className="relative inline-flex shrink-0 items-center">
-          <span
-            className={cn(
-              "pointer-events-none absolute -top-6 left-1/2 -translate-x-1/2 rounded-md border border-emerald-500/40 bg-emerald-500/12 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-emerald-200 transition-all duration-200",
-              copied ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0",
-            )}
-            aria-hidden
-          >
-            Copiado
+      <div className="inline-flex shrink-0 items-center gap-1.5">
+        {copyDigits ? (
+          <span className="relative inline-flex shrink-0 items-center">
+            <span
+              className={cn(
+                "pointer-events-none absolute -top-6 left-1/2 -translate-x-1/2 rounded-md border border-emerald-500/40 bg-emerald-500/12 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-emerald-200 transition-all duration-200",
+                copied ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0",
+              )}
+              aria-hidden
+            >
+              Copiado
+            </span>
+            <button
+              type="button"
+              className="inline-flex size-[22px] items-center justify-center rounded-md border border-border bg-background/70 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/40"
+              aria-label={`Copiar telefone ${displayPlus55}`}
+              title="Copiar telefone sem +55"
+              onClick={(e) => {
+                e.stopPropagation();
+                void navigator.clipboard.writeText(copyDigits).then(() => {
+                  setCopied(true);
+                  window.setTimeout(() => setCopied(false), 1200);
+                });
+              }}
+            >
+              <Copy className="size-3" aria-hidden />
+            </button>
           </span>
-          <button
-            type="button"
-            className="inline-flex size-[22px] items-center justify-center rounded-md border border-border bg-background/70 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/40"
-            aria-label={`Copiar telefone ${displayPlus55}`}
-            title="Copiar telefone sem +55"
-            onClick={(e) => {
-              e.stopPropagation();
-              void navigator.clipboard.writeText(copyDigits).then(() => {
-                setCopied(true);
-                window.setTimeout(() => setCopied(false), 1200);
-              });
-            }}
+        ) : (
+          <span
+            className="inline-flex size-[22px] items-center justify-center rounded-md border border-border/50 bg-muted/35 text-muted-foreground/45"
+            aria-hidden
+            title="Copiar indisponível"
           >
             <Copy className="size-3" aria-hidden />
-          </button>
-        </span>
-      ) : null}
-      {waHref ? (
-        <a
-          href={waHref}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={TABLE_EXTERNAL_LINK_CHIP_CLASS}
-          aria-label={`Abrir WhatsApp ${displayPlus55}`}
-          title="Abrir no WhatsApp"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <WhatsAppIcon className="size-3" aria-hidden />
-        </a>
-      ) : null}
+          </span>
+        )}
+        {waHref ? (
+          <a
+            href={waHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={TABLE_EXTERNAL_LINK_CHIP_CLASS}
+            aria-label={`Abrir WhatsApp ${displayPlus55}`}
+            title="Abrir no WhatsApp"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <WhatsAppIcon className="size-3" aria-hidden />
+          </a>
+        ) : (
+          <span
+            className="inline-flex size-[22px] items-center justify-center rounded-md border border-border/50 bg-muted/35 text-muted-foreground/45"
+            aria-hidden
+            title="WhatsApp indisponível"
+          >
+            <WhatsAppIcon className="size-3" aria-hidden />
+          </span>
+        )}
+      </div>
     </div>
   );
 }
@@ -313,8 +562,8 @@ function LeadsPageContent() {
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const [captureOpen, setCaptureOpen] = useState(false);
-  const [captureNiches, setCaptureNiches] = useState("");
-  const [captureCities, setCaptureCities] = useState("");
+  const [captureNiches, setCaptureNiches] = useState<string[]>([]);
+  const [captureCities, setCaptureCities] = useState<string[]>([]);
   const [captureMax, setCaptureMax] = useState(25);
   const [captureBusy, setCaptureBusy] = useState(false);
   const [captureProgress, setCaptureProgress] = useState(0);
@@ -357,8 +606,8 @@ function LeadsPageContent() {
   }, [reports]);
 
   const captureOverlayHint = useMemo(() => {
-    const n = splitToList(captureNiches)[0];
-    const c = splitToList(captureCities)[0];
+    const n = captureNiches[0];
+    const c = captureCities[0];
     if (n && c) return `${n} · ${c}`;
     if (n) return n;
     return undefined;
@@ -380,6 +629,40 @@ function LeadsPageContent() {
   useEffect(() => {
     window.localStorage.setItem(LEADS_PAGE_SIZE_STORAGE_KEY, String(pageSize));
   }, [pageSize]);
+
+  useEffect(() => {
+    const raw = window.localStorage.getItem(LEADS_CAPTURE_FORM_STORAGE_KEY);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw) as {
+        niches?: unknown;
+        cities?: unknown;
+        max?: unknown;
+      };
+      if (Array.isArray(parsed.niches)) {
+        setCaptureNiches(splitToList(parsed.niches.join(",")));
+      }
+      if (Array.isArray(parsed.cities)) {
+        setCaptureCities(splitToList(parsed.cities.join(",")));
+      }
+      if (typeof parsed.max === "number" && Number.isFinite(parsed.max)) {
+        setCaptureMax(Math.min(50, Math.max(1, Math.floor(parsed.max))));
+      }
+    } catch {
+      // Ignora dados inválidos no storage.
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      LEADS_CAPTURE_FORM_STORAGE_KEY,
+      JSON.stringify({
+        niches: captureNiches,
+        cities: captureCities,
+        max: captureMax,
+      }),
+    );
+  }, [captureCities, captureMax, captureNiches]);
 
   useEffect(() => {
     if (!captureBusy) return;
@@ -540,8 +823,8 @@ function LeadsPageContent() {
 
   const runCapture = async () => {
     if (!user) return;
-    const niches = splitToList(captureNiches);
-    const cities = splitToList(captureCities);
+    const niches = captureNiches;
+    const cities = captureCities;
     if (!niches.length || !cities.length) {
       setCaptureError("Informe ao menos um nicho e uma cidade (linhas ou separados por vírgula).");
       return;
@@ -873,8 +1156,7 @@ function LeadsPageContent() {
                 Captura automática (Google Places)
               </DialogTitle>
               <DialogDescription className="text-[13px] leading-relaxed text-zinc-300 sm:text-sm">
-                Nichos e cidades no Google Places. Mínimo: telefone (8+ dígitos), site ou e-mail público. Sem duplicados.
-                Novos em <span className="font-medium text-white">Novo Lead</span>.
+                Nichos e cidades no Google Places.
               </DialogDescription>
             </DialogHeader>
           </div>
@@ -884,29 +1166,32 @@ function LeadsPageContent() {
               <Label htmlFor="capture-niches" className="text-xs font-medium text-zinc-200">
                 Nichos / segmentos <span className="text-red-400">*</span>
               </Label>
-              <Textarea
+              <CaptureTagInput
                 id="capture-niches"
-                value={captureNiches}
-                onChange={(e) => setCaptureNiches(e.target.value)}
-                rows={3}
-                placeholder={"Ex.: clínica dentária\nmarketing para restaurantes"}
-                className="min-h-[88px] rounded-md border border-white/15 bg-white/[0.07] text-sm text-zinc-50 placeholder:text-zinc-400 placeholder:opacity-100 focus-visible:border-brand/55 focus-visible:ring-2 focus-visible:ring-brand/25"
+                tags={captureNiches}
+                onChange={setCaptureNiches}
+                placeholder="Ex.: clínica dentária"
+                minHeightClassName="min-h-[88px]"
               />
-              <p className="text-[11px] leading-relaxed text-zinc-400">Um por linha, ou separados por vírgula.</p>
+              <p className="text-[11px] leading-relaxed text-zinc-400">
+                Pressione Enter ou vírgula para criar cada tag.
+              </p>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="capture-cities" className="text-xs font-medium text-zinc-200">
                 Cidades <span className="text-red-400">*</span>
               </Label>
-              <Textarea
+              <CaptureTagInput
                 id="capture-cities"
-                value={captureCities}
-                onChange={(e) => setCaptureCities(e.target.value)}
-                rows={2}
-                placeholder={"Campinas\nSão Paulo"}
-                className="min-h-[72px] rounded-md border border-white/15 bg-white/[0.07] text-sm text-zinc-50 placeholder:text-zinc-400 placeholder:opacity-100 focus-visible:border-brand/55 focus-visible:ring-2 focus-visible:ring-brand/25"
+                tags={captureCities}
+                onChange={setCaptureCities}
+                placeholder="Campinas"
+                minHeightClassName="min-h-[72px]"
               />
+              <p className="text-[11px] leading-relaxed text-zinc-400">
+                Pressione Enter ou vírgula para criar cada cidade.
+              </p>
             </div>
 
             <div className="space-y-4 rounded-xl border border-white/12 bg-white/[0.05] px-4 py-4 sm:px-5 sm:py-5">
@@ -1150,7 +1435,7 @@ function LeadsPageContent() {
                   E-mail
                 </TableHead>
                 <TableHead className="h-auto w-[16%] px-3 py-3 align-middle text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  Telefone
+                  Telefone/Whatsapp
                 </TableHead>
                 <TableHead className="h-auto w-[12%] px-3 py-3 align-middle text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                   Status
@@ -1192,6 +1477,8 @@ function LeadsPageContent() {
                     reportDocumentExists: false,
                     reportIdOnLead: lead.reportId,
                   });
+                  const websiteHref = normalizeWebsiteHref(lead.websiteUrl);
+                  const instagramHref = normalizeInstagramHref(lead.instagramUrl);
                   return (
                   <TableRow
                     key={lead.id}
@@ -1209,7 +1496,59 @@ function LeadsPageContent() {
                       </Link>
                     </TableCell>
                     <TableCell className="px-3 py-4 align-middle">
-                      <span className="block truncate text-sm font-medium text-foreground/90">{lead.company}</span>
+                      <div className="flex w-full min-w-0 items-center gap-2">
+                        <span
+                          className="min-w-0 flex-1 truncate text-sm font-medium text-foreground/90"
+                          title={lead.company}
+                        >
+                          {lead.company}
+                        </span>
+                        <div className="inline-flex shrink-0 items-center gap-1.5">
+                        {websiteHref ? (
+                          <a
+                            href={websiteHref}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex size-[20px] shrink-0 items-center justify-center rounded-md border border-sky-500/35 bg-sky-500/12 text-sky-300 transition-colors hover:border-sky-400/45 hover:bg-sky-500/20 hover:text-sky-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sky-400/40"
+                            aria-label={`Abrir site de ${lead.company}`}
+                            title="Abrir website"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Globe className="size-3" aria-hidden />
+                          </a>
+                        ) : (
+                          <span
+                            className="inline-flex size-[20px] shrink-0 items-center justify-center rounded-md border border-border/50 bg-muted/35 text-muted-foreground/45"
+                            aria-hidden
+                            title="Website não cadastrado"
+                          >
+                            <Globe className="size-3" aria-hidden />
+                          </span>
+                        )}
+                        {instagramHref ? (
+                          <a
+                            href={instagramHref}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex size-[20px] shrink-0 items-center justify-center rounded-md border border-pink-300/45 bg-gradient-to-r from-fuchsia-500/[0.07] via-rose-500/[0.08] to-amber-500/[0.07] text-pink-600 transition-colors hover:border-pink-300/65 hover:from-fuchsia-500/[0.11] hover:via-rose-500/[0.12] hover:to-amber-500/[0.11] hover:text-pink-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-pink-500/40 dark:border-pink-500/28 dark:from-fuchsia-500/[0.11] dark:via-rose-500/[0.10] dark:to-amber-500/[0.09] dark:text-pink-400"
+                            aria-label={`Abrir Instagram de ${lead.company}`}
+                            title="Abrir Instagram"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <InstagramBrandGlyph className="size-3" aria-hidden />
+                          </a>
+                        ) : null}
+                        {!instagramHref ? (
+                          <span
+                            className="inline-flex size-[20px] shrink-0 items-center justify-center rounded-md border border-border/50 bg-muted/35 text-muted-foreground/45"
+                            aria-hidden
+                            title="Instagram não cadastrado"
+                          >
+                            <InstagramBrandGlyph className="size-3" aria-hidden />
+                          </span>
+                        ) : null}
+                        </div>
+                      </div>
                     </TableCell>
                     <TableCell className="px-3 py-4 align-middle">
                       <span className="block truncate text-sm font-medium text-foreground/90">{lead.email || "Sem e-mail"}</span>
