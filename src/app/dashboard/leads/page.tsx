@@ -64,6 +64,7 @@ const DEFAULT_PAGE_SIZE = 10;
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const;
 const LEADS_PAGE_SIZE_STORAGE_KEY = "leads_page_size";
 const LEADS_CAPTURE_FORM_STORAGE_KEY = "leads_capture_form_v1";
+const DEFAULT_PHONE_COUNTRY_CODE = "55";
 
 const ALL_STATUSES: LeadStatus[] = [...LEAD_STATUSES];
 
@@ -72,7 +73,30 @@ const STATUS_FILTER_TODOS = "todos" as const;
 
 type StatusFilter = typeof STATUS_FILTER_TODOS | LeadStatus;
 
+type PhoneCountry = {
+  code: string;
+  flag: string;
+  label: string;
+};
+
+const PHONE_COUNTRIES: PhoneCountry[] = [
+  { code: "55", flag: "🇧🇷", label: "Brasil" },
+  { code: "1", flag: "🇺🇸", label: "Estados Unidos / Canadá" },
+  { code: "351", flag: "🇵🇹", label: "Portugal" },
+  { code: "34", flag: "🇪🇸", label: "Espanha" },
+  { code: "44", flag: "🇬🇧", label: "Reino Unido" },
+  { code: "49", flag: "🇩🇪", label: "Alemanha" },
+  { code: "39", flag: "🇮🇹", label: "Itália" },
+  { code: "33", flag: "🇫🇷", label: "França" },
+  { code: "598", flag: "🇺🇾", label: "Uruguai" },
+  { code: "54", flag: "🇦🇷", label: "Argentina" },
+  { code: "56", flag: "🇨🇱", label: "Chile" },
+  { code: "57", flag: "🇨🇴", label: "Colômbia" },
+  { code: "52", flag: "🇲🇽", label: "México" },
+];
+
 function statusFilterLabel(v: StatusFilter): string {
+  if (v === "Novo Lead") return "Novos leads";
   return v === STATUS_FILTER_TODOS ? "Todos os status" : v;
 }
 
@@ -262,8 +286,51 @@ function CaptureTagInput({
   );
 }
 
+function stripBrazilCountryCode(raw: string, aggressive = false): string {
+  let digits = raw.replace(/\D/g, "");
+  const trimmed = raw.trim();
+  const hasExplicitCountryCode =
+    /^\+?55[\s().-]/.test(trimmed) || /^0055/.test(trimmed) || /^\s*55\d{9,11}$/.test(trimmed);
+  if (digits.startsWith("55")) {
+    const shouldStrip = hasExplicitCountryCode || digits.length > 11 || (aggressive && digits.length >= 11);
+    if (shouldStrip) {
+      const withoutCountry = digits.slice(2);
+      if (withoutCountry.length >= 8) digits = withoutCountry;
+    }
+  }
+  return digits;
+}
+
+function onlyPhoneDigits(raw: string): string {
+  return raw.replace(/\D/g, "");
+}
+
+function parsePhoneForForm(raw: string | undefined): { countryCode: string; localDigits: string } {
+  const digits = onlyPhoneDigits(raw ?? "");
+  if (!digits) return { countryCode: DEFAULT_PHONE_COUNTRY_CODE, localDigits: "" };
+  const sortedCodes = [...PHONE_COUNTRIES].sort((a, b) => b.code.length - a.code.length);
+  for (const country of sortedCodes) {
+    if (!digits.startsWith(country.code)) continue;
+    const localDigits = digits.slice(country.code.length);
+    if (localDigits.length >= 6) {
+      return { countryCode: country.code, localDigits };
+    }
+  }
+  return {
+    countryCode: DEFAULT_PHONE_COUNTRY_CODE,
+    localDigits: stripBrazilCountryCode(raw ?? "", true),
+  };
+}
+
+function composePhoneForStorage(localPhone: string, countryCode: string): string {
+  const digits = onlyPhoneDigits(localPhone);
+  if (!digits) return "";
+  const cc = countryCode.trim() || DEFAULT_PHONE_COUNTRY_CODE;
+  return `+${cc}${digits}`;
+}
+
 function formatPhoneBr(value: string): string {
-  const digits = value.replace(/\D/g, "").slice(0, 11);
+  const digits = stripBrazilCountryCode(value).slice(0, 11);
   if (!digits) return "";
   if (digits.length <= 2) return `(${digits}`;
   if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
@@ -552,7 +619,7 @@ function LeadsPageContent() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [reports, setReports] = useState<RotaDigitalReport[]>([]);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>(STATUS_FILTER_TODOS);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("Novo Lead");
   const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
   const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -575,6 +642,7 @@ function LeadsPageContent() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [phoneCountryCode, setPhoneCountryCode] = useState<string>(DEFAULT_PHONE_COUNTRY_CODE);
   const [company, setCompany] = useState("");
   const [websiteUrl, setWebsiteUrl] = useState("");
   const [instagramUrl, setInstagramUrl] = useState("");
@@ -713,10 +781,16 @@ function LeadsPageContent() {
 
   const openForm = (lead?: Lead) => {
     if (lead) {
+      const parsedPhone = parsePhoneForForm(lead.phone);
       setEditingLead(lead);
       setName(lead.name);
       setEmail(lead.email);
-      setPhone(formatPhoneBr(lead.phone));
+      setPhoneCountryCode(parsedPhone.countryCode);
+      setPhone(
+        parsedPhone.countryCode === DEFAULT_PHONE_COUNTRY_CODE
+          ? formatPhoneBr(parsedPhone.localDigits)
+          : parsedPhone.localDigits,
+      );
       setCompany(lead.company);
       setWebsiteUrl(lead.websiteUrl?.trim() ?? "");
       setInstagramUrl(lead.instagramUrl?.trim() ?? "");
@@ -733,6 +807,7 @@ function LeadsPageContent() {
       setName("");
       setEmail("");
       setPhone("");
+      setPhoneCountryCode(DEFAULT_PHONE_COUNTRY_CODE);
       setCompany("");
       setWebsiteUrl("");
       setInstagramUrl("");
@@ -765,7 +840,7 @@ function LeadsPageContent() {
       const payload = {
         name,
         email,
-        phone,
+        phone: composePhoneForStorage(phone, phoneCountryCode),
         company,
         status,
         websiteUrl: websiteUrl.trim(),
@@ -1014,17 +1089,71 @@ function LeadsPageContent() {
                     Telefone / WhatsApp <span className="font-normal text-zinc-600">(opcional)</span>
                   </Label>
                   <div className="relative">
-                    <Phone
-                      className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-zinc-600"
-                      aria-hidden
-                    />
+                    <DropdownMenu>
+                      <DropdownMenuTrigger
+                        className="absolute left-2.5 top-1/2 inline-flex h-6 -translate-y-1/2 items-center gap-1 rounded-sm border border-white/10 bg-white/[0.06] px-2 text-[11px] font-semibold text-zinc-300 transition-colors hover:bg-white/[0.11]"
+                        title="Selecionar país"
+                      >
+                        <span aria-hidden>
+                          {PHONE_COUNTRIES.find((country) => country.code === phoneCountryCode)?.flag ?? "🌐"}
+                        </span>
+                        <span>+{phoneCountryCode}</span>
+                        <ChevronDown className="size-3 opacity-70" aria-hidden />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="min-w-[16rem] p-1.5">
+                        {PHONE_COUNTRIES.map((country) => (
+                          <DropdownMenuItem
+                            key={country.code}
+                            className="gap-2 rounded-md py-2"
+                            onClick={() => {
+                              setPhoneCountryCode(country.code);
+                              setPhone((current) => {
+                                if (country.code === DEFAULT_PHONE_COUNTRY_CODE) return formatPhoneBr(current);
+                                return onlyPhoneDigits(current).slice(0, 15);
+                              });
+                            }}
+                          >
+                            <span aria-hidden>{country.flag}</span>
+                            <span className="flex-1 text-left">{country.label}</span>
+                            <span className="text-xs text-muted-foreground">+{country.code}</span>
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                     <Input
                       id="lead-phone"
                       type="tel"
                       value={phone}
-                      onChange={(e) => setPhone(formatPhoneBr(e.target.value))}
-                      className="h-10 rounded-md border-white/10 bg-white/[0.04] pl-9 text-sm text-zinc-100 placeholder:text-zinc-600 focus-visible:border-brand/45 focus-visible:ring-2 focus-visible:ring-brand/20"
-                      placeholder="(11) 99999-9999"
+                      onChange={(e) => {
+                        const next = e.target.value;
+                        if (phoneCountryCode === DEFAULT_PHONE_COUNTRY_CODE) {
+                          setPhone(formatPhoneBr(next));
+                          return;
+                        }
+                        setPhone(onlyPhoneDigits(next).slice(0, 15));
+                      }}
+                      onPaste={(e) => {
+                        const pasted = e.clipboardData.getData("text");
+                        if (!pasted) return;
+                        e.preventDefault();
+                        const digits = onlyPhoneDigits(pasted);
+                        if (!digits) return;
+                        if (phoneCountryCode === DEFAULT_PHONE_COUNTRY_CODE) {
+                          const withoutCountry = stripBrazilCountryCode(pasted, true);
+                          setPhone(formatPhoneBr(withoutCountry));
+                          return;
+                        }
+                        const withoutSelectedCode = digits.startsWith(phoneCountryCode)
+                          ? digits.slice(phoneCountryCode.length)
+                          : digits;
+                        setPhone(withoutSelectedCode.slice(0, 15));
+                      }}
+                      className="h-10 rounded-md border-white/10 bg-white/[0.04] pl-[5.4rem] text-sm text-zinc-100 placeholder:text-zinc-600 focus-visible:border-brand/45 focus-visible:ring-2 focus-visible:ring-brand/20"
+                      placeholder={
+                        phoneCountryCode === DEFAULT_PHONE_COUNTRY_CODE
+                          ? "(11) 99999-9999"
+                          : "Digite o telefone"
+                      }
                       autoComplete="tel"
                     />
                   </div>
