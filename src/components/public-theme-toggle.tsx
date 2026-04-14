@@ -4,14 +4,13 @@ import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { Moon, Sun } from "lucide-react";
 
-import { PUBLIC_REPORT_THEME_TOGGLE_ID, switchThemeCircularFromElement } from "@/lib/theme-switch-animation";
+import { PUBLIC_REPORT_THEME_TOGGLE_ID, switchThemeDirectionalFromElement } from "@/lib/theme-switch-animation";
 import { cn } from "@/lib/utils";
 
 type PublicThemeToggleProps = {
   className?: string;
 };
 
-/** No clique do relatório público, usa circular com origem no próprio botão (como no exemplo RN). */
 export function PublicThemeToggle({ className }: PublicThemeToggleProps) {
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -51,7 +50,7 @@ export function PublicThemeToggle({ className }: PublicThemeToggleProps) {
         className,
       )}
       onClick={(event) =>
-        switchThemeCircularFromElement({
+        switchThemeDirectionalFromElement({
           switchThemeFunction: () => setTheme(getNextTheme()),
           element: event.currentTarget,
           disableAnimation: reduceMotion,

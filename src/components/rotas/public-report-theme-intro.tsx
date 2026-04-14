@@ -30,7 +30,13 @@ async function resolveIntroOrigin(): Promise<{ cx: number; cy: number }> {
     if (el) {
       const rect = el.getBoundingClientRect();
       if (rect.width > 0 && rect.height > 0) {
-        const next = { cx: rect.left + rect.width / 2, cy: rect.top + rect.height / 2 };
+        const vv = window.visualViewport;
+        const offsetX = vv?.offsetLeft ?? 0;
+        const offsetY = vv?.offsetTop ?? 0;
+        const next = {
+          cx: rect.left + rect.width / 2 - offsetX,
+          cy: rect.top + rect.height / 2 - offsetY,
+        };
         if (last && Math.hypot(next.cx - last.cx, next.cy - last.cy) < STABLE_DRIFT_PX) {
           stableCount++;
           if (stableCount >= STABLE_FRAMES_REQUIRED) return next;
@@ -47,48 +53,34 @@ async function resolveIntroOrigin(): Promise<{ cx: number; cy: number }> {
 }
 
 /**
- * Na primeira montagem do relatório público: mostra o tema **oposto** ao resolvido
- * e corre sozinha o **circular invertido** 900 ms até ao tema real.
+ * Na primeira montagem do relatório público:
+ * - Força light imediatamente (sem esperar preferência)
+ * - Anima **inverted-circular** de light → dark
  *
- * Usa `useRef` para correr uma única vez — sem `theme`/`resolvedTheme` nos deps,
- * evitando que o React cancele o efeito ao re-renderizar depois do `setTheme(opposite)`.
+ * Resultado: a página sempre "nasce" clara e a revelação escura é a animação de entrada.
  */
 export function PublicReportThemeIntro() {
-  const { theme, resolvedTheme, setTheme } = useTheme();
+  const { setTheme } = useTheme();
   const didRunRef = useRef(false);
-  const themeRef = useRef(theme);
-  const resolvedRef = useRef(resolvedTheme);
-
-  themeRef.current = theme;
-  resolvedRef.current = resolvedTheme;
 
   useEffect(() => {
     if (didRunRef.current) return;
     if (typeof window === "undefined") return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-
-    const currentTheme = themeRef.current;
-    const currentResolved = resolvedRef.current;
-
-    if (currentTheme === undefined || !currentResolved) return;
-    if (currentResolved !== "light" && currentResolved !== "dark") return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setTheme("dark");
+      return;
+    }
 
     didRunRef.current = true;
 
-    const savedPreference = currentTheme;
-    const opposite: "light" | "dark" = currentResolved === "dark" ? "light" : "dark";
-
-    setTheme(opposite);
+    setTheme("light");
 
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         void (async () => {
           const origin = await resolveIntroOrigin();
           switchThemeInvertedCircularFromPoint({
-            switchThemeFunction: () => {
-              if (savedPreference === "system") setTheme("system");
-              else setTheme(savedPreference);
-            },
+            switchThemeFunction: () => setTheme("dark"),
             startingPoint: origin,
           });
         })();

@@ -108,10 +108,42 @@ export function switchThemeInvertedCircularFromPoint(options: {
 /** `id` no botão de tema do relatório público — o intro automático usa o mesmo centro que o clique. */
 export const PUBLIC_REPORT_THEME_TOGGLE_ID = "public-report-theme-toggle";
 
-/** Centro do alvo (equivalente a `measure` + metade da largura/altura no RN). */
+/**
+ * Centro do alvo ajustado ao visual viewport (equivalente a `measure` + metade da largura/altura no RN).
+ * No mobile, `window.visualViewport` pode ter offset se a barra de endereço está visível;
+ * os pseudo-elements de View Transition alinham-se ao visual viewport, não ao layout viewport.
+ */
 export function themeSwitchCircularOrigin(element: Element): { cx: number; cy: number } {
   const r = element.getBoundingClientRect();
-  return { cx: r.left + r.width / 2, cy: r.top + r.height / 2 };
+  const vv = typeof window !== "undefined" ? window.visualViewport : null;
+  const offsetX = vv?.offsetLeft ?? 0;
+  const offsetY = vv?.offsetTop ?? 0;
+  return {
+    cx: r.left + r.width / 2 - offsetX,
+    cy: r.top + r.height / 2 - offsetY,
+  };
+}
+
+/**
+ * Escolhe automaticamente a direção da animação com base no estado atual do DOM:
+ * - Indo para dark (light→dark) → **inverted-circular** (fecha para o botão)
+ * - Indo para light (dark→light) → **circular** (abre a partir do botão)
+ */
+export function switchThemeDirectionalFromElement(options: {
+  switchThemeFunction: () => void;
+  element: Element;
+  disableAnimation?: boolean;
+}): void {
+  const goingToDark = !document.documentElement.classList.contains("dark");
+  const origin = themeSwitchCircularOrigin(options.element);
+  const config = goingToDark
+    ? buildSharedInvertedCircularThemeAnimation(origin)
+    : buildSharedCircularThemeAnimation(origin);
+  switchTheme({
+    switchThemeFunction: options.switchThemeFunction,
+    animationConfig: config,
+    disableAnimation: options.disableAnimation,
+  });
 }
 
 /** Centro do ecrã (reveal automático ao carregar, ex. relatório público). */
