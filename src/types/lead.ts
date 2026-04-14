@@ -41,4 +41,6 @@ export interface Lead {
   /** Referência Google Places (resource name, ex.: `places/ChIJ…`) para dedupe. */
   googlePlaceId?: string;
   leadSource?: LeadSource;
+  /** Início do ciclo de followup (D1, D2...) em ms. */
+  followupStartedAt?: number;
 }

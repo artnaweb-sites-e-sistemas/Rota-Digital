@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { isLeadStatusSelectable, leadHasGeneratedRoute } from "@/lib/lead-status-rules";
+import { getLeadFollowupDay, statusUsesFollowupUrgencyColor } from "@/lib/lead-followup";
 import {
   LEAD_STATUS_DOT_CLASSES,
   LEAD_STATUS_MENU_DOT_CLASSES,
@@ -151,6 +152,29 @@ const TABLE_PUBLIC_ROUTE_CHIP_CLASS =
 /** Chip “gerar rota” — tom âmbar, distinto do link externo (ícone Sparkles). */
 const TABLE_CREATE_ROUTE_CHIP_CLASS =
   "inline-flex size-[22px] shrink-0 items-center justify-center rounded-md border border-amber-500/35 bg-amber-500/10 text-amber-800 transition-colors hover:border-amber-500/55 hover:bg-amber-500/18 hover:text-amber-950 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500/40 focus-visible:ring-offset-1 focus-visible:ring-offset-background dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200 dark:hover:border-amber-300/45 dark:hover:bg-amber-400/16 dark:hover:text-amber-50";
+
+const FOLLOWUP_NEUTRAL_BADGE_CLASS =
+  "inline-flex h-8 min-w-8 items-center justify-center rounded-md border border-border/80 bg-muted/60 px-1.5 text-[10px] font-bold uppercase tabular-nums tracking-wide text-muted-foreground dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-400";
+
+function leadFollowupBadgeClass(status: LeadStatus, day: number): string {
+  if (!statusUsesFollowupUrgencyColor(status)) return FOLLOWUP_NEUTRAL_BADGE_CLASS;
+  if (day <= 2) {
+    return "inline-flex h-8 min-w-8 items-center justify-center rounded-md border border-emerald-700/40 bg-emerald-500/12 px-1.5 text-[10px] font-bold uppercase tabular-nums tracking-wide text-emerald-900 dark:border-emerald-400/45 dark:bg-emerald-500/18 dark:text-emerald-100";
+  }
+  if (day <= 5) {
+    return "inline-flex h-8 min-w-8 items-center justify-center rounded-md border border-amber-700/40 bg-amber-500/12 px-1.5 text-[10px] font-bold uppercase tabular-nums tracking-wide text-amber-900 dark:border-amber-400/45 dark:bg-amber-500/18 dark:text-amber-100";
+  }
+  return "inline-flex h-8 min-w-8 items-center justify-center rounded-md border border-red-700/40 bg-red-500/12 px-1.5 text-[10px] font-bold uppercase tabular-nums tracking-wide text-red-900 dark:border-red-400/45 dark:bg-red-500/18 dark:text-red-100";
+}
+
+function LeadFollowupCell({ lead }: { lead: Lead }) {
+  const day = getLeadFollowupDay(lead);
+  return (
+    <span className={leadFollowupBadgeClass(lead.status, day)} title={`Followup dia ${day}`}>
+      D{day}
+    </span>
+  );
+}
 
 function LeadTableSharedRouteLink({
   lead,
@@ -319,11 +343,17 @@ function LeadsPageContent() {
 
   const filteredLeads = useMemo(
     () =>
-      leads.filter((lead) => {
+      leads
+        .filter((lead) => {
         if (!leadMatchesSearch(lead, search)) return false;
         if (statusFilter !== STATUS_FILTER_TODOS && lead.status !== statusFilter) return false;
         return true;
-      }),
+      })
+        .sort((a, b) => {
+          const dayDiff = getLeadFollowupDay(b) - getLeadFollowupDay(a);
+          if (dayDiff !== 0) return dayDiff;
+          return b.updatedAt - a.updatedAt;
+        }),
     [leads, search, statusFilter],
   );
 
@@ -1023,28 +1053,31 @@ function LeadsPageContent() {
           <Table className="table-fixed">
             <TableHeader>
               <TableRow className="border-border bg-muted/40 hover:bg-transparent dark:border-white/5 dark:bg-white/[0.03]">
-                <TableHead className="h-auto w-[19%] py-3 pl-6 pr-3 align-middle text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  Nome
-                </TableHead>
-                <TableHead className="h-auto w-[19%] px-3 py-3 align-middle text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  Empresa
-                </TableHead>
-                <TableHead className="h-auto w-[23%] px-3 py-3 align-middle text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  E-mail
+                <TableHead className="h-auto w-[10%] py-3 pl-6 pr-3 align-middle text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  Followup
                 </TableHead>
                 <TableHead className="h-auto w-[17%] px-3 py-3 align-middle text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  Nome
+                </TableHead>
+                <TableHead className="h-auto w-[18%] px-3 py-3 align-middle text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  Empresa
+                </TableHead>
+                <TableHead className="h-auto w-[22%] px-3 py-3 align-middle text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  E-mail
+                </TableHead>
+                <TableHead className="h-auto w-[16%] px-3 py-3 align-middle text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                   Telefone
                 </TableHead>
-                <TableHead className="h-auto w-[14%] px-3 py-3 align-middle text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                <TableHead className="h-auto w-[12%] px-3 py-3 align-middle text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                   Status
                 </TableHead>
-                <TableHead className="h-auto w-[8%] min-w-[4rem] py-3 pl-3 pr-6 align-middle" />
+                <TableHead className="h-auto w-[5%] min-w-[4rem] py-3 pl-3 pr-6 align-middle" />
               </TableRow>
             </TableHeader>
             <TableBody>
               {leads.length === 0 ? (
                 <TableRow className="border-b-0 hover:bg-transparent">
-                  <TableCell colSpan={6} className="text-center py-24">
+                  <TableCell colSpan={7} className="text-center py-24">
                     <div className="flex flex-col items-center gap-3">
                       <Users className="size-12 text-muted-foreground/50" />
                       <p className="font-medium text-muted-foreground">Nenhum lead encontrado.</p>
@@ -1053,7 +1086,7 @@ function LeadsPageContent() {
                 </TableRow>
               ) : filteredLeads.length === 0 ? (
                 <TableRow className="border-b-0 hover:bg-transparent">
-                  <TableCell colSpan={6} className="text-center py-16">
+                  <TableCell colSpan={7} className="text-center py-16">
                     <p className="font-medium text-muted-foreground">
                       Nenhum lead corresponde à busca ou ao status selecionado.
                     </p>
@@ -1081,6 +1114,9 @@ function LeadsPageContent() {
                     className="border-border transition-colors hover:bg-muted/50 dark:border-white/5 dark:hover:bg-white/[0.02] group"
                   >
                     <TableCell className="py-4 pl-6 pr-3 align-middle">
+                      <LeadFollowupCell lead={lead} />
+                    </TableCell>
+                    <TableCell className="px-3 py-4 align-middle">
                       <Link
                         href={`/dashboard/leads/${lead.id}`}
                         className="block truncate text-base font-bold text-foreground transition-colors hover:text-brand dark:hover:text-brand"

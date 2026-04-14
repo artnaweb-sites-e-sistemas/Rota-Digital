@@ -34,6 +34,7 @@ type AnchorBanner = {
   left: number;
   width: number;
   height: number;
+  arrowTopInBanner: number;
 };
 type AnchorState = AnchorBeside | AnchorBelow | AnchorBanner;
 
@@ -63,6 +64,7 @@ export function PublicThemeToggleHint() {
   const updateAnchor = useCallback(() => {
     const btn = document.getElementById(PUBLIC_REPORT_THEME_TOGGLE_ID);
     if (!btn) return;
+    const rect = btn.getBoundingClientRect();
 
     const vw = window.innerWidth;
     const isMobile = vw <= MOBILE_MAX_W;
@@ -70,17 +72,17 @@ export function PublicThemeToggleHint() {
 
     if (isMobile && header) {
       const hr = header.getBoundingClientRect();
+      const arrowTopInBanner = Math.max(8, Math.min(rect.top + rect.height / 2 - hr.top, hr.height - 8));
       setAnchor({
         mode: "banner",
         top: hr.top,
         left: INSET_PX,
         width: Math.max(0, vw - 2 * INSET_PX),
         height: Math.max(Math.ceil(hr.height), 52),
+        arrowTopInBanner,
       });
       return;
     }
-
-    const rect = btn.getBoundingClientRect();
 
     if (isMobile && !header) {
       setAnchor({
@@ -89,6 +91,7 @@ export function PublicThemeToggleHint() {
         left: INSET_PX,
         width: Math.max(0, vw - 2 * INSET_PX),
         height: 52,
+        arrowTopInBanner: Math.max(8, Math.min(rect.height / 2, 44)),
       });
       return;
     }
@@ -241,9 +244,19 @@ export function PublicThemeToggleHint() {
             />
           </div>
         ) : isBanner ? (
-          <p className="text-center text-[12px] font-medium leading-snug tracking-tight text-zinc-800 antialiased sm:text-sm">
-            Modo claro? Clique aqui
-          </p>
+          <div className="relative flex h-full w-full items-center justify-center">
+            <p className="px-8 text-center text-[12px] font-medium leading-snug tracking-tight text-zinc-800 antialiased sm:text-sm">
+              Modo claro? Clique aqui
+            </p>
+            <span
+              aria-hidden
+              className={cn(tipBeside, "right-0")}
+              style={{
+                top: `${anchor.arrowTopInBanner}px`,
+                transform: "translate(50%, -50%)",
+              }}
+            />
+          </div>
         ) : (
           <div className={cn("relative w-full", shell)}>
             <span

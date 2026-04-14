@@ -33,6 +33,7 @@ function adminLeadFromDoc(id: string, data: Record<string, unknown>): Lead {
     instagramUrl: typeof data.instagramUrl === "string" ? data.instagramUrl : undefined,
     googlePlaceId: typeof data.googlePlaceId === "string" ? data.googlePlaceId : undefined,
     leadSource: data.leadSource === "google_places" || data.leadSource === "manual" ? data.leadSource : undefined,
+    followupStartedAt: millisFromFirestoreValue(data.followupStartedAt),
   };
 }
 
