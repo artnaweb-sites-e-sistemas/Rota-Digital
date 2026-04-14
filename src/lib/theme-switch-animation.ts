@@ -86,6 +86,15 @@ function getStartViewTransition(): ((cb: () => void | Promise<void>) => ViewTran
   return typeof d.startViewTransition === "function" ? d.startViewTransition.bind(document) : undefined;
 }
 
+/**
+ * Em `pointer: coarse` (telefone), a View Transition para **claro** costuma falhar ou não animar;
+ * o fallback com máscara é estável nos dois sentidos.
+ */
+function preferCircularViewTransition(): boolean {
+  if (typeof window === "undefined") return true;
+  return !window.matchMedia("(pointer: coarse)").matches;
+}
+
 /** Garante que o React aplica o tema antes do browser capturar o estado “new”. */
 function runSwitchSynchronously(switchThemeFunction: () => void) {
   try {
@@ -158,23 +167,28 @@ export default function switchTheme(options: SwitchThemeOptions): void {
 
   const startVt = getStartViewTransition();
 
-  if (animationConfig.type === "circular" && startVt) {
+  if (animationConfig.type === "circular" && startVt && preferCircularViewTransition()) {
     const html = document.documentElement;
     const { cx, cy } = animationConfig.startingPoint;
     const duration = Math.max(120, animationConfig.duration);
-    html.style.setProperty("--theme-switch-vt-cx", `${cx}px`);
-    html.style.setProperty("--theme-switch-vt-cy", `${cy}px`);
-    html.style.setProperty("--theme-switch-vt-duration", `${duration}ms`);
-    html.setAttribute("data-theme-switch-vt", "circular");
+    try {
+      html.style.setProperty("--theme-switch-vt-cx", `${cx}px`);
+      html.style.setProperty("--theme-switch-vt-cy", `${cy}px`);
+      html.style.setProperty("--theme-switch-vt-duration", `${duration}ms`);
+      html.setAttribute("data-theme-switch-vt", "circular");
 
-    const vt = startVt(() => {
-      runSwitchSynchronously(switchThemeFunction);
-    });
+      const vt = startVt(() => {
+        runSwitchSynchronously(switchThemeFunction);
+      });
 
-    void vt.finished.finally(() => {
+      void vt.finished.finally(() => {
+        cleanupThemeSwitchVtVars();
+      });
+      return;
+    } catch (e) {
+      console.warn("[theme-switch] View Transition circular falhou, a usar overlay.", e);
       cleanupThemeSwitchVtVars();
-    });
-    return;
+    }
   }
 
   if (animationConfig.type === "fade" && startVt) {

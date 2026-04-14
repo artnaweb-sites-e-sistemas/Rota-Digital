@@ -2427,10 +2427,10 @@ export function RotaDigitalReportView({
           "no-print justify-between gap-4 sm:gap-6",
           isDashboard
             ? "flex flex-col items-start sm:flex-row sm:items-start"
-            : "flex flex-row items-start justify-between gap-3 sm:items-center",
+            : "flex flex-row items-start justify-between gap-3 sm:items-center sm:gap-6",
         )}
       >
-        <div className={cn("flex items-center gap-3", !isDashboard && "min-w-0 flex-1")}>
+        <div className={cn("flex items-center gap-3", !isDashboard && "min-w-0 flex-1 pr-2 sm:pr-4")}>
           {isDashboard ? (
             <Button
               variant="ghost"
@@ -2478,12 +2478,12 @@ export function RotaDigitalReportView({
             </Button>
           </div>
         ) : (
-          <div className="flex shrink-0 items-center gap-3 sm:gap-4">
-            <PublicThemeToggle className="no-print" />
-            <p className="hidden max-w-[min(100%,28rem)] text-right text-sm leading-snug text-muted-foreground sm:block">
+          <div className="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center sm:justify-end sm:gap-5">
+            <p className="hidden max-w-[min(100%,32rem)] text-right text-sm leading-snug text-muted-foreground sm:block sm:min-w-0">
               Gerado para{" "}
               <span className="font-medium text-foreground">{report.leadCompany}</span>
             </p>
+            <PublicThemeToggle className="no-print shrink-0" />
           </div>
         )}
       </div>
