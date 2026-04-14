@@ -1,10 +1,19 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useState, type KeyboardEvent, type SVGProps } from "react";
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type SVGProps,
+} from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { Lead, LEAD_STATUSES, normalizeLeadStatus, type LeadStatus } from "@/types/lead";
-import { getLeads, createLead, updateLead, deleteLead } from "@/lib/leads";
+import { getLeads, createLead, updateLead } from "@/lib/leads";
 import { deleteReportsByLead, getReportsByUser } from "@/lib/reports";
 import type { RotaDigitalReport } from "@/types/report";
 import { buildWhatsAppHref, maskWhatsappBRDisplay, onlyDigitsPhone } from "@/lib/report-cta";
@@ -306,12 +315,24 @@ function onlyPhoneDigits(raw: string): string {
 }
 
 function parsePhoneForForm(raw: string | undefined): { countryCode: string; localDigits: string } {
-  const digits = onlyPhoneDigits(raw ?? "");
+  const input = (raw ?? "").trim();
+  const digits = onlyPhoneDigits(input);
   if (!digits) return { countryCode: DEFAULT_PHONE_COUNTRY_CODE, localDigits: "" };
+
+  // Números legados sem prefixo internacional explícito devem abrir como Brasil.
+  const hasExplicitInternationalPrefix = input.startsWith("+") || input.startsWith("00");
+  if (!hasExplicitInternationalPrefix) {
+    return {
+      countryCode: DEFAULT_PHONE_COUNTRY_CODE,
+      localDigits: stripBrazilCountryCode(input, true),
+    };
+  }
+
+  const intlDigits = input.startsWith("00") && digits.startsWith("00") ? digits.slice(2) : digits;
   const sortedCodes = [...PHONE_COUNTRIES].sort((a, b) => b.code.length - a.code.length);
   for (const country of sortedCodes) {
-    if (!digits.startsWith(country.code)) continue;
-    const localDigits = digits.slice(country.code.length);
+    if (!intlDigits.startsWith(country.code)) continue;
+    const localDigits = intlDigits.slice(country.code.length);
     if (localDigits.length >= 6) {
       return { countryCode: country.code, localDigits };
     }
@@ -429,6 +450,20 @@ function leadMatchesSearch(lead: Lead, rawQuery: string): boolean {
   });
 }
 
+function publicAppOrigin(): string {
+  const explicit = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/$/, "");
+  if (explicit) return explicit;
+  if (typeof window !== "undefined") return window.location.origin;
+  return "";
+}
+
+function sharedReportHref(slug: string): string {
+  const origin = publicAppOrigin();
+  const safeSlug = encodeURIComponent(slug.trim());
+  if (!origin) return `/r/${safeSlug}`;
+  return `${origin}/r/${safeSlug}`;
+}
+
 /** Chip verde do WhatsApp na tabela (link externo compacto). */
 const TABLE_EXTERNAL_LINK_CHIP_CLASS =
   "inline-flex size-[22px] shrink-0 items-center justify-center rounded-md border border-[#25D366]/20 bg-[#25D366]/5 text-[#25D366]/80 transition-colors hover:border-[#25D366]/35 hover:bg-[#25D366]/10 hover:text-[#25D366] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#25D366]/30 focus-visible:ring-offset-1 focus-visible:ring-offset-background dark:border-[#25D366]/15 dark:bg-[#25D366]/10 dark:hover:border-[#25D366]/28 dark:hover:bg-[#25D366]/12";
@@ -495,7 +530,7 @@ function LeadTableSharedRouteLink({
     return null;
   }
   const slug = publicSlugByReportId.get(lead.reportId);
-  const href = slug ? `/r/${slug}` : `/dashboard/rotas/${lead.reportId}`;
+  const href = slug ? sharedReportHref(slug) : `/dashboard/rotas/${lead.reportId}`;
   const opensPublic = Boolean(slug);
   const label = opensPublic
     ? `Abrir rota pública${slug ? ` (${slug})` : ""}`
@@ -627,6 +662,11 @@ function LeadsPageContent() {
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const pendingRestoreScrollYRef = useRef<number | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Lead | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const [captureOpen, setCaptureOpen] = useState(false);
   const [captureNiches, setCaptureNiches] = useState<string[]>([]);
@@ -740,6 +780,18 @@ function LeadsPageContent() {
     return () => window.clearInterval(id);
   }, [captureBusy]);
 
+  useEffect(() => {
+    if (isDialogOpen || deleteConfirmOpen) return;
+    const top = pendingRestoreScrollYRef.current;
+    if (top === null) return;
+    pendingRestoreScrollYRef.current = null;
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        window.scrollTo({ top, behavior: "auto" });
+      });
+    });
+  }, [deleteConfirmOpen, isDialogOpen]);
+
   const statusQuery = searchParams.get("status");
   useEffect(() => {
     const parsed = statusFromQueryParam(statusQuery);
@@ -836,6 +888,7 @@ function LeadsPageContent() {
     }
     setIsSaving(true);
     setSaveError(null);
+    pendingRestoreScrollYRef.current = window.scrollY;
     try {
       const payload = {
         name,
@@ -848,14 +901,24 @@ function LeadsPageContent() {
       };
       if (editingLead) {
         await updateLead(editingLead.id, payload);
+        setLeads((prev) =>
+          prev.map((leadRow) =>
+            leadRow.id === editingLead.id
+              ? {
+                  ...leadRow,
+                  ...payload,
+                }
+              : leadRow,
+          ),
+        );
       } else {
         await createLead({
           userId: user.uid,
           ...payload,
         });
+        await fetchLeads();
       }
       setIsDialogOpen(false);
-      fetchLeads();
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : "Erro desconhecido ao salvar.";
       setSaveError(msg);
@@ -864,15 +927,40 @@ function LeadsPageContent() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!user) return;
-    if (!confirm("Excluir este lead e também a rota vinculada? Esta ação não pode ser desfeita.")) return;
+  const openDeleteConfirm = (lead: Lead) => {
+    setDeleteTarget(lead);
+    setDeleteError(null);
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (!user || !deleteTarget) return;
+    pendingRestoreScrollYRef.current = window.scrollY;
+    setIsDeleting(true);
+    setDeleteError(null);
     try {
-      await deleteReportsByLead({ leadId: id, userId: user.uid });
-      await deleteLead(id);
-      fetchLeads();
+      await deleteReportsByLead({ leadId: deleteTarget.id, userId: user.uid });
+      const idToken = await user.getIdToken();
+      const res = await fetch("/api/leads-delete", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ leadId: deleteTarget.id }),
+      });
+      const payload = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        throw new Error(payload.error || "Não foi possível excluir o lead.");
+      }
+      setLeads((prev) => prev.filter((item) => item.id !== deleteTarget.id));
+      setDeleteConfirmOpen(false);
+      setDeleteTarget(null);
     } catch (error) {
       console.error(error);
+      setDeleteError("Não foi possível excluir o lead agora. Tente novamente.");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -1265,6 +1353,75 @@ function LeadsPageContent() {
       </Dialog>
 
       <Dialog
+        open={deleteConfirmOpen}
+        onOpenChange={(next) => {
+          if (isDeleting) return;
+          setDeleteConfirmOpen(next);
+          if (!next) {
+            setDeleteTarget(null);
+            setDeleteError(null);
+          }
+        }}
+      >
+        <DialogContent
+          showCloseButton
+          className={cn(
+            "w-full max-w-[calc(100%-1.5rem)] gap-0 overflow-hidden border-white/10 bg-zinc-950 p-0 text-zinc-100 shadow-2xl sm:max-w-md",
+            "rounded-2xl ring-1 ring-white/10",
+          )}
+        >
+          <div className="border-b border-white/[0.06] bg-white/[0.015] px-6 py-5 sm:px-8 sm:py-6">
+            <DialogHeader className="space-y-2 text-left">
+              <DialogTitle className="font-heading text-lg font-semibold tracking-tight text-white">
+                Confirmar exclusão
+              </DialogTitle>
+              <DialogDescription className="text-sm leading-relaxed text-zinc-200">
+                Você vai excluir o lead{" "}
+                <span className="font-semibold text-white">{deleteTarget?.name ?? "selecionado"}</span> e a rota
+                vinculada. Esta ação não pode ser desfeita.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+          <div className="space-y-3 px-6 py-4 sm:px-8 sm:py-5">
+            {deleteError ? (
+              <div
+                role="alert"
+                className="rounded-md border border-red-400/35 bg-red-500/15 px-3.5 py-2.5 text-sm font-medium leading-relaxed text-red-200"
+              >
+                {deleteError}
+              </div>
+            ) : null}
+          </div>
+          <div className="flex flex-col-reverse gap-3 border-t border-white/[0.06] bg-white/[0.02] px-6 py-4 sm:flex-row sm:items-center sm:justify-end sm:gap-3 sm:px-8 sm:py-5">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                if (isDeleting) return;
+                setDeleteConfirmOpen(false);
+                setDeleteTarget(null);
+                setDeleteError(null);
+              }}
+              disabled={isDeleting}
+              className="h-10 rounded-md text-zinc-200 hover:bg-white/10 hover:text-white sm:min-w-[7rem]"
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => void handleDelete()}
+              disabled={isDeleting || !deleteTarget}
+              className="min-w-[10rem] gap-2"
+            >
+              {isDeleting ? <Loader2 className="size-4 animate-spin shrink-0" aria-hidden /> : null}
+              {isDeleting ? "Excluindo…" : "Excluir lead"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
         open={captureOpen}
         onOpenChange={(next) => {
           if (captureBusy) return;
@@ -1611,7 +1768,7 @@ function LeadsPageContent() {
                   return (
                   <TableRow
                     key={lead.id}
-                    className="border-border transition-colors hover:bg-muted/50 dark:border-white/5 dark:hover:bg-white/[0.02] group"
+                    className="border-border transition-colors hover:bg-muted/50 dark:border-white/5 dark:hover:bg-white/[0.06] group"
                   >
                     <TableCell className="py-4 pl-6 pr-3 align-middle">
                       <LeadFollowupCell lead={lead} />
@@ -1759,7 +1916,7 @@ function LeadsPageContent() {
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => openForm(lead)}>Editar Lead</DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem variant="destructive" onClick={() => handleDelete(lead.id)}>
+                          <DropdownMenuItem variant="destructive" onClick={() => openDeleteConfirm(lead)}>
                             Excluir
                           </DropdownMenuItem>
                         </DropdownMenuContent>

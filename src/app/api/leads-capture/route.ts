@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuth } from "firebase-admin/auth";
 
 import { getFirebaseAdminApp } from "@/lib/firebase-admin-app";
-import { createLeadCaptureAdmin, listLeadsForUserAdmin } from "@/lib/leads-admin";
+import {
+  createLeadCaptureAdmin,
+  listLeadCaptureBlocksForUserAdmin,
+  listLeadsForUserAdmin,
+} from "@/lib/leads-admin";
 import { normalizePlaceResourceName, placesGetDetails, placesSearchText } from "@/lib/google-places";
 import { onlyDigitsPhone } from "@/lib/report-cta";
 
@@ -127,7 +131,10 @@ export async function POST(req: NextRequest) {
 
     const maxResults = clampInt(body.maxResults, MIN_CAPTURE, MAX_CAPTURE, DEFAULT_CAPTURE);
 
-    const existing = await listLeadsForUserAdmin(uid);
+    const [existing, blocked] = await Promise.all([
+      listLeadsForUserAdmin(uid),
+      listLeadCaptureBlocksForUserAdmin(uid),
+    ]);
     const seenPlaceIds = new Set<string>();
     const seenPhones = new Set<string>();
     const seenHosts = new Set<string>();
@@ -144,6 +151,28 @@ export async function POST(req: NextRequest) {
       if (h) seenHosts.add(h);
       const em = typeof lead.email === "string" ? lead.email.trim().toLowerCase() : "";
       if (em.includes("@")) seenHosts.add(`email:${em}`);
+    }
+
+    for (const entry of blocked) {
+      if (entry.kind === "place") {
+        seenPlaceIds.add(entry.value);
+        continue;
+      }
+      if (entry.kind === "phone") {
+        seenPhones.add(entry.value);
+        continue;
+      }
+      if (entry.kind === "phone_loose") {
+        seenPhones.add(`loose:${entry.value}`);
+        continue;
+      }
+      if (entry.kind === "host") {
+        seenHosts.add(entry.value);
+        continue;
+      }
+      if (entry.kind === "email") {
+        seenHosts.add(`email:${entry.value}`);
+      }
     }
 
     type Candidate = {

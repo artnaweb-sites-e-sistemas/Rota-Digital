@@ -69,6 +69,13 @@ function leadInstagramHref(raw: string | undefined): string {
   return h ? `https://instagram.com/${h}` : "";
 }
 
+function resolvePublicAppOrigin(): string {
+  const explicit = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/$/, "");
+  if (explicit) return explicit;
+  if (typeof window !== "undefined") return window.location.origin;
+  return "";
+}
+
 function formatPhoneBr(value: string): string {
   const digits = value.replace(/\D/g, "").slice(0, 11);
   if (!digits) return "";
@@ -125,7 +132,7 @@ export default function LeadDetailPage() {
   }, [loadLead]);
 
   useEffect(() => {
-    setPublicLinkOrigin(typeof window !== "undefined" ? window.location.origin : "");
+    setPublicLinkOrigin(resolvePublicAppOrigin());
   }, []);
 
   const openEditDialog = () => {
@@ -631,7 +638,7 @@ export default function LeadDetailPage() {
                 {publicLinkCopied ? "Copiado" : "Copiar"}
               </Button>
               <LinkButton
-                href={`/r/${existingReport.publicSlug}`}
+                href={`${publicLinkOrigin}/r/${existingReport.publicSlug}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 variant="outline"
