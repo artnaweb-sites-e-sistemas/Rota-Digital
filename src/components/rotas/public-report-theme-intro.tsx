@@ -4,11 +4,14 @@ import { useEffect, useLayoutEffect, useState } from "react";
 import { flushSync } from "react-dom";
 import { useTheme } from "next-themes";
 
-import { switchThemeFadeFromSurface } from "@/lib/theme-switch-animation";
+import {
+  getPublicReportCircularOriginOrViewport,
+  switchThemeInvertedCircularFromPoint,
+} from "@/lib/theme-switch-animation";
 
 /**
  * Na primeira montagem do relatório público: mostra o tema **oposto** ao resolvido
- * e corre sozinha o **fade** 900 ms até ao tema real (referência RN `type: 'fade'`).
+ * e corre sozinha o **circular invertido** 900 ms até ao tema real.
  */
 let lastPublicThemeIntro: { path: string; at: number } | null = null;
 const STRICT_MODE_DEDUP_MS = 2200;
@@ -49,11 +52,12 @@ export function PublicReportThemeIntro() {
 
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        switchThemeFadeFromSurface({
+        switchThemeInvertedCircularFromPoint({
           switchThemeFunction: () => {
             if (savedPreference === "system") setTheme("system");
             else setTheme(savedPreference);
           },
+          startingPoint: getPublicReportCircularOriginOrViewport(),
         });
       });
     });

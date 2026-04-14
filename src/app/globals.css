@@ -441,6 +441,16 @@
     animation: theme-switch-vt-circular-reveal var(--theme-switch-vt-duration, 900ms) linear both;
   }
 
+  html[data-theme-switch-vt="inverted-circular"]::view-transition-old(root) {
+    z-index: 2;
+    animation: theme-switch-vt-circular-reveal var(--theme-switch-vt-duration, 900ms) linear reverse both;
+  }
+
+  html[data-theme-switch-vt="inverted-circular"]::view-transition-new(root) {
+    z-index: 1;
+    animation: none;
+  }
+
   /**
    * Raios em `vmax` alinhados a uma ease-out (~quint): mais passos no início,
    * desaceleração natural no fim (sem depender só de um único cubic-bezier no clip-path).

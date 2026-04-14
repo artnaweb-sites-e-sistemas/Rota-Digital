@@ -12,7 +12,8 @@ import { flushSync } from "react-dom";
 
 export type ThemeSwitchAnimationConfig =
   | { type: "fade"; duration: number }
-  | { type: "circular"; duration: number; startingPoint: { cx: number; cy: number } };
+  | { type: "circular"; duration: number; startingPoint: { cx: number; cy: number } }
+  | { type: "inverted-circular"; duration: number; startingPoint: { cx: number; cy: number } };
 
 export type SwitchThemeOptions = {
   switchThemeFunction: () => void;
@@ -35,6 +36,18 @@ export function buildSharedCircularThemeAnimation(startingPoint: {
 }): Extract<ThemeSwitchAnimationConfig, { type: "circular" }> {
   return {
     type: "circular",
+    duration: THEME_SWITCH_CIRCULAR_DURATION_MS,
+    startingPoint,
+  };
+}
+
+/** Variante invertida do circular (útil para a intro automática no relatório público). */
+export function buildSharedInvertedCircularThemeAnimation(startingPoint: {
+  cx: number;
+  cy: number;
+}): Extract<ThemeSwitchAnimationConfig, { type: "inverted-circular" }> {
+  return {
+    type: "inverted-circular",
     duration: THEME_SWITCH_CIRCULAR_DURATION_MS,
     startingPoint,
   };
@@ -75,6 +88,19 @@ export function switchThemeCircularFromElement(options: {
   switchTheme({
     switchThemeFunction: options.switchThemeFunction,
     animationConfig: buildSharedCircularThemeAnimation(themeSwitchCircularOrigin(options.element)),
+    disableAnimation: options.disableAnimation,
+  });
+}
+
+/** Mesmo pipeline circular, mas invertido (raio fecha para o ponto de origem). */
+export function switchThemeInvertedCircularFromPoint(options: {
+  switchThemeFunction: () => void;
+  startingPoint: { cx: number; cy: number };
+  disableAnimation?: boolean;
+}): void {
+  switchTheme({
+    switchThemeFunction: options.switchThemeFunction,
+    animationConfig: buildSharedInvertedCircularThemeAnimation(options.startingPoint),
     disableAnimation: options.disableAnimation,
   });
 }
@@ -195,7 +221,9 @@ export default function switchTheme(options: SwitchThemeOptions): void {
 
   const startVt = getStartViewTransition();
 
-  if (animationConfig.type === "circular" && startVt && preferCircularViewTransition()) {
+  const isCircularAnimation = animationConfig.type === "circular" || animationConfig.type === "inverted-circular";
+
+  if (isCircularAnimation && startVt && preferCircularViewTransition()) {
     const html = document.documentElement;
     const { cx, cy } = animationConfig.startingPoint;
     const duration = Math.max(120, animationConfig.duration);
@@ -203,7 +231,7 @@ export default function switchTheme(options: SwitchThemeOptions): void {
       html.style.setProperty("--theme-switch-vt-cx", `${cx}px`);
       html.style.setProperty("--theme-switch-vt-cy", `${cy}px`);
       html.style.setProperty("--theme-switch-vt-duration", `${duration}ms`);
-      html.setAttribute("data-theme-switch-vt", "circular");
+      html.setAttribute("data-theme-switch-vt", animationConfig.type);
 
       const vt = startVt(() => {
         runSwitchSynchronously(switchThemeFunction);
@@ -284,6 +312,36 @@ export default function switchTheme(options: SwitchThemeOptions): void {
         requestAnimationFrame(tick);
         return;
       }
+
+    if (animationConfig.type === "inverted-circular") {
+      runSwitch();
+
+      const { cx, cy } = animationConfig.startingPoint;
+      const maxR = maxRevealRadiusPx(cx, cy);
+      const minR = 0.35;
+      const maskAt = (r: number) =>
+        `radial-gradient(circle at ${cx}px ${cy}px, #fff ${r}px, transparent ${r + 0.75}px)`;
+      overlay.style.webkitMaskImage = maskAt(maxR);
+      overlay.style.maskImage = maskAt(maxR);
+
+      const start = performance.now();
+      const tick = (now: number) => {
+        const t = Math.min(1, (now - start) / duration);
+        const r = Math.max(minR, (1 - easeOutQuint(t)) * maxR);
+        const mask = maskAt(r);
+        overlay.style.webkitMaskImage = mask;
+        overlay.style.maskImage = mask;
+        if (t < 1) {
+          requestAnimationFrame(tick);
+        } else {
+          overlay.style.webkitMaskImage = "";
+          overlay.style.maskImage = "";
+          finish();
+        }
+      };
+      requestAnimationFrame(tick);
+      return;
+    }
 
       runSwitch();
 
