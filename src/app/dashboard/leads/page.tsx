@@ -42,6 +42,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Copy,
   ExternalLink,
   Loader2,
   Mail,
@@ -58,7 +59,9 @@ import { WhatsAppIcon } from "@/components/icons/whatsapp-icon";
 import { LeadCaptureProgressOverlay } from "@/components/leads/lead-capture-progress-overlay";
 // import { toast } from "sonner"; // If not available, we can use a simple alert or just implement without it
 
-const PAGE_SIZE = 10;
+const DEFAULT_PAGE_SIZE = 10;
+const PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const;
+const LEADS_PAGE_SIZE_STORAGE_KEY = "leads_page_size";
 
 const ALL_STATUSES: LeadStatus[] = [...LEAD_STATUSES];
 
@@ -102,6 +105,12 @@ function formatPhoneBr(value: string): string {
 /** Dígitos nacionais ou já com 55; remove zeros de tronco (ex.: 011…) para wa.me com +55. */
 function leadPhoneDigitsForWhatsApp(raw: string): string {
   return onlyDigitsPhone(raw).replace(/^0+/, "");
+}
+
+function leadPhoneDigitsForCopy(raw: string): string {
+  const digits = leadPhoneDigitsForWhatsApp(raw);
+  if (digits.length > 11 && digits.startsWith("55")) return digits.slice(2);
+  return digits;
 }
 
 /** Busca instantânea: qualquer termo deve aparecer em nome, empresa, e-mail ou telefone (trecho ou início de palavra). */
@@ -233,6 +242,7 @@ function LeadTablePhoneCell({ phone }: { phone: string | undefined }) {
     return <span className="block truncate text-sm text-muted-foreground">Sem telefone</span>;
   }
   const waDigits = leadPhoneDigitsForWhatsApp(trimmed);
+  const copyDigits = leadPhoneDigitsForCopy(trimmed);
   const waHref = buildWhatsAppHref(waDigits);
   const displayPlus55 = maskWhatsappBRDisplay(waDigits);
   return (
@@ -240,6 +250,20 @@ function LeadTablePhoneCell({ phone }: { phone: string | undefined }) {
       <span className="min-w-0 truncate text-sm text-muted-foreground" title={displayPlus55}>
         {displayPlus55 || trimmed}
       </span>
+      {copyDigits ? (
+        <button
+          type="button"
+          className="inline-flex size-[22px] shrink-0 items-center justify-center rounded-md border border-border bg-background/70 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/40"
+          aria-label={`Copiar telefone ${displayPlus55}`}
+          title="Copiar telefone sem +55"
+          onClick={(e) => {
+            e.stopPropagation();
+            void navigator.clipboard.writeText(copyDigits);
+          }}
+        >
+          <Copy className="size-3" aria-hidden />
+        </button>
+      ) : null}
       {waHref ? (
         <a
           href={waHref}
@@ -264,6 +288,7 @@ function LeadsPageContent() {
   const [reports, setReports] = useState<RotaDigitalReport[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(STATUS_FILTER_TODOS);
+  const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
   const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -328,6 +353,19 @@ function LeadsPageContent() {
   }, [fetchLeads]);
 
   useEffect(() => {
+    const raw = window.localStorage.getItem(LEADS_PAGE_SIZE_STORAGE_KEY);
+    if (!raw) return;
+    const parsed = Number(raw);
+    if (PAGE_SIZE_OPTIONS.includes(parsed as (typeof PAGE_SIZE_OPTIONS)[number])) {
+      setPageSize(parsed);
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(LEADS_PAGE_SIZE_STORAGE_KEY, String(pageSize));
+  }, [pageSize]);
+
+  useEffect(() => {
     if (!captureBusy) return;
     const id = window.setInterval(() => {
       setCaptureProgress((p) => (p >= 88 ? p : p + 2));
@@ -357,14 +395,14 @@ function LeadsPageContent() {
     [leads, search, statusFilter],
   );
 
-  const pageCount = Math.max(1, Math.ceil(filteredLeads.length / PAGE_SIZE));
+  const pageCount = Math.max(1, Math.ceil(filteredLeads.length / pageSize));
   const safePage = Math.min(Math.max(1, currentPage), pageCount);
-  const pageSliceStart = (safePage - 1) * PAGE_SIZE;
-  const paginatedLeads = filteredLeads.slice(pageSliceStart, pageSliceStart + PAGE_SIZE);
+  const pageSliceStart = (safePage - 1) * pageSize;
+  const paginatedLeads = filteredLeads.slice(pageSliceStart, pageSliceStart + pageSize);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, statusFilter]);
+  }, [search, statusFilter, pageSize]);
 
   useEffect(() => {
     setCurrentPage((p) => Math.min(Math.max(1, p), pageCount));
@@ -1225,42 +1263,67 @@ function LeadsPageContent() {
             <p className="text-xs text-muted-foreground">
               Mostrando{" "}
               <span className="font-medium text-foreground/85">
-                {pageSliceStart + 1}–{Math.min(pageSliceStart + PAGE_SIZE, filteredLeads.length)}
+                {pageSliceStart + 1}–{Math.min(pageSliceStart + pageSize, filteredLeads.length)}
               </span>{" "}
               de{" "}
               <span className="font-medium text-foreground/85">
                 {filteredLeads.length}
               </span>
             </p>
-            {pageCount > 1 ? (
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
               <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={safePage <= 1}
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  className="h-9 gap-1 rounded-xl border-border bg-background dark:border-white/10 dark:bg-white/[0.03] dark:text-zinc-200 dark:hover:bg-white/[0.06] disabled:opacity-40"
+                <span className="text-xs text-muted-foreground">Exibir</span>
+                <Select
+                  value={String(pageSize)}
+                  onValueChange={(val) => {
+                    const next = Number(val);
+                    if (PAGE_SIZE_OPTIONS.includes(next as (typeof PAGE_SIZE_OPTIONS)[number])) {
+                      setPageSize(next);
+                    }
+                  }}
                 >
-                  <ChevronLeft className="size-4" aria-hidden />
-                  Anterior
-                </Button>
-                <span className="min-w-[5.5rem] text-center text-xs font-medium text-muted-foreground">
-                  {safePage} / {pageCount}
-                </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={safePage >= pageCount}
-                  onClick={() => setCurrentPage((p) => Math.min(pageCount, p + 1))}
-                  className="h-9 gap-1 rounded-xl border-border bg-background dark:border-white/10 dark:bg-white/[0.03] dark:text-zinc-200 dark:hover:bg-white/[0.06] disabled:opacity-40"
-                >
-                  Próxima
-                  <ChevronRight className="size-4" aria-hidden />
-                </Button>
+                  <SelectTrigger className="h-8 w-[6.5rem]" aria-label="Quantidade de leads por página">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent align="end">
+                    {PAGE_SIZE_OPTIONS.map((option) => (
+                      <SelectItem key={option} value={String(option)}>
+                        {option}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            ) : null}
+              {pageCount > 1 ? (
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={safePage <= 1}
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    className="h-9 gap-1 rounded-xl border-border bg-background dark:border-white/10 dark:bg-white/[0.03] dark:text-zinc-200 dark:hover:bg-white/[0.06] disabled:opacity-40"
+                  >
+                    <ChevronLeft className="size-4" aria-hidden />
+                    Anterior
+                  </Button>
+                  <span className="min-w-[5.5rem] text-center text-xs font-medium text-muted-foreground">
+                    {safePage} / {pageCount}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={safePage >= pageCount}
+                    onClick={() => setCurrentPage((p) => Math.min(pageCount, p + 1))}
+                    className="h-9 gap-1 rounded-xl border-border bg-background dark:border-white/10 dark:bg-white/[0.03] dark:text-zinc-200 dark:hover:bg-white/[0.06] disabled:opacity-40"
+                  >
+                    Próxima
+                    <ChevronRight className="size-4" aria-hidden />
+                  </Button>
+                </div>
+              ) : null}
+            </div>
           </div>
         ) : null}
       </Card>
