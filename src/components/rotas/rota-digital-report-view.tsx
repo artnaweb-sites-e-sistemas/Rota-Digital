@@ -81,21 +81,25 @@ import { PublicThemeToggleHint } from "@/components/public-theme-toggle-hint";
 
 const PRIORITY_COLORS: Record<string, string> = {
   Alta:
-    "border border-[color:var(--rota-sev-a-border)]/35 bg-[color:var(--rota-sev-a-bar)]/15 text-[color:var(--rota-sev-a-fg)] dark:bg-[color:var(--rota-sev-a-bar)]/22 dark:text-[color:var(--rota-sev-a-fg-dark)] dark:border-[color:var(--rota-sev-a-border)]/45",
+    "border border-[color:var(--rota-sev-a-border)]/45 bg-[color:var(--rota-sev-a-bar)]/16 text-[color:var(--rota-sev-a-fg)] shadow-sm shadow-[color:var(--rota-sev-a-border)]/10 dark:shadow-none dark:bg-[color:var(--rota-sev-a-bar)]/22 dark:text-[color:var(--rota-sev-a-fg-dark)] dark:border-[color:var(--rota-sev-a-border)]/45",
   Média:
-    "border border-[color:var(--rota-sev-b-border)]/35 bg-[color:var(--rota-sev-b-bar)]/12 text-[color:var(--rota-sev-b-fg)] dark:bg-[color:var(--rota-sev-b-bar)]/18 dark:text-[color:var(--rota-sev-b-fg-dark)] dark:border-[color:var(--rota-sev-b-border)]/42",
+    "border border-[color:var(--rota-sev-b-border)]/42 bg-[color:var(--rota-sev-b-bar)]/14 text-[color:var(--rota-sev-b-fg)] shadow-sm shadow-[color:var(--rota-sev-b-border)]/10 dark:shadow-none dark:bg-[color:var(--rota-sev-b-bar)]/18 dark:text-[color:var(--rota-sev-b-fg-dark)] dark:border-[color:var(--rota-sev-b-border)]/42",
   Baixa:
-    "border border-[color:var(--rota-sev-c-border)]/35 bg-[color:var(--rota-sev-c-bar)]/12 text-[color:var(--rota-sev-c-fg)] dark:bg-[color:var(--rota-sev-c-bar)]/18 dark:text-[color:var(--rota-sev-c-fg-dark)] dark:border-[color:var(--rota-sev-c-border)]/42",
+    "border border-[color:var(--rota-sev-c-border)]/42 bg-[color:var(--rota-sev-c-bar)]/14 text-[color:var(--rota-sev-c-fg)] shadow-sm shadow-[color:var(--rota-sev-c-border)]/10 dark:shadow-none dark:bg-[color:var(--rota-sev-c-bar)]/18 dark:text-[color:var(--rota-sev-c-fg-dark)] dark:border-[color:var(--rota-sev-c-border)]/42",
 };
 
-/** Fundo opaco da aba de prioridade (fora da moldura BorderGlow) — todos os breakpoints. */
+/**
+ * Aba “Prioridade …” acima do card de canal.
+ * Modo claro: fundo suave + texto escuro + borda visível (harmonia no fundo branco do relatório).
+ * Modo escuro: mantém o chip escuro com texto claro.
+ */
 const CHANNEL_PRIORITY_TAB_SURFACE: Record<string, string> = {
   Alta:
-    "!bg-[oklch(0.22_0.045_38_/_0.96)] dark:!bg-[oklch(0.2_0.04_38_/_0.94)] !text-[color:var(--rota-sev-a-fg-dark)] dark:!text-[color:var(--rota-sev-a-fg-dark)]",
+    "!shadow-sm !border-x !border-t !border-b-0 !border-[color:var(--rota-sev-a-border)]/55 !bg-[oklch(0.97_0.022_42)] !text-[color:var(--rota-sev-a-fg)] !font-semibold dark:!shadow-none dark:!border-transparent dark:!bg-[oklch(0.2_0.04_38_/_0.94)] dark:!text-[color:var(--rota-sev-a-fg-dark)]",
   Média:
-    "!bg-[oklch(0.24_0.035_78_/_0.95)] dark:!bg-[oklch(0.22_0.03_78_/_0.92)] !text-[color:var(--rota-sev-b-fg)] dark:!text-[color:var(--rota-sev-b-fg-dark)]",
+    "!shadow-sm !border-x !border-t !border-b-0 !border-[color:var(--rota-sev-b-border)]/52 !bg-[oklch(0.97_0.02_82)] !text-[color:var(--rota-sev-b-fg)] !font-semibold dark:!shadow-none dark:!border-transparent dark:!bg-[oklch(0.22_0.03_78_/_0.92)] dark:!text-[color:var(--rota-sev-b-fg-dark)]",
   Baixa:
-    "!bg-[oklch(0.22_0.04_152_/_0.95)] dark:!bg-[oklch(0.2_0.035_152_/_0.92)] !text-[color:var(--rota-sev-c-fg)] dark:!text-[color:var(--rota-sev-c-fg-dark)]",
+    "!shadow-sm !border-x !border-t !border-b-0 !border-[color:var(--rota-sev-c-border)]/52 !bg-[oklch(0.97_0.018_150)] !text-[color:var(--rota-sev-c-fg)] !font-semibold dark:!shadow-none dark:!border-transparent dark:!bg-[oklch(0.2_0.035_152_/_0.92)] dark:!text-[color:var(--rota-sev-c-fg-dark)]",
 };
 
 /** Borda 1px do BorderGlow em repouso (inline — evita conflito com `border-border` do componente). */
@@ -1483,7 +1487,7 @@ function ChannelCard({
       */}
       <Badge
         className={cn(
-          "pointer-events-none absolute right-5 top-0 z-0 inline-flex h-auto min-h-7 -translate-y-[calc(100%-8px)] shrink-0 items-center justify-center gap-1 rounded-t-md rounded-b-none border-x border-t border-b-0 px-2.5 pb-2 pt-1.5 text-[11px] font-medium leading-snug whitespace-nowrap sm:right-7",
+          "pointer-events-none absolute right-3 top-0 z-0 inline-flex h-auto min-h-[26px] max-sm:min-h-[24px] -translate-y-[calc(100%-8px)] shrink-0 items-center justify-center gap-1 rounded-t-md rounded-b-none border-x border-t border-b-0 px-2 pb-1.5 pt-1 text-[10px] font-semibold leading-snug whitespace-nowrap sm:right-5 sm:min-h-7 sm:px-2.5 sm:pb-2 sm:pt-1.5 sm:text-[11px] sm:font-medium",
           priorityBadgeCls,
           priorityTabSurface,
         )}
@@ -1555,14 +1559,14 @@ function ChannelCard({
                     }
                   }}
                 >
-                  <ReportProseBlocks text={channel.description} size="sm" collapseToTwoParagraphs />
+                  <ReportProseBlocks text={channel.description} size="sm" collapseToOneParagraph />
                 </div>
               ) : (
-                <ReportProseBlocks text={channel.description} size="sm" collapseToTwoParagraphs />
+                <ReportProseBlocks text={channel.description} size="sm" collapseToOneParagraph />
               )}
             </DashboardEditableRegion>
           ) : (
-            <ReportProseBlocks text={channel.description} size="sm" collapseToTwoParagraphs />
+            <ReportProseBlocks text={channel.description} size="sm" collapseToOneParagraph />
           )}
           {(channel.actions.length > 0 || d) ? (
             d ? (
@@ -2367,15 +2371,19 @@ export function RotaDigitalReportView({
 
   const notes = parseResearchNotes(report.evidences?.researchNotes);
   const instagramEvidenceSrc = buildInstagramEvidenceSrc(report);
-  const brandImageSrc =
-    report.evidences?.logoImageUrl ||
-    report.evidences?.instagramProfileImageUrl ||
-    withSnapshotParams(instagramEvidenceSrc, {
-      variant: "profile",
-      start: 1,
-    });
+  /** Thumbnail do card “Resumo”: prioriza sempre foto de perfil do Instagram quando houver análise IG; logo/favicon do site só se não houver imagem de Instagram. */
+  const instagramProfileThumb =
+    report.evidences?.instagramProfileImageUrl?.trim() ||
+    (instagramEvidenceSrc?.startsWith("/api/instagram-profile-snapshot")
+      ? withSnapshotParams(instagramEvidenceSrc, { variant: "profile", start: 1 })
+      : undefined) ||
+    instagramEvidenceSrc;
+  const brandImageSrc = instagramProfileThumb || report.evidences?.logoImageUrl;
   const hasBrandImage = Boolean(brandImageSrc);
-  const isWebsiteLogo = Boolean(report.evidences?.logoImageUrl);
+  const isWebsiteLogo = Boolean(
+    report.evidences?.logoImageUrl?.trim() &&
+      brandImageSrc === report.evidences.logoImageUrl.trim(),
+  );
   const normalizedInstagramNote = alignInstagramNoteForDisplay((
     notes.instagram ||
     "Instagram: não foi possível validar conteúdo suficiente; tratar como presença parcial até revisão manual."
@@ -3865,7 +3873,7 @@ export function RotaDigitalReportView({
           </div>
         </CardHeader>
         <CardContent className="overflow-visible">
-          <div className="grid grid-cols-1 gap-10 md:auto-rows-fr md:grid-cols-2 md:items-stretch md:gap-5">
+          <div className="grid grid-cols-1 gap-10 md:auto-rows-fr md:grid-cols-2 md:items-stretch md:gap-x-6 md:gap-y-12">
             {sortedChannels.map((channel, i) => (
               <ChannelCard
                 key={`${channel.name}-${i}`}

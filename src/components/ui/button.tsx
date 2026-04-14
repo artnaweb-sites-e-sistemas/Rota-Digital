@@ -32,7 +32,7 @@ const buttonVariants = cva(
          * que o ouro mas mantém a mesma “séria” da identidade.
          */
         ctaMotionGreen:
-          "border-none bg-gradient-to-r from-[var(--cta-report-green-from)] via-[var(--cta-report-green-via)] to-[var(--cta-report-green-to)] bg-[length:200%_100%] animate-[gradient-move_3s_ease_infinite] font-semibold text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.5)] transition hover:brightness-105 focus-visible:ring-2 focus-visible:ring-emerald-200/45 focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:focus-visible:ring-emerald-300/35",
+          "border-none bg-gradient-to-r from-[var(--cta-report-green-from)] via-[var(--cta-report-green-via)] to-[var(--cta-report-green-to)] bg-[length:200%_100%] animate-[gradient-move_3s_ease_infinite] font-semibold text-white shadow-md shadow-emerald-950/14 ring-1 ring-emerald-950/15 [text-shadow:0_1px_1px_rgba(0,0,0,0.32)] transition hover:brightness-105 focus-visible:ring-2 focus-visible:ring-emerald-200/45 focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:shadow-none dark:ring-0 dark:[text-shadow:0_1px_2px_rgba(0,0,0,0.5)] dark:focus-visible:ring-emerald-300/35",
       },
       size: {
         default:

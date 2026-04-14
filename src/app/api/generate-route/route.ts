@@ -1404,8 +1404,8 @@ function buildDiagnosticImprovementText(
   return "Para 10/10: evidenciar o que funciona, corrigir atritos e traduzir em ação no site e no Instagram.";
 }
 
-/** Teto alinhado ao prompt: cabe 2 parágrafos com frases completas sem truncar a meio. */
-const DIAGNOSTIC_COMMENT_MAX_CHARS = 520;
+/** Teto alinhado ao prompt: 2 parágrafos objetivos e diretos. */
+const DIAGNOSTIC_COMMENT_MAX_CHARS = 420;
 
 /**
  * Encurta até `maxLen` preferindo cortar no fim da última frase completa (`.!?` + espaço ou fim).
@@ -1647,9 +1647,9 @@ ${buildReportCopyVoicePromptSection()}
 - **Coerência de maturidade:** quando houver pelo menos um item em "diagnosticScores", faça "digitalMaturityScore" **numericamente igual** à média aritmética dos "score" desses itens (uma casa decimal) e "digitalMaturityLevel" coerente: **<4** Iniciante; **≥4 e <7** Intermediário; **≥7** Avançado. Cada nota de tópico deve obedecer à exigência definida e o "comment" deve sustentar a nota com evidência; em exigência **alta**, seja mais duro nos tópicos onde houver falhas reais.
 - "companyProfile": texto curto e claro sobre o que a empresa aparenta vender, para quem e com qual proposta.
 - "strengths", "weaknesses", "opportunities", "quickWins", "longTermActions", "nextSteps": itens curtos, diretos e fáceis de entender. Evite frases longas.
-- "recommendedChannels.description": **exatamente 2 parágrafos curtos** com \\n\\n; linguagem comercial simples. Meta **total ~380–560 caracteres**: 1º = por que o canal faz sentido **neste** caso (detalhe concreto); 2º = ângulo complementar (ex.: público ou prioridade). Sem frase genérica vazia.
+- "recommendedChannels.description": **exatamente 1 parágrafo curto** (sem \\n\\n); linguagem comercial simples. Meta **total ~160–300 caracteres** (teto rígido **320**): por que o canal faz sentido **neste** caso + 1 direção prática imediata. Sem frase genérica vazia.
 - "recommendedChannels.actions": ações práticas, em tom de orientação direta.
-- "diagnosticScores.comment": **exatamente 2 parágrafos curtos** com \\n\\n; meta **total ~260–480 caracteres** (teto rígido ~520 — planeje frases completas dentro disso). **No máximo 2 frases curtas por parágrafo.** 1º = leitura objetiva do tópico com **fato ou evidência concreta**; 2º = **uma** prioridade ou próximo passo mensurável. **Cada parágrafo deve terminar com frase completa** (ponto final, exclamação ou interrogação). **Proibido** usar reticências ("..." ou "…") ou deixar frase aberta como se fosse continuar. Proibido preencher com adjetivos genéricos, clichês ou contraste repetido (ex.: Instagram bom / site ruim) em todos os tópicos. Se a nota for < 10, o que falta para 10/10 **no máximo uma vez** no comentário inteiro.
+- "diagnosticScores.comment": **exatamente 2 parágrafos curtos** com \\n\\n; meta **total ~220–380 caracteres** (teto rígido **420**). **Preferência:** 1 frase por parágrafo (máximo 2). 1º = leitura objetiva do tópico com **fato ou evidência concreta**; 2º = **uma** prioridade ou próximo passo mensurável. **Cada parágrafo deve terminar com frase completa** (ponto final, exclamação ou interrogação). **Proibido** usar reticências ("..." ou "…") ou deixar frase aberta como se fosse continuar. Proibido preencher com adjetivos genéricos, clichês ou contraste repetido (ex.: Instagram bom / site ruim) em todos os tópicos. Se a nota for < 10, o que falta para 10/10 **no máximo uma vez** no comentário inteiro.
 - "websiteResearchNote" e "instagramResearchNote": **sempre exatamente 2 parágrafos curtos cada** (\\n\\n), como na regra 1.3.
 
 **REGRA ABSOLUTA: NUNCA INVENTE INFORMAÇÃO**
@@ -1710,7 +1710,7 @@ Responda **somente** com um único objeto JSON válido (sem markdown fora do JSO
   "estimatedTimelineMonths": number,
   "nextSteps": ["string"],
   "diagnosticScores": [
-    { "topic": "Posicionamento", "score": number, "comment": "string — 2 parágrafos com \\n\\n; total preferencialmente ≤400 caracteres; máx. 2 frases curtas por parágrafo" }
+    { "topic": "Posicionamento", "score": number, "comment": "string — 2 parágrafos com \\n\\n; total preferencialmente ≤360 caracteres (máx. 420); ideal 1 frase por parágrafo" }
   ],
   "websiteResearchNote": "string — exatamente 2 parágrafos com \\n\\n; total ~520–780 caracteres; sem repetir métricas das evidências",
   "instagramResearchNote": "string — exatamente 2 parágrafos com \\n\\n; não começar com seguidores/posts; sem bio entre aspas; síntese",

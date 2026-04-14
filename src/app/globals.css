@@ -93,12 +93,12 @@
   --brand-foreground: #fafaf7;
   --brand-muted: color-mix(in srgb, #8e7d4d 14%, transparent);
   /**
-   * CTA do relatório público: verde floresta terroso (tom quente, baixa saturação).
-   * Combina com o dourado #8e7d4d sem parecer WhatsApp neon.
+   * CTA do relatório público (modo claro): verde floresta mais claro e vivo,
+   * mantém contraste com texto branco e destaque sobre fundo branco/cinza.
    */
-  --cta-report-green-from: #0f1813;
-  --cta-report-green-via: #1f3d2f;
-  --cta-report-green-to: #2f5844;
+  --cta-report-green-from: #1c4f3f;
+  --cta-report-green-via: #2c6d55;
+  --cta-report-green-to: #3b8266;
   /**
    * Relatório: terracota (A), ouro-oliva (B), verde-floresta (C) — mesmos tokens no .dark com texto mais claro.
    */

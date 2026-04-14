@@ -114,6 +114,50 @@ const MODEL_COST_PER_1M_USD: Record<string, ModelCostPer1M> = {
 };
 
 const USD_TO_BRL_ESTIMATE = 5.2;
+const DIAGNOSTIC_COMMENT_MAX_CHARS = 420;
+
+function fitTextToMaxCharsPreferSentenceEnd(text: string, maxLen: number): string {
+  const t = text.replace(/\s+/g, " ").trim();
+  if (t.length <= maxLen) return t;
+  const w = t.slice(0, maxLen);
+  const floor = Math.min(36, Math.max(20, Math.floor(maxLen * 0.32)));
+  for (let i = w.length - 1; i >= floor; i--) {
+    const ch = w[i];
+    if (ch !== "." && ch !== "!" && ch !== "?") continue;
+    const next = i + 1 < w.length ? w[i + 1] : "";
+    if (next === "" || /\s/.test(next)) {
+      return w.slice(0, i + 1).trim();
+    }
+  }
+  return w.replace(/\s+\S*$/, "").trim();
+}
+
+function clampDiagnosticComment(raw: string, maxChars: number): string {
+  const s = raw
+    .replace(/\r\n/g, "\n")
+    .replace(/[ \t]*\u2026[ \t]*$/g, "")
+    .replace(/[ \t]*\.{3,}[ \t]*$/g, "")
+    .trim();
+  if (s.length <= maxChars) return s;
+  const paras = s
+    .split(/\n{2,}/)
+    .map((p) => p.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+  if (paras.length >= 2) {
+    const first = paras[0]!;
+    let second = paras.slice(1).join(" ");
+    const sep = "\n\n";
+    const maxSecond = maxChars - first.length - sep.length;
+    if (maxSecond >= 28) {
+      if (second.length > maxSecond) {
+        second = fitTextToMaxCharsPreferSentenceEnd(second, maxSecond);
+      }
+      const out = `${first}${sep}${second}`;
+      if (out.length <= maxChars) return out;
+    }
+  }
+  return fitTextToMaxCharsPreferSentenceEnd(s.replace(/\n+/g, " "), maxChars);
+}
 
 function estimateCostUsdFromUsage(modelName: string, usage?: GeminiUsageMetadata): number | undefined {
   if (!usage) return undefined;
@@ -199,9 +243,9 @@ Tom por campo:
 - **Coerência de maturidade:** com "diagnosticScores" preenchido, "digitalMaturityScore" deve ser a **média aritmética** dos "score" (uma casa decimal) e "digitalMaturityLevel" coerente: **<4** Iniciante; **≥4 e <7** Intermediário; **≥7** Avançado. O servidor harmoniza; ainda assim mantenha o JSON alinhado.
 - "companyProfile": texto curto, direto e fácil de entender.
 - "strengths", "weaknesses", "opportunities", "quickWins", "longTermActions", "nextSteps": itens curtos e objetivos.
-- "recommendedChannels.description": **exatamente 2 parágrafos curtos** com \\n\\n; meta total ~380–560 caracteres; comercial, com detalhe deste caso (evite genérico).
+- "recommendedChannels.description": **exatamente 1 parágrafo curto** (sem \\n\\n); meta total ~160–300 caracteres (teto rígido 320); comercial, com detalhe deste caso (evite genérico).
 - "recommendedChannels.actions": ações práticas e diretas.
-- "diagnosticScores.comment": **exatamente 2 parágrafos curtos** com \\n\\n; meta **total ~260–480 caracteres** (teto rígido ~520); **no máximo 2 frases curtas por parágrafo**; 1º = fato/evidência do tópico; 2º = uma prioridade ou passo claro. **Cada parágrafo termina com frase completa** (ponto final, exclamação ou interrogação); **proibido** reticências ("..." ou "…") ou frase cortada. Sem clichês nem repetir o mesmo contraste em todos. Se a nota for < 10, o que falta para 10/10 **no máximo uma vez**.
+- "diagnosticScores.comment": **exatamente 2 parágrafos curtos** com \\n\\n; meta **total ~220–380 caracteres** (teto rígido **420**); **preferência: 1 frase por parágrafo** (máximo 2). 1º = fato/evidência do tópico; 2º = uma prioridade ou passo claro. **Cada parágrafo termina com frase completa** (ponto final, exclamação ou interrogação); **proibido** reticências ("..." ou "…") ou frase cortada. Sem clichês nem repetir o mesmo contraste em todos. Se a nota for < 10, o que falta para 10/10 **no máximo uma vez**.
 - Nunca escreva frases vagas como "há espaço para melhorar" ou "há espaço para otimizações técnicas" sem explicar exatamente o que deve ser feito.
 - Em "Identidade Visual", comente harmonia visual, paleta, contraste, hierarquia, espaçamento, alinhamento, legibilidade e coerência entre site e Instagram.
 - "websiteResearchNote" e "instagramResearchNote": **exatamente 2 parágrafos curtos cada** (\\n\\n); meta total ~520–780 caracteres por campo; em Instagram não comece com seguidores/posts e não transcreva a bio entre aspas — sintetize.
@@ -238,7 +282,7 @@ Retorne SOMENTE um JSON válido com os campos atualizados:
     {
       "topic": "string",
       "score": number,
-      "comment": "string — 2 parágrafos \\n\\n; total ≤400 caracteres; denso e específico",
+      "comment": "string — 2 parágrafos \\n\\n; total preferencialmente ≤360 caracteres (máx. 420); denso e específico",
       "evidenceTitle": "string",
       "evidenceImageUrl": "string",
       "evidenceNote": "string"
@@ -306,7 +350,7 @@ Retorne SOMENTE um JSON válido com os campos atualizados:
       ? (aiData.diagnosticScores as DiagnosticScore[]).map((item) => ({
           topic: String(item.topic || "Tópico"),
           score: Math.max(0, Math.min(10, Number(item.score) || 0)),
-          comment: String(item.comment || ""),
+          comment: clampDiagnosticComment(String(item.comment || ""), DIAGNOSTIC_COMMENT_MAX_CHARS),
           evidenceTitle: item.evidenceTitle,
           evidenceImageUrl: item.evidenceImageUrl,
           evidenceNote: item.evidenceNote,

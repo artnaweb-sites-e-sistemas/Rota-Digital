@@ -66,6 +66,29 @@ function resolveCanonicalRestrictedLabel(rawName: string, allowedLabels: string[
   return undefined;
 }
 
+function fitTextToMaxCharsPreferSentenceEnd(text: string, maxLen: number): string {
+  const t = text.replace(/\s+/g, " ").trim();
+  if (t.length <= maxLen) return t;
+  const w = t.slice(0, maxLen);
+  const floor = Math.min(36, Math.max(20, Math.floor(maxLen * 0.32)));
+  for (let i = w.length - 1; i >= floor; i--) {
+    const ch = w[i];
+    if (ch !== "." && ch !== "!" && ch !== "?") continue;
+    const next = i + 1 < w.length ? w[i + 1] : "";
+    if (next === "" || /\s/.test(next)) {
+      return w.slice(0, i + 1).trim();
+    }
+  }
+  return w.replace(/\s+\S*$/, "").trim();
+}
+
+function compactRecommendedChannelDescription(raw: string): string {
+  const normalized = raw.replace(/\r\n/g, "\n").trim();
+  if (!normalized) return "";
+  const oneParagraph = normalized.split(/\n{2,}/).join(" ").replace(/\s+/g, " ").trim();
+  return fitTextToMaxCharsPreferSentenceEnd(oneParagraph, 320);
+}
+
 function sanitizeChannelEntry(input: unknown, forcedName?: string): DigitalChannel | null {
   if (!input || typeof input !== "object") return null;
   const row = input as Record<string, unknown>;
@@ -74,10 +97,11 @@ function sanitizeChannelEntry(input: unknown, forcedName?: string): DigitalChann
   if (!name) return null;
   const priority: DigitalChannel["priority"] =
     row.priority === "Alta" || row.priority === "Baixa" ? row.priority : "Média";
-  const description =
+  const descriptionRaw =
     typeof row.description === "string" && row.description.trim().length > 0
       ? row.description.trim()
       : `Canal recomendado para acelerar resultados em ${name}.`;
+  const description = compactRecommendedChannelDescription(descriptionRaw);
   const actions = Array.isArray(row.actions)
     ? row.actions.filter((x): x is string => typeof x === "string" && x.trim().length > 0).slice(0, 5)
     : [];
