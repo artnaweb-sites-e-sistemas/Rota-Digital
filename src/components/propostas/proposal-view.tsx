@@ -1,44 +1,344 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  ArrowRight,
   Building2,
+  Calendar,
   CalendarDays,
   Check,
   Copy,
   ExternalLink,
+  AtSign,
   FileText,
+  Globe,
   ImagePlus,
+  ListChecks,
   Loader2,
+  MapPin,
+  MessageCircle,
   Pencil,
+  Phone,
+  PlayCircle,
+  Plus,
+  RefreshCw,
+  Trash2,
   Save,
+  X,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
-import type { Proposal } from "@/types/proposal";
+import { PlanPriceHero } from "@/components/propostas/plan-installment-summary";
+import { PlanPaymentMethodsChips, PlanPaymentMethodsPicker, normalizePlanPaymentMethods, sortPaymentMethods } from "@/components/propostas/plan-payment-methods";
+import type { Lead } from "@/types/lead";
+import type { Proposal, ProposalAgencySnapshot, ProposalLeadSnapshot, ProposalPlan } from "@/types/proposal";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardSpotlight } from "@/components/ui/card-spotlight";
 import { Button, buttonVariants } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  formatCurrencyInput,
+  normalizePriceForCurrencyInput,
+  parseCurrencyInputToCents,
+} from "@/lib/currency-brl-input";
+import { DEFAULT_PROPOSAL_NEXT_STEPS } from "@/lib/proposal-default-next-steps";
+import { createEmptyProposalPlan, planLooksEmpty } from "@/lib/proposal-plan-factory";
+import { PROPOSAL_PLAN_MAX_INSTALLMENTS, normalizeInstallmentCount } from "@/lib/proposal-plan-installments";
 import { cn } from "@/lib/utils";
+import { getLead } from "@/lib/leads";
+import {
+  proposalLeadSnapshotFromLead,
+  proposalLeadSnapshotsDiffer,
+  proposalTitleIfDefaultForCompany,
+} from "@/lib/proposal-lead-from-source";
 import { updateProposal } from "@/lib/proposals";
 import { describeManualUploadFailure, uploadUserProposalImage } from "@/lib/evidence-storage";
-import { getUserCompanyAboutSettings } from "@/lib/user-settings";
+import { getUserCompanyAboutSettings, getUserReportCtaSettings } from "@/lib/user-settings";
+import { maskPhoneDisplayLoose, resolveReportCtas, type ResolvedReportCta } from "@/lib/report-cta";
 import type { UserCompanyAboutSettings } from "@/types/user-settings";
+import { WhatsAppIcon } from "@/components/icons/whatsapp-icon";
 
 type ProposalViewProps = {
   proposal: Proposal;
   variant: "dashboard" | "public";
   onProposalChange?: (proposal: Proposal) => void;
+  /** Página pública: CTA resolvido no servidor. Dashboard: opcional (carrega no cliente). */
+  reportCta?: ResolvedReportCta;
 };
 
-/** Raios menos genéricos que o kit (xl/2xl) para esta vista. */
+/** Fallback na UI (propostas antigas sem `nextSteps` no documento). */
+const PROPOSAL_NEXT_STEPS_COPY = DEFAULT_PROPOSAL_NEXT_STEPS;
+
+/** Topo alinhado ao conteúdo; base mais contida (evita “vazio” em baixo). */
+const PROPOSAL_NEXT_STEPS_CARD_BOX = "pt-6 sm:pt-7 pb-4 sm:pb-5";
+
+/** Texto do botão na proposta: foco em contacto (o `href` continua o das configurações / relatório). */
+function proposalNextStepsCtaCopy(bottom: ResolvedReportCta["bottom"]): {
+  label: string;
+  title: string;
+  ariaLabel: string;
+} {
+  if (bottom.useWhatsAppIcon) {
+    return {
+      label: "Falar conosco no WhatsApp",
+      title: "Abre o WhatsApp para conversarmos sobre a proposta",
+      ariaLabel: "Falar conosco pelo WhatsApp sobre esta proposta",
+    };
+  }
+  if (bottom.href.trim().toLowerCase().startsWith("mailto:")) {
+    return {
+      label: "Entrar em contato por e-mail",
+      title: "Enviar mensagem por e-mail sobre a proposta",
+      ariaLabel: "Entrar em contato por e-mail sobre esta proposta",
+    };
+  }
+  return {
+    label: "Entrar em contato",
+    title: "Abre o link para conversarmos sobre a proposta",
+    ariaLabel: "Entrar em contato sobre esta proposta",
+  };
+}
+
+function ProposalSectionHeaderIcon({ Icon, tone = "indigo" }: { Icon: LucideIcon; tone?: "indigo" | "neutral" }) {
+  return (
+    <div
+      className={cn(
+        "flex h-6 w-6 shrink-0 items-center justify-center rounded-md border",
+        tone === "indigo" && "border-brand/30 bg-brand/10 text-brand dark:text-brand",
+        tone === "neutral" && "border-border bg-muted text-muted-foreground",
+      )}
+    >
+      <Icon size={14} aria-hidden />
+    </div>
+  );
+}
+
+function ProposalNextStepsSpotlight({
+  stepsForList,
+  leadEmail,
+  bottomCta,
+  isDashboard,
+  editing,
+  saving,
+  onStartEdit,
+  onCancel,
+  onSave,
+  onDraftChange,
+  onAddStep,
+  onRemoveStep,
+}: {
+  stepsForList: string[];
+  leadEmail: string;
+  bottomCta: ResolvedReportCta["bottom"];
+  isDashboard: boolean;
+  editing: boolean;
+  saving: boolean;
+  onStartEdit: () => void;
+  onCancel: () => void;
+  onSave: () => void | Promise<void>;
+  onDraftChange: (index: number, value: string) => void;
+  onAddStep: () => void;
+  onRemoveStep: (index: number) => void;
+}) {
+  const mail = leadEmail.trim();
+  const mailtoHref = mail
+    ? `mailto:${encodeURIComponent(mail)}?subject=${encodeURIComponent("Re: Proposta comercial")}`
+    : undefined;
+
+  const ctaCopy = proposalNextStepsCtaCopy(bottomCta);
+
+  return (
+    <CardSpotlight
+      className={cn(
+        "scroll-mt-6 w-full print:border-zinc-200 print:bg-white",
+        PROPOSAL_NEXT_STEPS_CARD_BOX,
+      )}
+    >
+      <Card
+        id="proposal-proximos-passos"
+        className="relative border-0 !bg-transparent py-0 shadow-none ring-0 print:bg-white"
+      >
+        <div>
+          <CardHeader className="px-4 pb-6 pt-0 sm:px-7 sm:pb-7 sm:pt-0">
+            <div className="flex items-center gap-2.5">
+              <ProposalSectionHeaderIcon Icon={ArrowRight} tone="indigo" />
+              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-foreground/78 dark:text-muted-foreground">
+                Próximos passos
+              </CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="px-4 pb-0 sm:px-7">
+            <div className="space-y-3">
+              {stepsForList.length === 0 && editing ? (
+                <p className="text-sm text-muted-foreground">Sem passos — use «Adicionar passo».</p>
+              ) : null}
+              {stepsForList.map((step, i) => (
+                <div key={i} className="group/step relative min-w-0 w-full pl-3 sm:pl-4">
+                  <div
+                    className={cn(
+                      "relative min-w-0 rounded-md border border-border border-l-transparent bg-card/80 py-4 pl-8 pr-4 sm:pr-6",
+                      editing && "pr-12 sm:pr-14",
+                      "shadow-sm transition-[border-color,box-shadow] duration-300",
+                      "group-hover/step:border-brand/45 group-hover/step:shadow-md group-hover/step:shadow-brand/5",
+                      "dark:border-border dark:bg-secondary/60 dark:group-hover/step:border-brand/35",
+                      "before:pointer-events-none before:absolute before:-left-[20px] before:top-1/2 before:h-10 before:w-6 before:-translate-y-full before:rounded-br-md before:border-b before:border-border before:content-[''] dark:before:border-border group-hover/step:before:border-brand/45",
+                      "after:pointer-events-none after:absolute after:-left-[20px] after:top-1/2 after:h-10 after:w-6 after:rounded-tr-md after:border-t after:border-border after:content-[''] dark:after:border-border group-hover/step:after:border-brand/45",
+                    )}
+                  >
+                    <div className="absolute -left-[21px] top-1/2 z-30 -translate-y-1/2">
+                      <div className="relative size-11 rounded-full bg-card transition-transform duration-300 group-hover/step:scale-110 dark:bg-zinc-950">
+                        <div
+                          className="pointer-events-none absolute inset-0 overflow-hidden [clip-path:inset(0_0_0_50%)]"
+                          aria-hidden
+                        >
+                          <div
+                            className={cn(
+                              "absolute left-1/2 top-1/2 size-11 -translate-x-1/2 -translate-y-1/2 rounded-full border border-border/90 bg-card shadow-sm",
+                              "dark:border-zinc-600/80 dark:bg-zinc-950",
+                              "transition-[border-color,box-shadow] duration-300 group-hover/step:border-brand/50 group-hover/step:shadow-brand/20",
+                            )}
+                          />
+                        </div>
+                        <div
+                          className={cn(
+                            "absolute left-1/2 top-1/2 z-10 flex size-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-brand/30 bg-card text-[13px] font-black tabular-nums text-brand",
+                            "dark:border-brand/35 dark:bg-zinc-900",
+                          )}
+                        >
+                          {i + 1}
+                        </div>
+                      </div>
+                    </div>
+                    {editing ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        disabled={saving}
+                        onClick={() => onRemoveStep(i)}
+                        className="no-print absolute right-2 top-2 z-20 size-8 text-muted-foreground hover:text-destructive"
+                        aria-label="Remover passo"
+                      >
+                        <Trash2 className="size-3.5" aria-hidden />
+                      </Button>
+                    ) : null}
+                    <div className="min-w-0">
+                      {editing ? (
+                        <Textarea
+                          value={step}
+                          onChange={(e) => onDraftChange(i, e.target.value)}
+                          disabled={saving}
+                          rows={3}
+                          className="min-h-[4.5rem] resize-y text-[14.5px] leading-relaxed"
+                          aria-label={`Texto do passo ${i + 1}`}
+                        />
+                      ) : (
+                        <p className="m-0 text-[14.5px] leading-relaxed text-foreground">{step}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {editing ? (
+              <div className="no-print mt-4 flex flex-wrap items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  disabled={saving}
+                  onClick={onAddStep}
+                  className="shrink-0 text-muted-foreground/75 hover:bg-muted/50 hover:text-foreground"
+                  aria-label="Adicionar passo"
+                >
+                  <Plus className="size-3.5" aria-hidden />
+                </Button>
+                <Button
+                  type="button"
+                  variant="cta"
+                  size="sm"
+                  className="gap-1.5"
+                  disabled={saving}
+                  onClick={() => void onSave()}
+                >
+                  {saving ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Check className="size-4" aria-hidden />}
+                  Salvar
+                </Button>
+                <Button type="button" variant="outline" size="sm" className="gap-1.5" disabled={saving} onClick={onCancel}>
+                  <X className="size-4" aria-hidden />
+                  Cancelar
+                </Button>
+              </div>
+            ) : null}
+          </CardContent>
+        </div>
+        <div
+          id="proposal-chamada-acao"
+          className="scroll-mt-6 mt-3 box-border w-full min-w-0 max-w-full shrink-0 space-y-2 px-5 pb-0 pt-0 sm:mt-4 sm:px-7"
+        >
+          <a
+            href={bottomCta.href}
+            {...(bottomCta.openInNewTab ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+            title={ctaCopy.title}
+            aria-label={ctaCopy.ariaLabel}
+            className={cn(
+              buttonVariants({ variant: "ctaMotionGreen", size: "lg" }),
+              "no-print box-border h-10 min-h-10 items-center justify-center gap-2 overflow-hidden px-4 md:px-5",
+              "flex w-full min-w-0 max-w-full md:inline-flex md:w-auto md:max-w-none md:shrink-0",
+            )}
+          >
+            {bottomCta.useWhatsAppIcon ? (
+              <WhatsAppIcon className="size-4 shrink-0" />
+            ) : (
+              <Calendar className="size-4 shrink-0" aria-hidden />
+            )}
+            {ctaCopy.label}
+          </a>
+          {mailtoHref ? (
+            <p className="no-print m-0 text-center text-sm text-muted-foreground">
+              <a href={mailtoHref} className="font-medium text-brand underline-offset-4 hover:underline">
+                Responder por e-mail
+              </a>
+            </p>
+          ) : null}
+        </div>
+        {isDashboard && !editing ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            disabled={saving}
+            onClick={onStartEdit}
+            className="no-print absolute bottom-3 right-4 z-[6] size-8 rounded-md border border-border/70 bg-background/95 text-muted-foreground shadow-sm backdrop-blur-sm hover:bg-muted hover:text-foreground sm:bottom-4 sm:right-7"
+            aria-label="Editar próximos passos"
+          >
+            <Pencil className="size-3.5" aria-hidden />
+          </Button>
+        ) : null}
+      </Card>
+    </CardSpotlight>
+  );
+}
+
+/** Raios da vista da proposta (mais contidos que antes). */
 const RR = {
-  btn: "rounded-[0.9375rem]",
-  stat: "rounded-[1.0625rem]",
-  panel: "rounded-[1.3125rem]",
-  logoMark: "rounded-[0.8125rem]",
+  btn: "rounded-lg",
+  stat: "rounded-lg",
+  panel: "rounded-xl",
+  logoMark: "rounded-md",
 } as const;
 
 function getInitials(value: string): string {
@@ -95,6 +395,149 @@ function splitReadableParagraphs(value: string): string[] {
     paragraphs.push(sentences.slice(index, index + 2).join(" "));
   }
   return paragraphs;
+}
+
+function telHrefFromDisplay(raw: string): string | undefined {
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length < 5) return undefined;
+  const compact = raw.replace(/[^\d+]/g, "");
+  return `tel:${compact || digits}`;
+}
+
+function hrefIfWebsite(raw: string): string | undefined {
+  const t = raw.trim();
+  if (!t) return undefined;
+  if (/^https?:\/\//i.test(t)) return t;
+  return `https://${t}`;
+}
+
+function hrefIfInstagram(raw: string): string | undefined {
+  const t = raw.trim();
+  if (!t) return undefined;
+  if (/^https?:\/\//i.test(t)) return t;
+  const h = t.replace(/^@/, "").replace(/^instagram\.com\/?/i, "").replace(/^\//, "");
+  if (!h) return undefined;
+  return `https://instagram.com/${h}`;
+}
+
+function hrefIfYoutube(raw: string): string | undefined {
+  const t = raw.trim();
+  if (!t) return undefined;
+  if (/^https?:\/\//i.test(t)) return t;
+  return `https://${t.replace(/^\/+/, "")}`;
+}
+
+function hrefIfWhatsapp(raw: string): string | undefined {
+  const t = raw.trim();
+  if (!t) return undefined;
+  if (/^https?:\/\//i.test(t)) return t;
+  const digits = t.replace(/\D/g, "");
+  if (digits.length >= 10) return `https://wa.me/${digits}`;
+  return undefined;
+}
+
+type AgencyContactRow = {
+  key: string;
+  label: string;
+  icon: typeof Phone;
+  value: string;
+  href?: string;
+  external?: boolean;
+  multiline?: boolean;
+  /** Serviços: lista para exibir em tópicos (cor de marca). */
+  topicLines?: string[];
+};
+
+function buildAgencyContactRows(
+  snap: ProposalAgencySnapshot,
+  live: UserCompanyAboutSettings | null,
+  isDashboard: boolean,
+): AgencyContactRow[] {
+  const pick = (liveVal?: string | null, snapVal?: string | null) =>
+    (isDashboard && live ? liveVal?.trim() : "") || snapVal?.trim() || "";
+
+  const phone = pick(live?.companyPhone, snap.companyPhone);
+  const whatsApp = pick(live?.whatsApp, snap.whatsApp);
+  const address = pick(live?.address, snap.address);
+  const websiteUrl = pick(live?.websiteUrl, snap.websiteUrl);
+  const instagramUrl = pick(live?.instagramUrl, snap.instagramUrl);
+  const youtubeUrl = pick(live?.youtubeUrl, snap.youtubeUrl);
+  const services = pick(live?.services, snap.services);
+
+  const rows: AgencyContactRow[] = [];
+  if (phone) {
+    rows.push({
+      key: "phone",
+      label: "Telefone",
+      icon: Phone,
+      value: maskPhoneDisplayLoose(phone),
+      href: telHrefFromDisplay(phone),
+    });
+  }
+  if (whatsApp) {
+    const href = hrefIfWhatsapp(whatsApp);
+    rows.push({
+      key: "whatsapp",
+      label: "WhatsApp",
+      icon: MessageCircle,
+      value: maskPhoneDisplayLoose(whatsApp),
+      href,
+      external: Boolean(href?.startsWith("http")),
+    });
+  }
+  if (address) {
+    rows.push({
+      key: "address",
+      label: "Endereço",
+      icon: MapPin,
+      value: address,
+      multiline: true,
+    });
+  }
+  if (websiteUrl) {
+    const href = hrefIfWebsite(websiteUrl);
+    rows.push({
+      key: "site",
+      label: "Site",
+      icon: Globe,
+      value: websiteUrl,
+      href,
+      external: true,
+    });
+  }
+  if (instagramUrl) {
+    const href = hrefIfInstagram(instagramUrl);
+    rows.push({
+      key: "instagram",
+      label: "Instagram",
+      icon: AtSign,
+      value: instagramUrl,
+      href,
+      external: true,
+    });
+  }
+  if (youtubeUrl) {
+    const href = hrefIfYoutube(youtubeUrl);
+    rows.push({
+      key: "youtube",
+      label: "YouTube",
+      icon: PlayCircle,
+      value: youtubeUrl,
+      href,
+      external: true,
+    });
+  }
+  if (services) {
+    rows.push({
+      key: "services",
+      label: "Serviços",
+      icon: ListChecks,
+      value: services,
+      multiline: true,
+      topicLines: parseAgencyServiceTopics(services),
+    });
+  }
+  return rows;
 }
 
 function validityTone(validUntilDate: number): {
@@ -196,6 +639,584 @@ function IdentityThumb({
   );
 }
 
+function parseDeliverableLines(text: string): string[] {
+  return text
+    .split(/\n+/)
+    .map((line) => line.trim().replace(/^[-*•]\s*/, ""))
+    .filter(Boolean);
+}
+
+/** Uma linha por tópico; marcadores à cabeça da linha são ignorados. */
+function parseAgencyServiceTopics(text: string): string[] {
+  const lines = parseDeliverableLines(text);
+  if (lines.length) return lines;
+  const trimmed = text.trim();
+  return trimmed ? [trimmed] : [];
+}
+
+function planToEditDraft(p: ProposalPlan): ProposalPlan {
+  return {
+    ...p,
+    price: p.price.trim() ? normalizePriceForCurrencyInput(p.price) : "",
+    promotionalPrice: p.promotionalPrice?.trim()
+      ? normalizePriceForCurrencyInput(p.promotionalPrice)
+      : "",
+    paymentMethods: sortPaymentMethods(normalizePlanPaymentMethods(p.paymentMethods)),
+    installmentCount: normalizeInstallmentCount(p.installmentCount),
+  };
+}
+
+/** Promoção aplicável: preço promocional válido e inferior ao normal (ou só promocional preenchido). */
+function planHasValidPromotionalOffer(plan: ProposalPlan): boolean {
+  const listTrim = plan.price.trim();
+  const promoTrim = plan.promotionalPrice?.trim() ?? "";
+  const listCents = listTrim ? parseCurrencyInputToCents(listTrim) : null;
+  const promoCents = promoTrim ? parseCurrencyInputToCents(promoTrim) : null;
+  return (
+    promoCents !== null &&
+    promoCents > 0 &&
+    (listCents === null || listCents <= 0 || promoCents < listCents)
+  );
+}
+
+/** Preço mostrado no herói e, se aplicável, valor de lista riscado (promo válida abaixo do valor normal). */
+function resolvePlanDisplayPrices(plan: ProposalPlan): {
+  displayPriceText: string;
+  struckOriginalText?: string;
+} {
+  const listTrim = plan.price.trim();
+  const promoTrim = plan.promotionalPrice?.trim() ?? "";
+  const listCents = listTrim ? parseCurrencyInputToCents(listTrim) : null;
+
+  if (planHasValidPromotionalOffer(plan)) {
+    return {
+      displayPriceText: promoTrim,
+      ...(listTrim && listCents !== null && listCents > 0 ? { struckOriginalText: listTrim } : {}),
+    };
+  }
+  return { displayPriceText: listTrim };
+}
+
+function ProposalPlanCard({
+  plan,
+  kind,
+  readOnly,
+  onSave,
+  onAbandonEmptyPlan,
+  onDeletePlan,
+}: {
+  plan: ProposalPlan;
+  kind: "spot" | "recurring";
+  readOnly: boolean;
+  onSave?: (next: ProposalPlan) => void | Promise<void>;
+  /** Se o plano ainda está vazio (nunca guardado com conteúdo), cancelar remove-o da proposta. */
+  onAbandonEmptyPlan?: () => void | Promise<void>;
+  /** Remove o plano após confirmação (dashboard). */
+  onDeletePlan?: () => void | Promise<void>;
+}) {
+  const [editing, setEditing] = useState(!readOnly && planLooksEmpty(plan));
+  const [saving, setSaving] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const [draft, setDraft] = useState<ProposalPlan>(() => planToEditDraft(plan));
+
+  useEffect(() => {
+    if (!editing) {
+      setDraft(planToEditDraft(plan));
+    }
+  }, [plan, editing]);
+
+  const lines = parseDeliverableLines(editing ? draft.deliverables : plan.deliverables);
+  const isSpot = kind === "spot";
+  const promoOfferActive = planHasValidPromotionalOffer(editing ? draft : plan);
+
+  const cancelEdit = () => {
+    if (planLooksEmpty(plan) && onAbandonEmptyPlan) {
+      void onAbandonEmptyPlan();
+      return;
+    }
+    setDraft(planToEditDraft(plan));
+    setEditing(false);
+  };
+
+  const handleSave = async () => {
+    if (!onSave) return;
+    setSaving(true);
+    try {
+      await onSave({
+        ...plan,
+        title: draft.title.trim(),
+        deliverables: draft.deliverables.trim(),
+        price: draft.price.trim(),
+        promotionalPrice: (draft.promotionalPrice ?? "").trim(),
+        installmentCount: normalizeInstallmentCount(draft.installmentCount),
+        paymentTerms: draft.paymentTerms.trim(),
+        paymentMethods: sortPaymentMethods(normalizePlanPaymentMethods(draft.paymentMethods)),
+      });
+      setEditing(false);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteClick = () => {
+    if (!onDeletePlan || saving || removing) return;
+    setRemoving(true);
+    void Promise.resolve(onDeletePlan()).finally(() => setRemoving(false));
+  };
+
+  const dashboardActions = readOnly ? null : (
+    <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
+      {editing ? (
+        <>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-8 shrink-0 text-muted-foreground hover:text-foreground"
+            onClick={() => cancelEdit()}
+            disabled={saving || removing}
+            aria-label="Cancelar edição"
+          >
+            <X className="size-4" aria-hidden />
+          </Button>
+          <Button
+            type="button"
+            variant="cta"
+            size="icon"
+            className="size-8 shrink-0"
+            onClick={() => void handleSave()}
+            disabled={saving || removing}
+            aria-label="Guardar plano"
+          >
+            {saving ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Check className="size-4" aria-hidden />}
+          </Button>
+          {onDeletePlan ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="size-8 shrink-0 text-muted-foreground hover:text-red-600 dark:hover:text-red-400"
+              onClick={() => handleDeleteClick()}
+              disabled={saving || removing}
+              aria-label="Remover plano"
+            >
+              {removing ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Trash2 className="size-4" aria-hidden />}
+            </Button>
+          ) : null}
+        </>
+      ) : (
+        <>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="size-8 shrink-0 border-border/80 bg-background/95 shadow-sm backdrop-blur-sm dark:bg-background/90"
+            onClick={() => {
+              setDraft(planToEditDraft(plan));
+              setEditing(true);
+            }}
+            disabled={removing}
+            aria-label="Editar plano"
+          >
+            <Pencil className="size-4" aria-hidden />
+          </Button>
+          {onDeletePlan ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="size-8 shrink-0 text-muted-foreground hover:text-red-600 dark:hover:text-red-400"
+              onClick={() => handleDeleteClick()}
+              disabled={saving || removing}
+              aria-label="Remover plano"
+            >
+              {removing ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Trash2 className="size-4" aria-hidden />}
+            </Button>
+          ) : null}
+        </>
+      )}
+    </div>
+  );
+
+  return (
+    <article
+      className={cn(
+        "group relative overflow-hidden border bg-background/80 shadow-sm transition-[box-shadow,transform] duration-200 dark:bg-white/[0.03]",
+        RR.panel,
+        "border-border/80 hover:border-brand/25 hover:shadow-md dark:border-white/10 dark:hover:border-brand/20",
+      )}
+    >
+      <div
+        className={cn(
+          "pointer-events-none absolute left-0 top-0 h-full w-1 bg-gradient-to-b",
+          isSpot ? "from-brand/70 to-brand/20" : "from-emerald-600/55 to-emerald-500/15 dark:from-emerald-400/50 dark:to-emerald-500/10",
+        )}
+        aria-hidden
+      />
+      {promoOfferActive ? (
+        <div className="pointer-events-none absolute right-3 top-3 z-10 sm:right-4 sm:top-4">
+          <Badge
+            variant="outline"
+            className="rounded-md border-red-500/35 bg-red-600/12 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-red-700 shadow-sm dark:border-red-500/40 dark:bg-red-500/15 dark:text-red-300"
+          >
+            Promoção
+          </Badge>
+        </div>
+      ) : null}
+      <div className="relative space-y-4 p-5 pl-6 pr-5 sm:p-6 sm:pl-7 sm:pr-7">
+        {editing ? (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor={`plan-title-${plan.id}`} className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Título
+              </Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id={`plan-title-${plan.id}`}
+                  value={draft.title}
+                  onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
+                  className="h-10 min-w-0 flex-1"
+                />
+                {dashboardActions}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor={`plan-deliverables-${plan.id}`} className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Entregas
+              </Label>
+              <Textarea
+                id={`plan-deliverables-${plan.id}`}
+                value={draft.deliverables}
+                onChange={(e) => setDraft((d) => ({ ...d, deliverables: e.target.value }))}
+                className="min-h-24 resize-y text-sm"
+                placeholder="Uma entrega por linha (ou parágrafos separados)."
+              />
+            </div>
+            <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(7.25rem,8.5rem)]">
+              <div className="space-y-2">
+                <Label htmlFor={`plan-price-${plan.id}`} className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Valor
+                </Label>
+                <Input
+                  id={`plan-price-${plan.id}`}
+                  value={draft.price}
+                  inputMode="numeric"
+                  autoComplete="off"
+                  placeholder="R$ 0,00"
+                  onChange={(e) => setDraft((d) => ({ ...d, price: formatCurrencyInput(e.target.value) }))}
+                  className="h-10"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor={`plan-promo-${plan.id}`} className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Promocional <span className="font-normal normal-case text-muted-foreground/80">(opcional)</span>
+                </Label>
+                <Input
+                  id={`plan-promo-${plan.id}`}
+                  value={draft.promotionalPrice ?? ""}
+                  inputMode="numeric"
+                  autoComplete="off"
+                  placeholder="R$ 0,00"
+                  onChange={(e) =>
+                    setDraft((d) => ({ ...d, promotionalPrice: formatCurrencyInput(e.target.value) }))
+                  }
+                  className="h-10"
+                />
+              </div>
+              <div className="space-y-2 sm:col-span-2 lg:col-span-1">
+                <Label htmlFor={`plan-installments-${plan.id}`} className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Parcelas
+                </Label>
+                <Select
+                  value={String(normalizeInstallmentCount(draft.installmentCount))}
+                  onValueChange={(v) =>
+                    setDraft((d) => ({ ...d, installmentCount: normalizeInstallmentCount(Number(v)) }))
+                  }
+                  disabled={saving}
+                >
+                  <SelectTrigger id={`plan-installments-${plan.id}`} className="h-10 w-full lg:max-w-none">
+                    <SelectValue placeholder="Parcelas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: PROPOSAL_PLAN_MAX_INSTALLMENTS }, (_, i) => i + 1).map((n) => (
+                      <SelectItem key={n} value={String(n)}>
+                        {n === 1 ? "À vista" : `${n}×`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor={`plan-terms-${plan.id}`} className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Condições de pagamento
+              </Label>
+              <Textarea
+                id={`plan-terms-${plan.id}`}
+                value={draft.paymentTerms}
+                onChange={(e) => setDraft((d) => ({ ...d, paymentTerms: e.target.value }))}
+                className="min-h-20 resize-y text-sm"
+              />
+            </div>
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Formas de pagamento</p>
+              <PlanPaymentMethodsPicker
+                value={normalizePlanPaymentMethods(draft.paymentMethods)}
+                onChange={(next) => setDraft((d) => ({ ...d, paymentMethods: next }))}
+                disabled={saving}
+              />
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="min-w-0 space-y-1">
+              <div className="flex items-start gap-2">
+                <h3 className="min-w-0 flex-1 text-lg font-bold leading-snug tracking-tight text-foreground sm:text-xl">
+                  {plan.title}
+                </h3>
+                {dashboardActions}
+              </div>
+              {lines.length > 0 ? (
+                <ul className="mt-3 space-y-2.5 text-sm leading-relaxed text-muted-foreground">
+                  {lines.map((line, index) => (
+                    <li key={`${plan.id}-${index}-${line.slice(0, 24)}`} className="flex gap-2.5">
+                      <ListChecks
+                        className={cn(
+                          "mt-0.5 size-4 shrink-0",
+                          isSpot ? "text-brand" : "text-emerald-600 dark:text-emerald-400",
+                        )}
+                        aria-hidden
+                      />
+                      <span className="min-w-0">{line}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+
+            {(() => {
+              const methods = sortPaymentMethods(normalizePlanPaymentMethods(plan.paymentMethods));
+              const terms = plan.paymentTerms.trim();
+              const { displayPriceText, struckOriginalText } = resolvePlanDisplayPrices(plan);
+              const hasPrice = Boolean(displayPriceText.trim());
+              const hasMethods = methods.length > 0;
+              const hasFooter = Boolean(hasPrice || hasMethods || terms);
+              if (!hasFooter) return null;
+              return (
+                <div className="space-y-4 border-t border-border/60 pt-4 dark:border-white/10">
+                  {hasPrice || hasMethods ? (
+                    <div className="space-y-2">
+                      {hasPrice ? (
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                          Investimento
+                        </p>
+                      ) : null}
+                      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+                        {hasPrice ? (
+                          <PlanPriceHero
+                            priceText={displayPriceText}
+                            struckOriginalText={struckOriginalText}
+                            installmentCount={plan.installmentCount}
+                            accent={isSpot ? "brand" : "emerald"}
+                            className="shrink-0"
+                          />
+                        ) : null}
+
+                        {hasMethods ? (
+                          <div className={cn("min-w-0 max-w-full", !hasPrice && "ml-auto")}>
+                            <PlanPaymentMethodsChips
+                              methods={methods}
+                              accent={isSpot ? "brand" : "emerald"}
+                              className="justify-end"
+                            />
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {terms ? (
+                    <div className={cn((hasPrice || hasMethods) && "mt-5")}>
+                      <div
+                        className={cn(
+                          "flex overflow-hidden rounded-lg border border-border/55 bg-muted/25 shadow-sm dark:border-white/10 dark:bg-white/[0.035] dark:shadow-none",
+                        )}
+                      >
+                        <div
+                          className={cn(
+                            "w-1 shrink-0",
+                            isSpot ? "bg-brand/45" : "bg-emerald-500/40 dark:bg-emerald-400/35",
+                          )}
+                          aria-hidden
+                        />
+                        <div className="min-w-0 flex-1 space-y-1 px-3.5 py-3 sm:px-4 sm:py-3.5">
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                            Condição de pagamento
+                          </p>
+                          <p className="text-[13px] font-normal leading-relaxed text-foreground/88 sm:text-sm">
+                            {terms}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })()}
+          </>
+        )}
+      </div>
+    </article>
+  );
+}
+
+function ProposalPlansSection({
+  proposal,
+  readOnly,
+  onSavePlan,
+  onAddPlan,
+  onAbandonEmptyPlan,
+  onDeletePlan,
+}: {
+  proposal: Proposal;
+  readOnly: boolean;
+  onSavePlan?: (kind: "spot" | "recurring", next: ProposalPlan) => void | Promise<void>;
+  onAddPlan?: (kind: "spot" | "recurring") => void | Promise<void>;
+  onAbandonEmptyPlan?: (kind: "spot" | "recurring", planId: string) => void | Promise<void>;
+  onDeletePlan?: (kind: "spot" | "recurring", planId: string) => void | Promise<void>;
+}) {
+  const spots = proposal.spotPlans ?? [];
+  const recurring = proposal.recurringPlans ?? [];
+  const showAdd = Boolean(onAddPlan);
+  if (!spots.length && !recurring.length && !showAdd) return null;
+
+  const showSpotColumn = spots.length > 0 || showAdd;
+  const showRecurringColumn = recurring.length > 0 || showAdd;
+
+  return (
+    <section
+      className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-xl dark:border-white/5 dark:bg-white/[0.02]"
+      aria-labelledby="proposal-plans-heading"
+    >
+      <div
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_20%_-10%,rgba(190,149,83,0.14),transparent_55%),radial-gradient(ellipse_60%_40%_at_100%_100%,rgba(255,255,255,0.06),transparent_45%)] dark:bg-[radial-gradient(ellipse_80%_50%_at_20%_-10%,rgba(190,149,83,0.12),transparent_55%),radial-gradient(ellipse_60%_40%_at_100%_100%,rgba(255,255,255,0.04),transparent_45%)]"
+        aria-hidden
+      />
+      <div className="relative space-y-8 px-6 py-8 sm:px-8 sm:py-9">
+        <div className="max-w-2xl space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="outline" className="rounded-full border-brand/20 bg-brand/10 px-3 py-1 text-xs font-semibold text-brand">
+              Oferta comercial
+            </Badge>
+          </div>
+          <h2 id="proposal-plans-heading" className="text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">
+            Planos personalizados
+          </h2>
+          <p className="text-sm leading-relaxed text-muted-foreground sm:text-base">
+            Valores, entregas e condições definidos para esta proposta.
+          </p>
+        </div>
+
+        <div className="grid gap-10 lg:grid-cols-2 lg:gap-12">
+          {showSpotColumn ? (
+            <div className="min-w-0 space-y-4">
+              <div className="flex items-center gap-2.5">
+                <div
+                  className={cn(
+                    "flex size-9 items-center justify-center rounded-lg border border-brand/25 bg-brand/10 text-brand",
+                    RR.logoMark,
+                  )}
+                >
+                  <FileText className="size-4" aria-hidden />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Pontual</p>
+                  <p className="text-sm font-semibold text-foreground">Investimento pontual</p>
+                </div>
+              </div>
+              <div className="space-y-4">
+                {spots.map((plan) => (
+                  <ProposalPlanCard
+                    key={plan.id}
+                    plan={plan}
+                    kind="spot"
+                    readOnly={readOnly}
+                    onSave={readOnly ? undefined : (next) => onSavePlan?.("spot", next)}
+                    onAbandonEmptyPlan={
+                      readOnly || !onAbandonEmptyPlan ? undefined : () => void onAbandonEmptyPlan("spot", plan.id)
+                    }
+                    onDeletePlan={
+                      readOnly || !onDeletePlan ? undefined : () => void onDeletePlan("spot", plan.id)
+                    }
+                  />
+                ))}
+              </div>
+              {showAdd ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full gap-2 border-brand/25 bg-background/80 hover:bg-brand/5 dark:border-brand/20 dark:hover:bg-brand/10 sm:w-auto"
+                  onClick={() => void onAddPlan?.("spot")}
+                >
+                  <Plus className="size-4" aria-hidden />
+                  Adicionar plano pontual
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
+
+          {showRecurringColumn ? (
+            <div className="min-w-0 space-y-4">
+              <div className="flex items-center gap-2.5">
+                <div
+                  className={cn(
+                    "flex size-9 items-center justify-center rounded-lg border border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-300",
+                    RR.logoMark,
+                  )}
+                >
+                  <RefreshCw className="size-4" aria-hidden />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Recorrente</p>
+                  <p className="text-sm font-semibold text-foreground">Planos contínuos</p>
+                </div>
+              </div>
+              <div className="space-y-4">
+                {recurring.map((plan) => (
+                  <ProposalPlanCard
+                    key={plan.id}
+                    plan={plan}
+                    kind="recurring"
+                    readOnly={readOnly}
+                    onSave={readOnly ? undefined : (next) => onSavePlan?.("recurring", next)}
+                    onAbandonEmptyPlan={
+                      readOnly || !onAbandonEmptyPlan ? undefined : () => void onAbandonEmptyPlan("recurring", plan.id)
+                    }
+                    onDeletePlan={
+                      readOnly || !onDeletePlan ? undefined : () => void onDeletePlan("recurring", plan.id)
+                    }
+                  />
+                ))}
+              </div>
+              {showAdd ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full gap-2 border-emerald-500/25 bg-background/80 hover:bg-emerald-500/5 dark:border-emerald-400/25 dark:hover:bg-emerald-500/10 sm:w-auto"
+                  onClick={() => void onAddPlan?.("recurring")}
+                >
+                  <Plus className="size-4" aria-hidden />
+                  Adicionar plano recorrente
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function SummaryStat({
   label,
   value,
@@ -239,14 +1260,27 @@ function SummaryStat({
   );
 }
 
-export function ProposalView({ proposal, variant, onProposalChange }: ProposalViewProps) {
+export function ProposalView({ proposal, variant, onProposalChange, reportCta: reportCtaProp }: ProposalViewProps) {
   const isDashboard = variant === "dashboard";
+  const proposalRef = useRef(proposal);
+  proposalRef.current = proposal;
   const [copied, setCopied] = useState(false);
+  const [publicLinkOrigin, setPublicLinkOrigin] = useState("");
   const [editingProfile, setEditingProfile] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [uploadingSlot, setUploadingSlot] = useState<"lead" | "agency" | null>(null);
   const [fieldError, setFieldError] = useState<string | null>(null);
+  const [reportCtaClient, setReportCtaClient] = useState<ResolvedReportCta | null>(null);
+  const [nextStepsEditing, setNextStepsEditing] = useState(false);
+  const [nextStepsDraft, setNextStepsDraft] = useState<string[]>([]);
+  const [nextStepsSaving, setNextStepsSaving] = useState(false);
+  const [removePlanTarget, setRemovePlanTarget] = useState<{
+    kind: "spot" | "recurring";
+    planId: string;
+  } | null>(null);
+  const [removePlanBusy, setRemovePlanBusy] = useState(false);
   const [companyAboutLive, setCompanyAboutLive] = useState<UserCompanyAboutSettings | null>(null);
+  const [linkedLeadLive, setLinkedLeadLive] = useState<Lead | null>(null);
   const [profileDraft, setProfileDraft] = useState({
     executiveSummary: proposal.companyProfile.executiveSummary,
   });
@@ -256,6 +1290,39 @@ export function ProposalView({ proposal, variant, onProposalChange }: ProposalVi
       executiveSummary: proposal.companyProfile.executiveSummary,
     });
   }, [proposal]);
+
+  useEffect(() => {
+    setNextStepsEditing(false);
+  }, [proposal.id]);
+
+  useEffect(() => {
+    if (reportCtaProp != null) {
+      setReportCtaClient(null);
+      return;
+    }
+    if (!isDashboard || !proposal.userId) {
+      setReportCtaClient(null);
+      return;
+    }
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const settings = await getUserReportCtaSettings(proposal.userId);
+        if (!cancelled) setReportCtaClient(resolveReportCtas(settings));
+      } catch {
+        if (!cancelled) setReportCtaClient(resolveReportCtas(null));
+      }
+    };
+    void load();
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") void load();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [reportCtaProp, isDashboard, proposal.userId]);
 
   useEffect(() => {
     if (!isDashboard || !proposal.userId) {
@@ -282,6 +1349,41 @@ export function ProposalView({ proposal, variant, onProposalChange }: ProposalVi
     };
   }, [isDashboard, proposal.userId]);
 
+  useEffect(() => {
+    if (!isDashboard || !proposal.leadId?.trim()) {
+      setLinkedLeadLive(null);
+      return;
+    }
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const lead = await getLead(proposal.leadId);
+        if (cancelled) return;
+        if (lead?.userId === proposal.userId) {
+          setLinkedLeadLive(lead);
+        } else {
+          setLinkedLeadLive(null);
+        }
+      } catch {
+        if (!cancelled) setLinkedLeadLive(null);
+      }
+    };
+    void load();
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") void load();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [isDashboard, proposal.leadId, proposal.userId]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setPublicLinkOrigin(window.location.origin);
+  }, []);
+
   const publicHref = proposal.publicSlug ? `/p/${proposal.publicSlug}` : undefined;
   const status = validityTone(proposal.validUntilDate);
   const spotCount = proposal.spotPlans.length;
@@ -303,6 +1405,14 @@ export function ProposalView({ proposal, variant, onProposalChange }: ProposalVi
   }, [isDashboard, companyAboutLive?.companySummary, snapAgencySummary]);
 
   const leadImageUrl = proposal.evidences?.leadImageUrl?.trim();
+
+  /** No dashboard: dados do lead atual no CRM; página pública mantém o snapshot gravado. */
+  const displayLead: ProposalLeadSnapshot = useMemo(() => {
+    if (isDashboard && linkedLeadLive && linkedLeadLive.userId === proposal.userId) {
+      return proposalLeadSnapshotFromLead(linkedLeadLive);
+    }
+    return proposal.lead;
+  }, [isDashboard, linkedLeadLive, proposal.lead, proposal.userId]);
 
   /** Ordem: override só desta proposta → imagens atuais em Configurações → snapshot da proposta. */
   const displayAgencyImage = useMemo(() => {
@@ -349,6 +1459,29 @@ export function ProposalView({ proposal, variant, onProposalChange }: ProposalVi
   const companyOverviewParagraphs = splitReadableParagraphs(companyOverviewText);
   const agencySummaryParagraphs = splitReadableParagraphs(displayAgencySummary);
 
+  const agencyContactRows = useMemo(
+    () => buildAgencyContactRows(proposal.agencySnapshot, companyAboutLive, isDashboard),
+    [proposal.agencySnapshot, companyAboutLive, isDashboard],
+  );
+
+  const removePlanPendingTitle = useMemo(() => {
+    if (!removePlanTarget) return null;
+    const pl =
+      removePlanTarget.kind === "spot"
+        ? proposal.spotPlans.find((p) => p.id === removePlanTarget.planId)
+        : proposal.recurringPlans.find((p) => p.id === removePlanTarget.planId);
+    const t = pl?.title?.trim();
+    return t || null;
+  }, [removePlanTarget, proposal.spotPlans, proposal.recurringPlans]);
+
+  const effectiveReportCta = reportCtaProp ?? reportCtaClient ?? resolveReportCtas(null);
+
+  const displayNextSteps = useMemo(() => {
+    const custom = proposal.nextSteps?.map((s) => s.trim()).filter(Boolean) ?? [];
+    if (custom.length) return custom;
+    return [...PROPOSAL_NEXT_STEPS_COPY];
+  }, [proposal.nextSteps]);
+
   const applyProposalPatch = async (
     patch: Partial<Omit<Proposal, "id" | "leadId" | "userId" | "createdAt">>,
   ) => {
@@ -359,17 +1492,153 @@ export function ProposalView({ proposal, variant, onProposalChange }: ProposalVi
       ...patch,
       companyProfile: patch.companyProfile ?? proposal.companyProfile,
       agencySnapshot: patch.agencySnapshot ?? proposal.agencySnapshot,
+      lead: patch.lead ?? proposal.lead,
       evidences: patch.evidences ?? proposal.evidences,
+      spotPlans: patch.spotPlans ?? proposal.spotPlans,
+      recurringPlans: patch.recurringPlans ?? proposal.recurringPlans,
       updatedAt: patch.updatedAt ?? proposal.updatedAt,
     });
   };
 
+  useEffect(() => {
+    if (!isDashboard || !linkedLeadLive || linkedLeadLive.userId !== proposal.userId) return;
+    const nextLead = proposalLeadSnapshotFromLead(linkedLeadLive);
+    if (!proposalLeadSnapshotsDiffer(proposal.lead, nextLead)) return;
+
+    const nextTitle = proposalTitleIfDefaultForCompany(
+      proposal.title,
+      proposal.lead.company,
+      nextLead.company,
+    );
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const updatedAt = Date.now();
+        const patch: Partial<Omit<Proposal, "id" | "leadId" | "userId" | "createdAt">> = {
+          lead: nextLead,
+          updatedAt,
+        };
+        if (nextTitle) patch.title = nextTitle;
+        const id = proposalRef.current.id;
+        await updateProposal(id, patch);
+        if (cancelled || !onProposalChange) return;
+        const prev = proposalRef.current;
+        onProposalChange({
+          ...prev,
+          lead: nextLead,
+          title: nextTitle ?? prev.title,
+          updatedAt,
+        });
+      } catch (e) {
+        console.error(e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isDashboard, linkedLeadLive, onProposalChange, proposal.lead, proposal.title, proposal.userId]);
+
+  const startNextStepsEdit = () => {
+    setFieldError(null);
+    setNextStepsDraft([...displayNextSteps]);
+    setNextStepsEditing(true);
+  };
+
+  const cancelNextStepsEdit = () => {
+    setNextStepsEditing(false);
+  };
+
+  const saveNextSteps = async () => {
+    if (!isDashboard) return;
+    setNextStepsSaving(true);
+    setFieldError(null);
+    try {
+      const cleaned = nextStepsDraft.map((s) => s.trim()).filter(Boolean);
+      await applyProposalPatch({ nextSteps: cleaned, updatedAt: Date.now() });
+      setNextStepsEditing(false);
+    } catch (e) {
+      console.error(e);
+      setFieldError("Não foi possível guardar os próximos passos.");
+    } finally {
+      setNextStepsSaving(false);
+    }
+  };
+
+  const handleAddPlan = async (kind: "spot" | "recurring") => {
+    if (!isDashboard) return;
+    setFieldError(null);
+    try {
+      const fresh = createEmptyProposalPlan();
+      if (kind === "spot") {
+        await applyProposalPatch({
+          spotPlans: [...proposal.spotPlans, fresh],
+          updatedAt: Date.now(),
+        });
+      } else {
+        await applyProposalPatch({
+          recurringPlans: [...proposal.recurringPlans, fresh],
+          updatedAt: Date.now(),
+        });
+      }
+    } catch (e) {
+      console.error(e);
+      setFieldError("Não foi possível adicionar o plano.");
+    }
+  };
+
+  const patchRemovePlan = async (kind: "spot" | "recurring", planId: string) => {
+    if (kind === "spot") {
+      await applyProposalPatch({
+        spotPlans: proposal.spotPlans.filter((p) => p.id !== planId),
+        updatedAt: Date.now(),
+      });
+    } else {
+      await applyProposalPatch({
+        recurringPlans: proposal.recurringPlans.filter((p) => p.id !== planId),
+        updatedAt: Date.now(),
+      });
+    }
+  };
+
+  const handleAbandonEmptyPlan = async (kind: "spot" | "recurring", planId: string) => {
+    if (!isDashboard) return;
+    setFieldError(null);
+    try {
+      await patchRemovePlan(kind, planId);
+    } catch (e) {
+      console.error(e);
+      setFieldError("Não foi possível remover o plano.");
+    }
+  };
+
+  const handleDeletePlan = (kind: "spot" | "recurring", planId: string) => {
+    if (!isDashboard) return;
+    setRemovePlanTarget({ kind, planId });
+  };
+
+  const confirmRemovePlan = async () => {
+    if (!removePlanTarget) return;
+    const { kind, planId } = removePlanTarget;
+    setFieldError(null);
+    setRemovePlanBusy(true);
+    try {
+      await patchRemovePlan(kind, planId);
+      setRemovePlanTarget(null);
+    } catch (e) {
+      console.error(e);
+      setFieldError("Não foi possível remover o plano.");
+    } finally {
+      setRemovePlanBusy(false);
+    }
+  };
+
   const handleCopyLink = async () => {
     if (!publicHref || typeof window === "undefined") return;
-    const url = `${window.location.origin}${publicHref}`;
-    await navigator.clipboard.writeText(url);
+    const origin = publicLinkOrigin || window.location.origin;
+    await navigator.clipboard.writeText(`${origin}${publicHref}`);
     setCopied(true);
-    window.setTimeout(() => setCopied(false), 1600);
+    window.setTimeout(() => setCopied(false), 2000);
   };
 
   const handleSaveProfile = async () => {
@@ -428,7 +1697,7 @@ export function ProposalView({ proposal, variant, onProposalChange }: ProposalVi
 
   return (
     <div className="space-y-8">
-      <section className="relative overflow-hidden rounded-[28px] border border-border bg-card shadow-xl dark:border-white/5 dark:bg-white/[0.02]">
+      <section className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-xl dark:border-white/5 dark:bg-white/[0.02]">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(190,149,83,0.18),transparent_42%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.08),transparent_34%)]" />
         <div className="relative grid gap-8 px-6 py-7 sm:px-8 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,30rem)] lg:items-stretch">
           <div className="flex min-h-0 flex-col space-y-5 lg:min-h-0">
@@ -441,7 +1710,7 @@ export function ProposalView({ proposal, variant, onProposalChange }: ProposalVi
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-sm font-medium text-brand">
                 <FileText className="size-7 shrink-0 sm:size-4" aria-hidden />
-                {proposal.lead.company}
+                {displayLead.company}
               </div>
               <div>
                 <h1 className="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
@@ -484,31 +1753,31 @@ export function ProposalView({ proposal, variant, onProposalChange }: ProposalVi
               </div>
             ) : null}
 
-            {isDashboard ? (
-              <div className="flex flex-wrap items-center gap-3">
-                {publicHref ? (
-                  <>
-                    <Button
-                      type="button"
-                      variant="cta"
-                      size="lg"
-                      className={cn("gap-2", RR.btn)}
-                      onClick={() => void handleCopyLink()}
-                    >
-                      {copied ? <Check className="size-4" aria-hidden /> : <Copy className="size-4" aria-hidden />}
-                      {copied ? "Link copiado" : "Copiar página pública"}
-                    </Button>
-                    <a
-                      href={publicHref}
-                      target="_blank"
-                      rel="noreferrer"
-                      className={cn(buttonVariants({ variant: "outline", size: "lg" }), "gap-2 no-underline", RR.btn)}
-                    >
-                      <ExternalLink className="size-4" aria-hidden />
-                      Abrir página
-                    </a>
-                  </>
-                ) : null}
+            {isDashboard && publicHref && publicLinkOrigin ? (
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                <code className="min-w-0 flex-1 truncate rounded-md bg-muted px-3 py-2 text-left text-sm text-foreground/90">
+                  {`${publicLinkOrigin}${publicHref}`}
+                </code>
+                <div className="flex shrink-0 flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="cta"
+                    className="gap-2"
+                    onClick={() => void handleCopyLink()}
+                  >
+                    {copied ? <Check className="size-4" aria-hidden /> : <Copy className="size-4" aria-hidden />}
+                    {copied ? "Copiado" : "Copiar"}
+                  </Button>
+                  <a
+                    href={publicHref}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={cn(buttonVariants({ variant: "outline" }), "gap-2 no-underline")}
+                  >
+                    <ExternalLink className="size-4" aria-hidden />
+                    Abrir
+                  </a>
+                </div>
               </div>
             ) : null}
           </div>
@@ -517,9 +1786,9 @@ export function ProposalView({ proposal, variant, onProposalChange }: ProposalVi
             <div className="flex items-center -space-x-11 py-4 sm:-space-x-[3.25rem] sm:py-5 lg:-space-x-[3.6rem] lg:py-2">
               <div className="relative z-10">
                 <IdentityThumb
-                  title={proposal.lead.company}
+                  title={displayLead.company}
                   imageUrl={leadImageUrl}
-                  fallback={proposal.lead.company}
+                  fallback={displayLead.company}
                   tone="muted"
                   busy={uploadingSlot === "lead"}
                   replaceButtonSide="left"
@@ -566,6 +1835,33 @@ export function ProposalView({ proposal, variant, onProposalChange }: ProposalVi
           </CardHeader>
 
           <CardContent className="space-y-6 pt-6">
+            <div
+              className={cn(
+                "border border-border bg-background/80 p-4 dark:border-white/10 dark:bg-white/[0.03]",
+                RR.panel,
+              )}
+            >
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                Proposta para:
+              </p>
+              <div className="mt-4 space-y-3 text-sm text-muted-foreground">
+                <div className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-4">
+                  <span>Cliente</span>
+                  <span className="min-w-0 font-medium leading-5 text-foreground">{displayLead.name}</span>
+                </div>
+                <div className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-4">
+                  <span>Empresa</span>
+                  <span className="min-w-0 font-medium leading-5 text-foreground">{displayLead.company}</span>
+                </div>
+                <div className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-4">
+                  <span>Validade</span>
+                  <span className="min-w-0 font-medium leading-5 text-foreground">
+                    {remainingValidityLabel(proposal.validUntilDate)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
             {editingProfile && isDashboard ? (
               <>
                 <div className="space-y-2">
@@ -688,33 +1984,160 @@ export function ProposalView({ proposal, variant, onProposalChange }: ProposalVi
               )}
             </div>
 
-            <div
-              className={cn(
-                "border border-border bg-background/80 p-4 dark:border-white/10 dark:bg-white/[0.03]",
-                RR.panel,
-              )}
-            >
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                Proposta para:
-              </p>
-              <div className="mt-4 space-y-3 text-sm text-muted-foreground">
-                <div className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-4">
-                  <span>Cliente</span>
-                  <span className="min-w-0 font-medium leading-5 text-foreground">{proposal.lead.name}</span>
-                </div>
-                <div className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-4">
-                  <span>Empresa</span>
-                  <span className="min-w-0 font-medium leading-5 text-foreground">{proposal.lead.company}</span>
-                </div>
-                <div className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-4">
-                  <span>Validade</span>
-                  <span className="min-w-0 font-medium leading-5 text-foreground">{remainingValidityLabel(proposal.validUntilDate)}</span>
-                </div>
+            {agencyContactRows.length ? (
+              <div
+                className={cn(
+                  "border border-border bg-muted/25 p-5 dark:border-white/10 dark:bg-white/[0.03]",
+                  RR.panel,
+                )}
+              >
+                <ul className="m-0 list-none space-y-4 p-0">
+                  {agencyContactRows.map((row) => {
+                    const Icon = row.icon;
+                    const body =
+                      row.topicLines && row.topicLines.length > 0 ? (
+                        <ul className="m-0 list-none space-y-2.5 p-0" aria-label={row.label}>
+                          {row.topicLines.map((line, idx) => (
+                            <li key={`${row.key}-${idx}`} className="flex gap-2.5">
+                              <span
+                                className="mt-2 size-1.5 shrink-0 rounded-full bg-brand ring-1 ring-brand/35"
+                                aria-hidden
+                              />
+                              <span className="text-sm font-medium leading-snug text-foreground">{line}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : row.href ? (
+                        <a
+                          href={row.href}
+                          className="text-sm font-medium text-foreground underline decoration-brand/35 underline-offset-2 transition-colors hover:text-brand"
+                          {...(row.external ? { target: "_blank", rel: "noreferrer" } : {})}
+                        >
+                          {row.value}
+                        </a>
+                      ) : (
+                        <span
+                          className={cn(
+                            "text-sm font-medium text-foreground/90",
+                            row.multiline ? "block whitespace-pre-line" : "",
+                          )}
+                        >
+                          {row.value}
+                        </span>
+                      );
+                    return (
+                      <li key={row.key} className="space-y-1">
+                        <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                          <Icon className="size-3.5 shrink-0 text-brand" aria-hidden />
+                          {row.label}
+                        </div>
+                        <div className="pl-5">{body}</div>
+                      </li>
+                    );
+                  })}
+                </ul>
               </div>
-            </div>
+            ) : null}
           </CardContent>
         </Card>
       </div>
+
+      <ProposalPlansSection
+        proposal={proposal}
+        readOnly={!isDashboard}
+        onAddPlan={isDashboard ? (kind) => void handleAddPlan(kind) : undefined}
+        onAbandonEmptyPlan={isDashboard ? (kind, planId) => void handleAbandonEmptyPlan(kind, planId) : undefined}
+        onDeletePlan={isDashboard ? (kind, planId) => void handleDeletePlan(kind, planId) : undefined}
+        onSavePlan={
+          isDashboard
+            ? async (kind, next) => {
+                setFieldError(null);
+                try {
+                  if (kind === "spot") {
+                    await applyProposalPatch({
+                      spotPlans: proposal.spotPlans.map((p) => (p.id === next.id ? next : p)),
+                      updatedAt: Date.now(),
+                    });
+                  } else {
+                    await applyProposalPatch({
+                      recurringPlans: proposal.recurringPlans.map((p) => (p.id === next.id ? next : p)),
+                      updatedAt: Date.now(),
+                    });
+                  }
+                } catch (e) {
+                  console.error(e);
+                  setFieldError("Não foi possível guardar o plano.");
+                  throw e;
+                }
+              }
+            : undefined
+        }
+      />
+
+      <ProposalNextStepsSpotlight
+        stepsForList={nextStepsEditing ? nextStepsDraft : displayNextSteps}
+        leadEmail={displayLead.email}
+        bottomCta={effectiveReportCta.bottom}
+        isDashboard={isDashboard}
+        editing={nextStepsEditing}
+        saving={nextStepsSaving}
+        onStartEdit={startNextStepsEdit}
+        onCancel={cancelNextStepsEdit}
+        onSave={saveNextSteps}
+        onDraftChange={(i, value) =>
+          setNextStepsDraft((prev) => {
+            const next = [...prev];
+            next[i] = value;
+            return next;
+          })
+        }
+        onAddStep={() => setNextStepsDraft((prev) => [...prev, ""])}
+        onRemoveStep={(i) => setNextStepsDraft((prev) => prev.filter((_, j) => j !== i))}
+      />
+
+      {isDashboard ? (
+        <Dialog
+          open={removePlanTarget !== null}
+          onOpenChange={(open) => {
+            if (!open && !removePlanBusy) setRemovePlanTarget(null);
+          }}
+        >
+          <DialogContent showCloseButton={!removePlanBusy} className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Remover este plano?</DialogTitle>
+              <DialogDescription>
+                {removePlanPendingTitle ? (
+                  <>
+                    “{removePlanPendingTitle}” deixará de aparecer nesta proposta e na página pública.
+                  </>
+                ) : (
+                  "Este plano deixará de aparecer nesta proposta e na página pública."
+                )}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2 sm:justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setRemovePlanTarget(null)}
+                disabled={removePlanBusy}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={() => void confirmRemovePlan()}
+                disabled={removePlanBusy}
+                className="gap-2"
+              >
+                {removePlanBusy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
+                Remover
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      ) : null}
     </div>
   );
 }

@@ -8,6 +8,7 @@ import type {
   UserUiTheme,
 } from "@/types/user-settings";
 import { coerceUserAiPromptSettingsRaw } from "@/lib/user-ai-prompt-coerce";
+import { coerceProposalPlansArray, proposalPlanToFirestoreValue } from "@/lib/proposal-plan-coerce";
 
 const USER_SETTINGS_COLLECTION = "userSettings";
 
@@ -50,6 +51,15 @@ function coerceCompanyAboutSettings(raw: Record<string, unknown>): UserCompanyAb
     companySummary: typeof raw.companySummary === "string" ? raw.companySummary : "",
     primaryImageUrl: typeof raw.primaryImageUrl === "string" ? raw.primaryImageUrl : "",
     secondaryImageUrl: typeof raw.secondaryImageUrl === "string" ? raw.secondaryImageUrl : "",
+    companyPhone: typeof raw.companyPhone === "string" ? raw.companyPhone : "",
+    whatsApp: typeof raw.whatsApp === "string" ? raw.whatsApp : "",
+    address: typeof raw.address === "string" ? raw.address : "",
+    websiteUrl: typeof raw.websiteUrl === "string" ? raw.websiteUrl : "",
+    instagramUrl: typeof raw.instagramUrl === "string" ? raw.instagramUrl : "",
+    youtubeUrl: typeof raw.youtubeUrl === "string" ? raw.youtubeUrl : "",
+    services: typeof raw.services === "string" ? raw.services : "",
+    defaultSpotPlans: coerceProposalPlansArray(raw.defaultSpotPlans),
+    defaultRecurringPlans: coerceProposalPlansArray(raw.defaultRecurringPlans),
   };
 }
 
@@ -94,6 +104,15 @@ export async function saveUserCompanyAboutSettings(
       companySummary: settings.companySummary,
       primaryImageUrl: settings.primaryImageUrl,
       secondaryImageUrl: settings.secondaryImageUrl,
+      companyPhone: settings.companyPhone,
+      whatsApp: settings.whatsApp,
+      address: settings.address,
+      websiteUrl: settings.websiteUrl,
+      instagramUrl: settings.instagramUrl,
+      youtubeUrl: settings.youtubeUrl,
+      services: settings.services,
+      defaultSpotPlans: settings.defaultSpotPlans.map(proposalPlanToFirestoreValue),
+      defaultRecurringPlans: settings.defaultRecurringPlans.map(proposalPlanToFirestoreValue),
       updatedAt: serverTimestamp(),
     },
     { merge: true }

@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Payload da proposta inválido." }, { status: 400 });
     }
 
-    const proposalId = await createProposalAdmin(proposal, uid);
+    const proposalId = await createProposalAdmin(proposal, uid, { advanceLeadStatusTo: "Proposta" });
     return NextResponse.json({ ok: true, proposalId });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Erro ao criar proposta.";

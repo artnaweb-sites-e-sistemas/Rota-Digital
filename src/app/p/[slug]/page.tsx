@@ -3,7 +3,11 @@ import { notFound } from "next/navigation";
 
 import { mergeProposalAgencySnapshotForPublicView } from "@/lib/merge-proposal-public-agency";
 import { getCachedPublicProposalBySlug } from "@/lib/public-proposal-cache";
-import { getCachedUserCompanyAboutSettingsAdmin } from "@/lib/user-settings-admin";
+import {
+  getCachedUserCompanyAboutSettingsAdmin,
+  getCachedUserReportCtaSettingsAdmin,
+} from "@/lib/user-settings-admin";
+import { resolveReportCtas } from "@/lib/report-cta";
 import { ProposalView } from "@/components/propostas/proposal-view";
 import type { Proposal } from "@/types/proposal";
 
@@ -80,12 +84,14 @@ export default async function PublicProposalPage({
   if (!raw) notFound();
   const companyAbout = await getCachedUserCompanyAboutSettingsAdmin(raw.userId);
   const proposal = mergeProposalAgencySnapshotForPublicView(toClientProposal(raw), companyAbout);
+  const reportCtaSettings = await getCachedUserReportCtaSettingsAdmin(raw.userId);
+  const reportCta = resolveReportCtas(reportCtaSettings);
 
   return (
     <div className="flex h-dvh max-h-dvh min-h-0 w-full min-w-0 flex-col overflow-hidden bg-background text-foreground">
       <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-background">
         <div className="mx-auto w-full min-h-0 min-w-0 max-w-[1760px] px-6 py-8 sm:px-8 md:px-10">
-          <ProposalView proposal={proposal} variant="public" />
+          <ProposalView proposal={proposal} variant="public" reportCta={reportCta} />
         </div>
       </main>
     </div>

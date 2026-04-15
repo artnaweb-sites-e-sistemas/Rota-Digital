@@ -1,20 +1,25 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { CalendarDays, FileText, Loader2, Plus, Repeat2, Search, Sparkles, Trash2, UserPlus } from "lucide-react";
+import { CalendarDays, FileText, Loader2, Repeat2, Search, Sparkles, UserPlus } from "lucide-react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/auth-context";
+import { createEmptyProposalPlan } from "@/lib/proposal-plan-factory";
+import { normalizeInstallmentCount } from "@/lib/proposal-plan-installments";
+import { clonePlansForNewProposal } from "@/lib/proposal-plan-coerce";
 import { createLead, getLeads } from "@/lib/leads";
 import { getReportByLead } from "@/lib/reports";
 import { getUserCompanyAboutSettings } from "@/lib/user-settings";
 import { newProposalPublicSlug } from "@/lib/proposals";
-import type { Proposal, ProposalPlan } from "@/types/proposal";
+import { ProposalPlanSectionEditor } from "@/components/propostas/proposal-plan-section-editor";
+import { normalizePlanPaymentMethods, sortPaymentMethods } from "@/components/propostas/plan-payment-methods";
+import type { Proposal, ProposalPaymentMethodId, ProposalPlan } from "@/types/proposal";
+import type { UserCompanyAboutSettings } from "@/types/user-settings";
 import { LEAD_STATUSES, type Lead, type LeadStatus } from "@/types/lead";
 import type { RotaDigitalReport } from "@/types/report";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -102,24 +107,8 @@ function formatLeadLabel(lead: Pick<Lead, "name" | "company">): string {
   return `${name} - ${company}`;
 }
 
-function formatCurrencyInput(value: string): string {
-  const digits = value.replace(/\D/g, "");
-  if (!digits) return "";
-  const amount = Number(digits) / 100;
-  return amount.toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  });
-}
-
 function newPlan(): ProposalPlan {
-  return {
-    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    title: "",
-    deliverables: "",
-    price: "",
-    paymentTerms: "",
-  };
+  return createEmptyProposalPlan();
 }
 
 function planHasContent(plan: ProposalPlan): boolean {
@@ -127,7 +116,9 @@ function planHasContent(plan: ProposalPlan): boolean {
     plan.title.trim() ||
       plan.deliverables.trim() ||
       plan.price.trim() ||
-      plan.paymentTerms.trim(),
+      plan.promotionalPrice?.trim() ||
+      plan.paymentTerms.trim() ||
+      (plan.paymentMethods?.length ?? 0) > 0,
   );
 }
 
@@ -137,116 +128,6 @@ function leadImageFromRoute(report: RotaDigitalReport | null): string {
     report?.evidences?.instagramSnapshotUrl?.trim() ||
     report?.evidences?.logoImageUrl?.trim() ||
     ""
-  );
-}
-
-function PlanSection({
-  title,
-  description,
-  icon: Icon,
-  plans,
-  onChange,
-  onAdd,
-  onRemove,
-}: {
-  title: string;
-  description: string;
-  icon: typeof FileText;
-  plans: ProposalPlan[];
-  onChange: (planId: string, field: keyof ProposalPlan, value: string) => void;
-  onAdd: () => void;
-  onRemove: (planId: string) => void;
-}) {
-  return (
-    <Card className="overflow-hidden border-border bg-card shadow-xl dark:border-white/5 dark:bg-white/[0.02]">
-      <CardHeader className="border-b border-border pb-5 dark:border-white/5">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand/10 ring-1 ring-brand/20">
-              <Icon className="size-4 text-brand" aria-hidden />
-            </div>
-            <div>
-              <CardTitle className="text-xl font-bold text-foreground">{title}</CardTitle>
-              <CardDescription className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                {description}
-              </CardDescription>
-            </div>
-          </div>
-          <Button type="button" variant="outline" className="gap-2" onClick={onAdd}>
-            <Plus className="size-4" aria-hidden />
-            Adicionar plano
-          </Button>
-        </div>
-      </CardHeader>
-
-      <CardContent className="space-y-4 pt-6">
-        {plans.map((plan, index) => (
-          <div
-            key={plan.id}
-            className="space-y-4 rounded-2xl border border-border bg-background/70 p-5 dark:border-white/10 dark:bg-white/[0.03]"
-          >
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                  Plano {index + 1}
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground">Defina escopo, valor e forma de pagamento.</p>
-              </div>
-              {plans.length > 1 ? (
-                <Button type="button" variant="ghost" className="gap-2 text-red-600 hover:text-red-700 dark:text-red-300" onClick={() => onRemove(plan.id)}>
-                  <Trash2 className="size-4" aria-hidden />
-                  Remover
-                </Button>
-              ) : null}
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor={`${plan.id}-title`}>Título do plano</Label>
-                <Input
-                  id={`${plan.id}-title`}
-                  value={plan.title}
-                  onChange={(e) => onChange(plan.id, "title", e.target.value)}
-                  placeholder="Ex.: Website institucional estratégico"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor={`${plan.id}-price`}>Valor</Label>
-                <Input
-                  id={`${plan.id}-price`}
-                  value={plan.price}
-                  inputMode="numeric"
-                  onChange={(e) => onChange(plan.id, "price", formatCurrencyInput(e.target.value))}
-                  placeholder="Ex.: R$ 2.500,00"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor={`${plan.id}-deliverables`}>Entregáveis</Label>
-              <Textarea
-                id={`${plan.id}-deliverables`}
-                value={plan.deliverables}
-                onChange={(e) => onChange(plan.id, "deliverables", e.target.value)}
-                className="min-h-28"
-                placeholder="Liste os entregáveis deste plano. Pode usar linhas separadas."
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor={`${plan.id}-payment`}>Condição e forma de pagamento</Label>
-              <Textarea
-                id={`${plan.id}-payment`}
-                value={plan.paymentTerms}
-                onChange={(e) => onChange(plan.id, "paymentTerms", e.target.value)}
-                className="min-h-24"
-                placeholder="Ex.: 50% no aceite e 50% na entrega. Pix, boleto ou cartão."
-              />
-            </div>
-          </div>
-        ))}
-      </CardContent>
-    </Card>
   );
 }
 
@@ -280,12 +161,8 @@ export default function NewProposalPage() {
   const [spotPlans, setSpotPlans] = useState<ProposalPlan[]>([newPlan()]);
   const [recurringPlans, setRecurringPlans] = useState<ProposalPlan[]>([newPlan()]);
 
-  const [companyAboutSettings, setCompanyAboutSettings] = useState<{
-    companyName: string;
-    companySummary: string;
-    primaryImageUrl: string;
-    secondaryImageUrl: string;
-  } | null>(null);
+  const [companyAboutSettings, setCompanyAboutSettings] = useState<UserCompanyAboutSettings | null>(null);
+  const plansSeededRef = useRef(false);
 
   const selectedLead = useMemo(
     () => leads.find((lead) => lead.id === leadId) ?? null,
@@ -350,6 +227,14 @@ export default function NewProposalPage() {
         ]);
         setCompanyAboutSettings(companyAbout);
         setLinkedReport(report);
+
+        if (!plansSeededRef.current) {
+          plansSeededRef.current = true;
+          const spotTpl = companyAbout?.defaultSpotPlans ?? [];
+          const recTpl = companyAbout?.defaultRecurringPlans ?? [];
+          setSpotPlans(spotTpl.length > 0 ? clonePlansForNewProposal(spotTpl) : [newPlan()]);
+          setRecurringPlans(recTpl.length > 0 ? clonePlansForNewProposal(recTpl) : [newPlan()]);
+        }
       } catch (e) {
         console.error(e);
       } finally {
@@ -368,6 +253,26 @@ export default function NewProposalPage() {
     const setter = kind === "spot" ? setSpotPlans : setRecurringPlans;
     setter((prev) =>
       prev.map((plan) => (plan.id === planId ? { ...plan, [field]: value } : plan)),
+    );
+  };
+
+  const updatePlanPaymentMethods = (
+    kind: "spot" | "recurring",
+    planId: string,
+    methods: ProposalPaymentMethodId[],
+  ) => {
+    const setter = kind === "spot" ? setSpotPlans : setRecurringPlans;
+    const next = sortPaymentMethods(methods);
+    setter((prev) =>
+      prev.map((plan) => (plan.id === planId ? { ...plan, paymentMethods: next } : plan)),
+    );
+  };
+
+  const updatePlanInstallmentCount = (kind: "spot" | "recurring", planId: string, count: number) => {
+    const setter = kind === "spot" ? setSpotPlans : setRecurringPlans;
+    const n = normalizeInstallmentCount(count);
+    setter((prev) =>
+      prev.map((plan) => (plan.id === planId ? { ...plan, installmentCount: n } : plan)),
     );
   };
 
@@ -479,6 +384,27 @@ export default function NewProposalPage() {
       ...(optionalTrimmed(companyAboutSettings?.secondaryImageUrl)
         ? { secondaryImageUrl: optionalTrimmed(companyAboutSettings?.secondaryImageUrl) }
         : {}),
+      ...(optionalTrimmed(companyAboutSettings?.companyPhone)
+        ? { companyPhone: optionalTrimmed(companyAboutSettings?.companyPhone) }
+        : {}),
+      ...(optionalTrimmed(companyAboutSettings?.whatsApp)
+        ? { whatsApp: optionalTrimmed(companyAboutSettings?.whatsApp) }
+        : {}),
+      ...(optionalTrimmed(companyAboutSettings?.address)
+        ? { address: optionalTrimmed(companyAboutSettings?.address) }
+        : {}),
+      ...(optionalTrimmed(companyAboutSettings?.websiteUrl)
+        ? { websiteUrl: optionalTrimmed(companyAboutSettings?.websiteUrl) }
+        : {}),
+      ...(optionalTrimmed(companyAboutSettings?.instagramUrl)
+        ? { instagramUrl: optionalTrimmed(companyAboutSettings?.instagramUrl) }
+        : {}),
+      ...(optionalTrimmed(companyAboutSettings?.youtubeUrl)
+        ? { youtubeUrl: optionalTrimmed(companyAboutSettings?.youtubeUrl) }
+        : {}),
+      ...(optionalTrimmed(companyAboutSettings?.services)
+        ? { services: optionalTrimmed(companyAboutSettings?.services) }
+        : {}),
     };
 
     const evidences = {
@@ -577,12 +503,12 @@ export default function NewProposalPage() {
       <Card className="overflow-hidden border-border bg-card shadow-xl dark:border-white/5 dark:bg-white/[0.02]">
         <CardHeader className="border-b border-border pb-5 dark:border-white/5">
           <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand/10 ring-1 ring-brand/20">
+            <div className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center self-start rounded-md bg-brand/10 ring-1 ring-brand/20">
               <Sparkles className="size-4 text-brand" aria-hidden />
             </div>
             <div>
-              <CardTitle className="text-xl font-bold text-foreground">Briefing da proposta</CardTitle>
-              <CardDescription className="mt-2 text-sm leading-relaxed text-muted-foreground">
+              <CardTitle className="text-xl font-bold leading-tight text-foreground">Briefing da proposta</CardTitle>
+              <CardDescription className="mt-1 text-sm leading-snug text-muted-foreground">
                 Escolha o lead e confirme o contexto base da proposta.
               </CardDescription>
             </div>
@@ -628,7 +554,7 @@ export default function NewProposalPage() {
                       window.setTimeout(() => setLeadSearchOpen(false), 120);
                     }}
                     placeholder={loadingLeads ? "Carregando leads…" : "Digite o nome da empresa ou do lead"}
-                    className="pl-9"
+                    className="h-10 pl-9"
                   />
                   {leadSearchOpen ? (
                     <div
@@ -691,7 +617,7 @@ export default function NewProposalPage() {
                   inputMode="numeric"
                   onChange={(e) => setValidUntilInput(formatBrDateInput(e.target.value))}
                   placeholder="22/04/2026"
-                  className="pl-9"
+                  className="h-10 pl-9"
                 />
               </div>
             </div>
@@ -756,22 +682,26 @@ export default function NewProposalPage() {
         </CardContent>
       </Card>
 
-      <PlanSection
+      <ProposalPlanSectionEditor
         title="Execução pontual"
         description="Planos fechados por escopo, com entregáveis e investimento definidos."
         icon={FileText}
         plans={spotPlans}
         onChange={(planId, field, value) => updatePlan("spot", planId, field, value)}
+        onInstallmentCountChange={(planId, count) => updatePlanInstallmentCount("spot", planId, count)}
+        onPaymentMethodsChange={(planId, methods) => updatePlanPaymentMethods("spot", planId, methods)}
         onAdd={() => addPlan("spot")}
         onRemove={(planId) => removePlan("spot", planId)}
       />
 
-      <PlanSection
+      <ProposalPlanSectionEditor
         title="Execução recorrente"
         description="Planos de acompanhamento contínuo com frequência e valor recorrente."
         icon={Repeat2}
         plans={recurringPlans}
         onChange={(planId, field, value) => updatePlan("recurring", planId, field, value)}
+        onInstallmentCountChange={(planId, count) => updatePlanInstallmentCount("recurring", planId, count)}
+        onPaymentMethodsChange={(planId, methods) => updatePlanPaymentMethods("recurring", planId, methods)}
         onAdd={() => addPlan("recurring")}
         onRemove={(planId) => removePlan("recurring", planId)}
       />

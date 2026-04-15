@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Building2, Check, ImagePlus, Loader2, Upload } from "lucide-react";
+import { Building2, Check, FileText, ImagePlus, Loader2, Repeat2, Upload } from "lucide-react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,8 +10,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/auth-context";
+import { ProposalPlanSectionEditor } from "@/components/propostas/proposal-plan-section-editor";
+import { sortPaymentMethods } from "@/components/propostas/plan-payment-methods";
 import { describeManualUploadFailure, uploadUserSettingsImage } from "@/lib/evidence-storage";
+import { createEmptyProposalPlan } from "@/lib/proposal-plan-factory";
+import { normalizeInstallmentCount } from "@/lib/proposal-plan-installments";
 import { getUserCompanyAboutSettings, saveUserCompanyAboutSettings } from "@/lib/user-settings";
+import {
+  digitsFromPhoneInput,
+  maskPhoneDisplayLoose,
+  normalizeWhatsappDigitsForStorage,
+  onlyDigitsPhone,
+} from "@/lib/report-cta";
+import type { ProposalPaymentMethodId, ProposalPlan } from "@/types/proposal";
 import type { UserCompanyAboutSettings } from "@/types/user-settings";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +31,15 @@ const DEFAULT_FORM: UserCompanyAboutSettings = {
   companySummary: "",
   primaryImageUrl: "",
   secondaryImageUrl: "",
+  companyPhone: "",
+  whatsApp: "",
+  address: "",
+  websiteUrl: "",
+  instagramUrl: "",
+  youtubeUrl: "",
+  services: "",
+  defaultSpotPlans: [createEmptyProposalPlan()],
+  defaultRecurringPlans: [createEmptyProposalPlan()],
 };
 
 /** Zona de pré-visualização: mesma altura fixa nos dois cartões (não depende de aspect-ratio). */
@@ -125,7 +145,14 @@ export function CompanyAboutSettingsForm() {
         form.companyName.trim() ||
           form.companySummary.trim() ||
           form.primaryImageUrl.trim() ||
-          form.secondaryImageUrl.trim(),
+          form.secondaryImageUrl.trim() ||
+          form.companyPhone.trim() ||
+          form.whatsApp.trim() ||
+          form.address.trim() ||
+          form.websiteUrl.trim() ||
+          form.instagramUrl.trim() ||
+          form.youtubeUrl.trim() ||
+          form.services.trim(),
       ),
     [form],
   );
@@ -139,9 +166,19 @@ export function CompanyAboutSettingsForm() {
       if (!data) {
         setForm(DEFAULT_FORM);
       } else {
+        const spot =
+          data.defaultSpotPlans.length > 0 ? data.defaultSpotPlans : [createEmptyProposalPlan()];
+        const recurring =
+          data.defaultRecurringPlans.length > 0 ? data.defaultRecurringPlans : [createEmptyProposalPlan()];
         setForm({
           ...data,
           companyName: data.companyName.trim() || DEFAULT_FORM.companyName,
+          companyPhone: onlyDigitsPhone(data.companyPhone ?? "").slice(0, 15),
+          whatsApp: data.whatsApp?.trim()
+            ? normalizeWhatsappDigitsForStorage(onlyDigitsPhone(data.whatsApp))
+            : "",
+          defaultSpotPlans: spot,
+          defaultRecurringPlans: recurring,
         });
       }
     } catch (e) {
@@ -162,6 +199,54 @@ export function CompanyAboutSettingsForm() {
     const id = window.setTimeout(() => setSavedAt(null), 3200);
     return () => window.clearTimeout(id);
   }, [savedAt]);
+
+  const updateDefaultPlan = useCallback(
+    (kind: "spot" | "recurring", planId: string, field: keyof ProposalPlan, value: string) => {
+      const key = kind === "spot" ? "defaultSpotPlans" : "defaultRecurringPlans";
+      setForm((prev) => ({
+        ...prev,
+        [key]: prev[key].map((plan) => (plan.id === planId ? { ...plan, [field]: value } : plan)),
+      }));
+    },
+    [],
+  );
+
+  const updateDefaultInstallments = useCallback(
+    (kind: "spot" | "recurring", planId: string, count: number) => {
+      const key = kind === "spot" ? "defaultSpotPlans" : "defaultRecurringPlans";
+      const n = normalizeInstallmentCount(count);
+      setForm((prev) => ({
+        ...prev,
+        [key]: prev[key].map((plan) => (plan.id === planId ? { ...plan, installmentCount: n } : plan)),
+      }));
+    },
+    [],
+  );
+
+  const updateDefaultPaymentMethods = useCallback(
+    (kind: "spot" | "recurring", planId: string, methods: ProposalPaymentMethodId[]) => {
+      const key = kind === "spot" ? "defaultSpotPlans" : "defaultRecurringPlans";
+      const next = sortPaymentMethods(methods);
+      setForm((prev) => ({
+        ...prev,
+        [key]: prev[key].map((plan) => (plan.id === planId ? { ...plan, paymentMethods: next } : plan)),
+      }));
+    },
+    [],
+  );
+
+  const addDefaultPlan = useCallback((kind: "spot" | "recurring") => {
+    const key = kind === "spot" ? "defaultSpotPlans" : "defaultRecurringPlans";
+    setForm((prev) => ({ ...prev, [key]: [...prev[key], createEmptyProposalPlan()] }));
+  }, []);
+
+  const removeDefaultPlan = useCallback((kind: "spot" | "recurring", planId: string) => {
+    const key = kind === "spot" ? "defaultSpotPlans" : "defaultRecurringPlans";
+    setForm((prev) => ({
+      ...prev,
+      [key]: prev[key].length <= 1 ? prev[key] : prev[key].filter((p) => p.id !== planId),
+    }));
+  }, []);
 
   const handleImageUpload = async (slot: "primary" | "secondary", file: File) => {
     if (!user) return;
@@ -211,6 +296,15 @@ export function CompanyAboutSettingsForm() {
         companySummary,
         primaryImageUrl: form.primaryImageUrl.trim(),
         secondaryImageUrl: form.secondaryImageUrl.trim(),
+        companyPhone: form.companyPhone.trim() ? onlyDigitsPhone(form.companyPhone).slice(0, 15) : "",
+        whatsApp: form.whatsApp.trim() ? normalizeWhatsappDigitsForStorage(form.whatsApp) : "",
+        address: form.address.trim(),
+        websiteUrl: form.websiteUrl.trim(),
+        instagramUrl: form.instagramUrl.trim(),
+        youtubeUrl: form.youtubeUrl.trim(),
+        services: form.services.trim(),
+        defaultSpotPlans: form.defaultSpotPlans,
+        defaultRecurringPlans: form.defaultRecurringPlans,
       };
       await saveUserCompanyAboutSettings(user.uid, payload);
       setForm(payload);
@@ -273,24 +367,156 @@ export function CompanyAboutSettingsForm() {
                   className="min-h-40 resize-y"
                 />
               </div>
+
+              <div className="space-y-3 rounded-xl border border-border bg-muted/20 p-4 dark:border-white/10 dark:bg-white/[0.02]">
+                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Contacto e presença online</p>
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  Campos opcionais. Só aparecem na proposta o que estiver preenchido.
+                </p>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2 sm:col-span-1">
+                    <Label htmlFor="company-about-phone" className="text-xs font-semibold text-muted-foreground">
+                      Telefone
+                    </Label>
+                    <Input
+                      id="company-about-phone"
+                      inputMode="tel"
+                      autoComplete="tel"
+                      value={maskPhoneDisplayLoose(form.companyPhone)}
+                      onChange={(e) => {
+                        const digits = onlyDigitsPhone(e.target.value).slice(0, 15);
+                        setForm((prev) => ({ ...prev, companyPhone: digits }));
+                      }}
+                      placeholder="+55 (11) 98765-4321"
+                      className="h-10"
+                    />
+                  </div>
+                  <div className="space-y-2 sm:col-span-1">
+                    <Label htmlFor="company-about-whatsapp" className="text-xs font-semibold text-muted-foreground">
+                      WhatsApp
+                    </Label>
+                    <Input
+                      id="company-about-whatsapp"
+                      inputMode="tel"
+                      value={maskPhoneDisplayLoose(form.whatsApp)}
+                      onChange={(e) => {
+                        const digits = digitsFromPhoneInput(e.target.value).slice(0, 15);
+                        setForm((prev) => ({
+                          ...prev,
+                          whatsApp: digits ? normalizeWhatsappDigitsForStorage(digits) : "",
+                        }));
+                      }}
+                      placeholder="+55 (11) 98765-4321 ou wa.me/5511…"
+                      className="h-10"
+                    />
+                  </div>
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label htmlFor="company-about-address" className="text-xs font-semibold text-muted-foreground">
+                      Endereço
+                    </Label>
+                    <Textarea
+                      id="company-about-address"
+                      value={form.address}
+                      onChange={(e) => setForm((prev) => ({ ...prev, address: e.target.value }))}
+                      placeholder="Morada completa ou cidade — como quiser exibir ao cliente."
+                      className="min-h-20 resize-y"
+                    />
+                  </div>
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label htmlFor="company-about-site" className="text-xs font-semibold text-muted-foreground">
+                      Site
+                    </Label>
+                    <Input
+                      id="company-about-site"
+                      value={form.websiteUrl}
+                      onChange={(e) => setForm((prev) => ({ ...prev, websiteUrl: e.target.value }))}
+                      placeholder="https://…"
+                      className="h-10"
+                      autoComplete="url"
+                    />
+                  </div>
+                  <div className="space-y-2 sm:col-span-1">
+                    <Label htmlFor="company-about-instagram" className="text-xs font-semibold text-muted-foreground">
+                      Instagram
+                    </Label>
+                    <Input
+                      id="company-about-instagram"
+                      value={form.instagramUrl}
+                      onChange={(e) => setForm((prev) => ({ ...prev, instagramUrl: e.target.value }))}
+                      placeholder="@perfil ou URL"
+                      className="h-10"
+                    />
+                  </div>
+                  <div className="space-y-2 sm:col-span-1">
+                    <Label htmlFor="company-about-youtube" className="text-xs font-semibold text-muted-foreground">
+                      YouTube
+                    </Label>
+                    <Input
+                      id="company-about-youtube"
+                      value={form.youtubeUrl}
+                      onChange={(e) => setForm((prev) => ({ ...prev, youtubeUrl: e.target.value }))}
+                      placeholder="URL do canal ou vídeo"
+                      className="h-10"
+                    />
+                  </div>
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label htmlFor="company-about-services" className="text-xs font-semibold text-muted-foreground">
+                      Serviços
+                    </Label>
+                    <Textarea
+                      id="company-about-services"
+                      value={form.services}
+                      onChange={(e) => setForm((prev) => ({ ...prev, services: e.target.value }))}
+                      placeholder="Liste serviços ou áreas de atuação (várias linhas)."
+                      className="min-h-24 resize-y"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,auto)_minmax(0,1fr)] lg:items-stretch">
+                <SettingsImageCard
+                  variant="logo"
+                  title="Logo da agência"
+                  description="Identidade visual principal da agência"
+                  imageUrl={form.primaryImageUrl}
+                  busy={uploadingSlot === "primary"}
+                  onPickFile={(file) => void handleImageUpload("primary", file)}
+                />
+                <SettingsImageCard
+                  variant="cover"
+                  title="Capa"
+                  description="Opcional. Imagem de capa ou destaque visual na proposta."
+                  imageUrl={form.secondaryImageUrl}
+                  busy={uploadingSlot === "secondary"}
+                  onPickFile={(file) => void handleImageUpload("secondary", file)}
+                />
+              </div>
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,auto)_minmax(0,1fr)] lg:items-stretch">
-              <SettingsImageCard
-                variant="logo"
-                title="Logo da agência"
-                description="Identidade visual principal da agência"
-                imageUrl={form.primaryImageUrl}
-                busy={uploadingSlot === "primary"}
-                onPickFile={(file) => void handleImageUpload("primary", file)}
+            <div className="space-y-4">
+              <ProposalPlanSectionEditor
+                title="Execução pontual"
+                description="Modelos de planos por escopo único; copiados ao criar uma proposta nova."
+                icon={FileText}
+                plans={form.defaultSpotPlans}
+                onChange={(planId, field, value) => updateDefaultPlan("spot", planId, field, value)}
+                onInstallmentCountChange={(planId, count) => updateDefaultInstallments("spot", planId, count)}
+                onPaymentMethodsChange={(planId, methods) => updateDefaultPaymentMethods("spot", planId, methods)}
+                onAdd={() => addDefaultPlan("spot")}
+                onRemove={(planId) => removeDefaultPlan("spot", planId)}
               />
-              <SettingsImageCard
-                variant="cover"
-                title="Capa"
-                description="Opcional. Imagem de capa ou destaque visual na proposta."
-                imageUrl={form.secondaryImageUrl}
-                busy={uploadingSlot === "secondary"}
-                onPickFile={(file) => void handleImageUpload("secondary", file)}
+
+              <ProposalPlanSectionEditor
+                title="Execução recorrente"
+                description="Modelos de planos contínuos ou mensais; copiados ao criar uma proposta nova."
+                icon={Repeat2}
+                plans={form.defaultRecurringPlans}
+                onChange={(planId, field, value) => updateDefaultPlan("recurring", planId, field, value)}
+                onInstallmentCountChange={(planId, count) => updateDefaultInstallments("recurring", planId, count)}
+                onPaymentMethodsChange={(planId, methods) => updateDefaultPaymentMethods("recurring", planId, methods)}
+                onAdd={() => addDefaultPlan("recurring")}
+                onRemove={(planId) => removeDefaultPlan("recurring", planId)}
               />
             </div>
 

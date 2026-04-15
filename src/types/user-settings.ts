@@ -1,3 +1,5 @@
+import type { ProposalPlan } from "@/types/proposal";
+
 export type UserReportCtaMode = "whatsapp" | "url";
 
 /** Tema do painel e base para páginas com alternância (ex.: relatório público). */
@@ -18,6 +20,23 @@ export interface UserCompanyAboutSettings {
   companySummary: string;
   primaryImageUrl: string;
   secondaryImageUrl: string;
+  /** Telefone de contacto (exibição livre; na proposta pode virar link tel:). */
+  companyPhone: string;
+  /** Número com DDI, link wa.me ou texto — conforme preencher. */
+  whatsApp: string;
+  address: string;
+  websiteUrl: string;
+  instagramUrl: string;
+  youtubeUrl: string;
+  /** Serviços ou áreas de atuação (texto livre, várias linhas). */
+  services: string;
+  /**
+   * Modelos de planos (execução pontual) copiados ao abrir “Gerar proposta”.
+   * O que for alterado na proposta antes de salvar fica só nessa proposta.
+   */
+  defaultSpotPlans: ProposalPlan[];
+  /** Modelos de planos (execução recorrente) para novas propostas. */
+  defaultRecurringPlans: ProposalPlan[];
 }
 
 /** Livre = IA sugere qualquer canal; restrito = só rótulos selecionados em recommendedChannels. */

@@ -8,10 +8,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, ExternalLink, Sparkles, Calendar, Trash2, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2, ExternalLink, Sparkles, Compass, Calendar, Eye, Trash2, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { LinkButton } from "@/components/ui/link-button";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { ReportSiteAvatar } from "@/components/report-site-avatar";
 
 const PAGE_SIZE = 10;
@@ -157,7 +158,7 @@ export default function RotasPage() {
           <p className="text-muted-foreground mt-1">Relatórios gerados por IA para seus leads</p>
         </div>
         <LinkButton href="/dashboard/rotas/new" className="gap-2">
-          <Sparkles size={16} />
+          <Compass size={16} aria-hidden />
           Gerar Rota
         </LinkButton>
       </div>
@@ -171,7 +172,7 @@ export default function RotasPage() {
           <Sparkles className="mx-auto mb-4 text-muted-foreground" size={32} />
           <p className="text-lg font-medium text-foreground">Nenhum relatório gerado ainda</p>
           <LinkButton href="/dashboard/rotas/new" className="mt-6 gap-2">
-            <Sparkles size={16} />
+            <Compass size={16} aria-hidden />
             Gerar Rota
           </LinkButton>
         </div>
@@ -244,9 +245,9 @@ export default function RotasPage() {
           {paginatedReports.map((report) => (
             <Card
               key={report.id}
-              className="border-border bg-card transition-colors hover:border-primary/20 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
+              className="flex h-full flex-col border-border bg-card transition-colors hover:border-primary/20 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
             >
-              <CardContent className="p-5 space-y-4">
+              <CardContent className="flex h-full flex-col gap-4 p-5">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex min-w-0 flex-1 items-center gap-2">
                     <ReportSiteAvatar
@@ -296,31 +297,50 @@ export default function RotasPage() {
                   </div>
                 </div>
 
-                <p className="line-clamp-2 text-sm text-muted-foreground">{report.executiveSummary}</p>
+                <p className="line-clamp-2 flex-1 text-sm text-muted-foreground">{report.executiveSummary}</p>
 
-                <div className="flex items-center justify-between pt-1">
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Calendar size={12} />
-                    {new Date(report.createdAt).toLocaleDateString("pt-BR")}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Link
-                      href={`/dashboard/rotas/${report.id}`}
-                      className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-lg px-2 text-sm font-medium text-brand transition-colors hover:bg-brand/10 hover:text-brand dark:text-brand dark:hover:bg-brand/15 dark:hover:text-brand"
+                <div className="mt-auto border-t border-border/60 pt-4 dark:border-zinc-700/70">
+                  <div className="flex flex-col gap-3">
+                    <div
+                      className={cn(
+                        "grid gap-2",
+                        report.publicSlug ? "grid-cols-2" : "grid-cols-1",
+                      )}
                     >
-                      <ExternalLink size={13} />
-                      Visualizar
-                    </Link>
-                    {report.publicSlug ? (
                       <Link
-                        href={`/r/${report.publicSlug}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-lg px-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        href={`/dashboard/rotas/${report.id}`}
+                        className={cn(
+                          buttonVariants({ variant: "cta", size: "sm" }),
+                          "h-auto min-h-9 w-full min-w-0 items-center justify-center gap-1.5 whitespace-normal px-2 py-2 text-center text-xs font-medium leading-tight shadow-sm sm:gap-2 sm:px-2.5 sm:text-[13px]",
+                        )}
                       >
-                        Compartilhar
+                        <Eye className="size-3.5 shrink-0 opacity-95" aria-hidden />
+                        Acessar
                       </Link>
-                    ) : null}
+                      {report.publicSlug ? (
+                        <Link
+                          href={`/r/${report.publicSlug}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={cn(
+                            buttonVariants({ variant: "outline", size: "sm" }),
+                            "h-auto min-h-9 w-full min-w-0 items-center justify-center gap-1.5 whitespace-normal border-border/80 px-2 py-2 text-center text-xs font-medium leading-tight shadow-sm sm:gap-2 sm:px-2.5 sm:text-[13px] dark:border-zinc-600 dark:bg-zinc-900/25 dark:hover:bg-zinc-800/55",
+                          )}
+                        >
+                          <ExternalLink className="size-3.5 shrink-0 opacity-90" aria-hidden />
+                          Página pública
+                        </Link>
+                      ) : null}
+                    </div>
+                    <time
+                      dateTime={new Date(report.createdAt).toISOString()}
+                      className="flex items-center justify-end gap-1.5 text-[11px] tabular-nums text-muted-foreground"
+                    >
+                      <Calendar className="size-3 shrink-0 opacity-65" aria-hidden />
+                      <span className="text-foreground/70 dark:text-zinc-400">
+                        {new Date(report.createdAt).toLocaleDateString("pt-BR")}
+                      </span>
+                    </time>
                   </div>
                 </div>
               </CardContent>

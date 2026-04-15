@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
 export default function SettingsIndexPage() {
-  redirect("/dashboard/settings/dados-basicos");
+  redirect("/dashboard/settings/sobre-a-empresa");
 }

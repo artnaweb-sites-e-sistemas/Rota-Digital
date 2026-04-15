@@ -6,19 +6,21 @@ import {
   Bot,
   ChevronLeft,
   ChevronRight,
+  Compass,
   FileText,
   LayoutDashboard,
   Users,
   Settings,
   LogOut,
-  Sparkles,
   SlidersHorizontal,
   Building2,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { getUserCompanyAboutSettings } from "@/lib/user-settings";
 import { useRouter, usePathname } from "next/navigation";
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import type { UserCompanyAboutSettings } from "@/types/user-settings";
 import { cn } from "@/lib/utils";
 
 const SIDEBAR_COLLAPSED_KEY = "rota-digital-sidebar-collapsed";
@@ -26,14 +28,14 @@ const SIDEBAR_COLLAPSED_KEY = "rota-digital-sidebar-collapsed";
 const navItems = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Leads", href: "/dashboard/leads", icon: Users },
-  { name: "Rotas Digitais", href: "/dashboard/rotas", icon: Sparkles },
+  { name: "Rotas Digitais", href: "/dashboard/rotas", icon: Compass },
   { name: "Propostas", href: "/dashboard/propostas", icon: FileText },
 ] as const;
 
 const settingsSubItems = [
-  { name: "Dados básicos", href: "/dashboard/settings/dados-basicos", icon: SlidersHorizontal },
   { name: "Sobre a Empresa", href: "/dashboard/settings/sobre-a-empresa", icon: Building2 },
   { name: "Inteligência Artificial", href: "/dashboard/settings/inteligencia-artificial", icon: Bot },
+  { name: "Dados básicos", href: "/dashboard/settings/dados-basicos", icon: SlidersHorizontal },
 ] as const;
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -42,6 +44,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const settingsSection = pathname.startsWith("/dashboard/settings");
   const [mainCollapsed, setMainCollapsed] = useState(false);
+  const [companyAbout, setCompanyAbout] = useState<UserCompanyAboutSettings | null>(null);
 
   useEffect(() => {
     try {
@@ -50,6 +53,25 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       /* ignore */
     }
   }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setCompanyAbout(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const data = await getUserCompanyAboutSettings(user.uid);
+        if (!cancelled) setCompanyAbout(data);
+      } catch {
+        if (!cancelled) setCompanyAbout(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   const toggleMainSidebar = () => {
     setMainCollapsed((c) => {
@@ -72,6 +94,9 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   if (loading || !user) {
     return null;
   }
+
+  const agencyName = companyAbout?.companyName?.trim() || "Rota Digital";
+  const agencyLogoUrl = companyAbout?.primaryImageUrl?.trim() || "";
 
   const handleLogout = async () => {
     if (!auth) {
@@ -149,7 +174,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             })}
 
             <Link
-              href="/dashboard/settings"
+              href="/dashboard/settings/sobre-a-empresa"
               title={mainCollapsed ? "Configurações" : undefined}
               aria-label={mainCollapsed ? "Configurações" : undefined}
               className={navLinkClass(settingsSection, mainCollapsed)}
@@ -174,19 +199,70 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             mainCollapsed ? "px-2 pb-3 pt-2" : "px-3",
           )}
         >
-          {!mainCollapsed ? (
-            <div className="mb-3 space-y-2 rounded-xl border border-sidebar-border bg-sidebar-accent/40 p-3 shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:shadow-none">
-              <p
-                className="truncate text-sm font-medium leading-snug text-sidebar-foreground dark:text-zinc-100"
-                title={user.email ?? undefined}
+          {mainCollapsed ? (
+            <div className="mb-3 flex justify-center" title={agencyName}>
+              <div
+                className={cn(
+                  "relative flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-full border border-sidebar-border bg-sidebar-accent/50 shadow-sm",
+                  "dark:border-white/12 dark:bg-white/[0.06]",
+                )}
               >
-                {user.email}
-              </p>
-              <span className="inline-flex w-fit items-center rounded-full border border-brand/30 bg-brand/[0.1] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-brand dark:border-brand/40 dark:bg-brand/15 dark:text-brand">
-                Plano Pro
-              </span>
+                {agencyLogoUrl ? (
+                  <img
+                    src={agencyLogoUrl}
+                    alt=""
+                    className="size-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <Building2 className="size-[1.125rem] text-muted-foreground dark:text-zinc-400" aria-hidden />
+                )}
+              </div>
             </div>
-          ) : null}
+          ) : (
+            <div className="mb-3 rounded-xl border border-sidebar-border bg-sidebar-accent/40 p-3 shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:shadow-none">
+              <div className="flex items-start gap-3">
+                <div
+                  className={cn(
+                    "relative flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-full border border-sidebar-border bg-muted/60 shadow-sm",
+                    "dark:border-white/12 dark:bg-zinc-800/80",
+                  )}
+                >
+                  {agencyLogoUrl ? (
+                    <img
+                      src={agencyLogoUrl}
+                      alt=""
+                      className="size-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <Building2 className="size-7 text-muted-foreground dark:text-zinc-400" aria-hidden />
+                  )}
+                </div>
+                <div className="min-w-0 flex-1 space-y-2">
+                  <div className="space-y-0.5">
+                    <p
+                      className="truncate font-heading text-sm font-semibold leading-tight tracking-tight text-sidebar-foreground dark:text-zinc-100"
+                      title={agencyName}
+                    >
+                      {agencyName}
+                    </p>
+                    {user.email ? (
+                      <p
+                        className="truncate text-[11px] leading-snug text-muted-foreground dark:text-zinc-500"
+                        title={user.email}
+                      >
+                        {user.email}
+                      </p>
+                    ) : null}
+                  </div>
+                  <span className="inline-flex w-fit items-center rounded-full border border-brand/30 bg-brand/[0.1] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-brand dark:border-brand/40 dark:bg-brand/15 dark:text-brand">
+                    Plano Pro
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
           <button
             type="button"
             onClick={handleLogout}
@@ -230,7 +306,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       {/* Segunda sidebar — só na área Configurações */}
       {settingsSection ? (
         <aside className="flex max-h-full min-h-0 w-[13.5rem] shrink-0 flex-col overflow-y-auto border-r border-sidebar-border bg-sidebar/90 text-sidebar-foreground backdrop-blur-xl dark:border-white/5 dark:bg-zinc-950/70">
-          <div className="border-b border-sidebar-border px-4 py-5 dark:border-white/5">
+          <div className="border-b border-sidebar-border py-5 pl-6 pr-4 dark:border-white/5">
             <p className="font-heading text-[10px] font-semibold uppercase tracking-widest text-muted-foreground dark:text-zinc-500">
               Configurações
             </p>

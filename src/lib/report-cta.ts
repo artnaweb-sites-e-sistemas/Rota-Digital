@@ -24,6 +24,30 @@ export function onlyDigitsPhone(input: string): string {
   return input.replace(/\D/g, "");
 }
 
+/** Extrai dígitos do que o utilizador escreve ou cola; reconhece `wa.me/5511…`. */
+export function digitsFromPhoneInput(raw: string): string {
+  const t = raw.trim();
+  const wa = /(?:https?:\/\/)?(?:www\.)?wa\.me\/+?(\d+)/i.exec(t);
+  if (wa?.[1]) return wa[1];
+  return onlyDigitsPhone(t);
+}
+
+/**
+ * Máscara para telefone em formulários: números BR (10–11 dígitos sem DDI ou já com 55)
+ * usam o formato +55 (DD) NNNNN-NNNN; outros ficam como + e os dígitos.
+ */
+export function maskPhoneDisplayLoose(rawDigits: string): string {
+  const d = onlyDigitsPhone(rawDigits).slice(0, 15);
+  if (!d) return "";
+  const asBrNational = d.length >= 10 && d.length <= 11 && !d.startsWith("55");
+  const asBrWithCountry = d.startsWith("55") && d.length >= 12;
+  if (asBrNational || asBrWithCountry) {
+    const with55 = asBrNational ? `55${d}`.slice(0, 15) : d;
+    return maskWhatsappBRDisplay(with55);
+  }
+  return `+${d}`;
+}
+
 /** BR: se vier 10–11 dígitos sem DDI, assume celular com DDD e prefixa 55. */
 export function normalizeWhatsappDigitsForStorage(digits: string): string {
   let d = onlyDigitsPhone(digits);

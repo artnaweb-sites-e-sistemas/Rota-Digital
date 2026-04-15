@@ -18,6 +18,13 @@ export function mergeProposalAgencySnapshotForPublicView(
       companySummary: settings.companySummary?.trim() || snap.companySummary,
       primaryImageUrl: settings.primaryImageUrl?.trim() || snap.primaryImageUrl,
       secondaryImageUrl: settings.secondaryImageUrl?.trim() || snap.secondaryImageUrl,
+      companyPhone: settings.companyPhone?.trim() || snap.companyPhone,
+      whatsApp: settings.whatsApp?.trim() || snap.whatsApp,
+      address: settings.address?.trim() || snap.address,
+      websiteUrl: settings.websiteUrl?.trim() || snap.websiteUrl,
+      instagramUrl: settings.instagramUrl?.trim() || snap.instagramUrl,
+      youtubeUrl: settings.youtubeUrl?.trim() || snap.youtubeUrl,
+      services: settings.services?.trim() || snap.services,
     },
   };
 }

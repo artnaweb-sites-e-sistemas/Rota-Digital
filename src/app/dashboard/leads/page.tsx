@@ -62,6 +62,7 @@ import {
   ChevronRight,
   Copy,
   ExternalLink,
+  FileText,
   Globe,
   Loader2,
   Mail,
@@ -69,8 +70,8 @@ import {
   MoreHorizontal,
   Phone,
   Plus,
+  Compass,
   Search,
-  Sparkles,
   X,
   Users,
 } from "lucide-react";
@@ -515,9 +516,13 @@ const TABLE_EXTERNAL_LINK_CHIP_CLASS =
 const TABLE_PUBLIC_ROUTE_CHIP_CLASS =
   "inline-flex size-[22px] shrink-0 items-center justify-center rounded-md border border-brand/30 bg-brand/10 text-brand transition-colors hover:border-brand/50 hover:bg-brand/18 hover:text-brand focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand/40 focus-visible:ring-offset-1 focus-visible:ring-offset-background dark:border-brand/40 dark:bg-brand/15 dark:text-brand dark:hover:border-brand/50 dark:hover:bg-brand/22";
 
-/** Chip “gerar rota” — tom âmbar, distinto do link externo (ícone Sparkles). */
+/** Chip “gerar rota” — tom âmbar, distinto do link externo (ícone bússola). */
 const TABLE_CREATE_ROUTE_CHIP_CLASS =
   "inline-flex size-[22px] shrink-0 items-center justify-center rounded-md border border-amber-500/35 bg-amber-500/10 text-amber-800 transition-colors hover:border-amber-500/55 hover:bg-amber-500/18 hover:text-amber-950 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500/40 focus-visible:ring-offset-1 focus-visible:ring-offset-background dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200 dark:hover:border-amber-300/45 dark:hover:bg-amber-400/16 dark:hover:text-amber-50";
+
+/** Atalho “gerar proposta” — violeta, alinhado ao status Proposta. */
+const TABLE_PROPOSAL_CHIP_CLASS =
+  "inline-flex size-[22px] shrink-0 items-center justify-center rounded-md border border-violet-500/35 bg-violet-500/10 text-violet-700 transition-colors hover:border-violet-500/55 hover:bg-violet-500/16 hover:text-violet-900 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-violet-500/40 focus-visible:ring-offset-1 focus-visible:ring-offset-background dark:border-violet-400/35 dark:bg-violet-500/15 dark:text-violet-200 dark:hover:border-violet-400/50 dark:hover:bg-violet-500/22 dark:hover:text-violet-50";
 
 const FOLLOWUP_NEUTRAL_BADGE_CLASS =
   "inline-flex h-8 min-w-8 items-center justify-center rounded-md border border-border/80 bg-muted/60 px-1.5 text-[10px] font-bold uppercase tabular-nums tracking-wide text-muted-foreground dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-400";
@@ -564,7 +569,7 @@ function LeadTableSharedRouteLink({
         title="Gerar rota para este lead (abre o formulário com o lead já selecionado)"
         onClick={(e) => e.stopPropagation()}
       >
-        <Sparkles className="size-3 shrink-0" aria-hidden />
+        <Compass className="size-3 shrink-0" aria-hidden />
       </Link>
     );
   }
@@ -589,6 +594,24 @@ function LeadTableSharedRouteLink({
       onClick={(e) => e.stopPropagation()}
     >
       <ExternalLink className="size-3 shrink-0" aria-hidden />
+    </Link>
+  );
+}
+
+function LeadTableProposalLink({ lead, rowHasRoute }: { lead: Lead; rowHasRoute: boolean }) {
+  if (!rowHasRoute || lead.status !== "Rota Gerada" || !lead.reportId) {
+    return null;
+  }
+  const href = `/dashboard/propostas/new?leadId=${encodeURIComponent(lead.id)}`;
+  return (
+    <Link
+      href={href}
+      className={TABLE_PROPOSAL_CHIP_CLASS}
+      aria-label={`Gerar proposta para ${lead.name}`}
+      title="Gerar proposta com este lead (abre o formulário já com o lead selecionado)"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <FileText className="size-3 shrink-0" aria-hidden />
     </Link>
   );
 }
@@ -2052,6 +2075,7 @@ function LeadsPageContent() {
                           rowHasRoute={rowHasRoute}
                           publicSlugByReportId={publicSlugByReportId}
                         />
+                        <LeadTableProposalLink lead={lead} rowHasRoute={rowHasRoute} />
                       </div>
                     </TableCell>
                     <TableCell className="py-4 pl-3 pr-6 text-right align-middle">
