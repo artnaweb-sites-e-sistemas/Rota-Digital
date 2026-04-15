@@ -212,7 +212,7 @@ const ROTA_SWOT_CARD_BOX = "gap-2 py-4 sm:gap-3 sm:py-5";
 
 /** Faixa superior dentro dos cards â€œO que fazer primeiroâ€ / â€œLongo prazoâ€ (corpo da lista fica mais claro). */
 const ROTA_ACTIONLIST_INNER_HEADER =
-  "border-b border-border/65 bg-gradient-to-b from-muted/55 via-muted/38 to-muted/18 px-5 py-4 dark:border-white/[0.08] dark:from-zinc-800/95 dark:via-zinc-900/88 dark:to-zinc-950/90 sm:px-7 sm:py-5 print:border-zinc-200 print:from-zinc-100 print:via-zinc-50 print:to-white";
+  "relative overflow-hidden border-b border-border/70 bg-gradient-to-b from-muted/50 via-muted/28 to-transparent px-5 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.5)] before:pointer-events-none before:absolute before:inset-x-6 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-brand/35 before:to-transparent dark:border-white/[0.09] dark:from-zinc-900/95 dark:via-zinc-900/86 dark:to-zinc-950/88 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] dark:before:via-brand/40 sm:px-7 sm:py-5 sm:before:inset-x-7 print:border-zinc-200 print:from-zinc-100 print:via-zinc-50 print:to-white";
 
 /**
  * Capturas full-page no quadro: em repouso mostra o **topo** da página (início do screenshot).
