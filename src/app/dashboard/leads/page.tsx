@@ -413,7 +413,23 @@ function isLikelyWhatsAppBr(raw: string): boolean {
   return national.charAt(2) === "9";
 }
 
-/** Busca instantânea: qualquer termo deve aparecer em nome, empresa, e-mail ou telefone (trecho ou início de palavra). */
+/** Dígitos do telefone do lead para busca (com variante sem DDI 55). */
+function leadPhoneDigitVariants(raw: string | undefined): string[] {
+  const d = onlyDigitsPhone(raw ?? "").replace(/^0+/, "");
+  if (!d || d.length < 6) return [];
+  const out = new Set<string>();
+  out.add(d);
+  if (d.startsWith("55") && d.length > 4) out.add(d.slice(2));
+  return [...out];
+}
+
+/** Termo tratável como número (só dígitos após limpar), mín. 6 para evitar ruído. */
+function searchTermAsPhoneDigits(term: string): string | null {
+  const d = onlyDigitsPhone(term).replace(/^0+/, "");
+  if (d.length < 6) return null;
+  return d;
+}
+
 /** `?status=` na URL (ex.: vindo do dashboard). */
 function statusFromQueryParam(raw: string | null): LeadStatus | null {
   if (!raw) return null;
@@ -429,6 +445,7 @@ function statusFromQueryParam(raw: string | null): LeadStatus | null {
   return null;
 }
 
+/** Busca em nome, empresa, e-mail, URLs; telefone compara só por dígitos (ex.: 11973290094 casa com +55 (11) 97329-0094). */
 function leadMatchesSearch(lead: Lead, rawQuery: string): boolean {
   const q = normalizeSearchText(rawQuery);
   if (!q) return true;
@@ -442,8 +459,21 @@ function leadMatchesSearch(lead: Lead, rawQuery: string): boolean {
     lead.instagramUrl || "",
   ].map(normalizeSearchText);
   const hayFlat = fieldTexts.join(" ");
+  const phoneVariants = leadPhoneDigitVariants(lead.phone);
   return terms.every((term) => {
     if (hayFlat.includes(term)) return true;
+    const phoneDigits = searchTermAsPhoneDigits(term);
+    if (phoneDigits && phoneVariants.length > 0) {
+      const queryVariants = new Set<string>([phoneDigits]);
+      if (phoneDigits.startsWith("55") && phoneDigits.length > 4) {
+        queryVariants.add(phoneDigits.slice(2));
+      }
+      for (const qd of queryVariants) {
+        for (const pv of phoneVariants) {
+          if (pv.includes(qd) || qd.includes(pv)) return true;
+        }
+      }
+    }
     return fieldTexts.some((field) =>
       field.split(/[\s@._\-/+]+/).some((word) => word.length > 0 && word.startsWith(term)),
     );
@@ -550,9 +580,20 @@ function LeadTableSharedRouteLink({
   );
 }
 
-function LeadTablePhoneCell({ phone }: { phone: string | undefined }) {
+function LeadTablePhoneCell({
+  leadId,
+  phone,
+  lastCopiedLeadId,
+  onPhoneCopied,
+}: {
+  leadId: string;
+  phone: string | undefined;
+  lastCopiedLeadId: string | null;
+  onPhoneCopied: () => void;
+}) {
   const [copied, setCopied] = useState(false);
   const trimmed = phone?.trim() ?? "";
+  const isLastCopiedRow = lastCopiedLeadId === leadId;
   if (!trimmed) {
     return (
       <div className="flex w-full min-w-0 items-center gap-2">
@@ -599,18 +640,27 @@ function LeadTablePhoneCell({ phone }: { phone: string | undefined }) {
             </span>
             <button
               type="button"
-              className="inline-flex size-[22px] items-center justify-center rounded-md border border-border bg-background/70 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/40"
+              className={cn(
+                "inline-flex size-[22px] items-center justify-center rounded-md border border-border bg-background/70 text-muted-foreground transition-[color,transform] duration-200 hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/40 active:scale-[0.92]",
+              )}
               aria-label={`Copiar telefone ${displayPlus55}`}
               title="Copiar telefone sem +55"
               onClick={(e) => {
                 e.stopPropagation();
                 void navigator.clipboard.writeText(copyDigits).then(() => {
+                  onPhoneCopied();
                   setCopied(true);
                   window.setTimeout(() => setCopied(false), 1200);
                 });
               }}
             >
-              <Copy className="size-3" aria-hidden />
+              <Copy
+                className={cn(
+                  "size-3 transition-colors duration-200",
+                  isLastCopiedRow && "text-emerald-600 dark:text-emerald-400",
+                )}
+                aria-hidden
+              />
             </button>
           </span>
         ) : (
@@ -665,6 +715,8 @@ function LeadsPageContent() {
   const pendingRestoreScrollYRef = useRef<number | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Lead | null>(null);
+  /** Último lead em que o utilizador copiou o telefone (destaque no ícone até outro clique). */
+  const [lastPhoneCopyLeadId, setLastPhoneCopyLeadId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -1840,7 +1892,12 @@ function LeadsPageContent() {
                       <span className="block truncate text-sm font-medium text-foreground/90">{lead.email || "Sem e-mail"}</span>
                     </TableCell>
                     <TableCell className="min-w-0 px-3 py-4 align-middle">
-                      <LeadTablePhoneCell phone={lead.phone} />
+                      <LeadTablePhoneCell
+                        leadId={lead.id}
+                        phone={lead.phone}
+                        lastCopiedLeadId={lastPhoneCopyLeadId}
+                        onPhoneCopied={() => setLastPhoneCopyLeadId(lead.id)}
+                      />
                     </TableCell>
                     <TableCell className="px-3 py-4 align-middle">
                       <div className="inline-flex max-w-full items-center gap-2">

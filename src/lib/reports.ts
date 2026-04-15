@@ -70,7 +70,12 @@ export const deleteReport = async (reportId: string): Promise<void> => {
   await deleteDoc(doc(db, REPORTS_COLLECTION, reportId));
 };
 
-/** Exclui o documento do relatório, limpa `reportId` no lead e apaga evidências no Storage. */
+/**
+ * Exclui o relatório e, no mesmo batch, atualiza o lead:
+ * remove `reportId` só se ainda apontava para este relatório; se o status era
+ * "Rota Gerada", volta para "Novo Lead" (sem rota ativa não faz sentido manter).
+ * Assim, ao gerar de novo, o fluxo volta a marcar "Rota Gerada" normalmente.
+ */
 export async function deleteReportAndCleanup(params: {
   reportId: string;
   leadId: string;
@@ -80,27 +85,27 @@ export async function deleteReportAndCleanup(params: {
   const reportRef = doc(db, REPORTS_COLLECTION, reportId);
   const leadRef = doc(db, LEADS_COLLECTION, leadId);
 
-  // Sempre remove o relatório, mesmo que o lead já tenha sido excluído.
-  await deleteDoc(reportRef);
-
-  // Só limpa referência no lead se o documento ainda existir.
-  try {
-    const leadSnap = await getDoc(leadRef);
-    if (leadSnap.exists()) {
-      const data = leadSnap.data();
+  const leadSnap = await getDoc(leadRef);
+  let leadPatch: Record<string, unknown> | null = null;
+  if (leadSnap.exists()) {
+    const data = leadSnap.data();
+    const storedReportId = typeof data.reportId === "string" ? data.reportId.trim() : "";
+    if (storedReportId === reportId) {
       const currentStatus = normalizeLeadStatus(data.status);
-      const payload: Record<string, unknown> = {
+      leadPatch = {
         reportId: deleteField(),
         updatedAt: serverTimestamp(),
+        ...(currentStatus === "Rota Gerada" ? { status: "Novo Lead" } : {}),
       };
-      if (currentStatus === "Rota Gerada") {
-        payload.status = "Novo Lead";
-      }
-      await updateDoc(leadRef, payload);
     }
-  } catch {
-    // Não bloqueia a exclusão do relatório se houver regra/permissão no lead.
   }
+
+  const batch = writeBatch(db);
+  batch.delete(reportRef);
+  if (leadPatch) {
+    batch.update(leadRef, leadPatch);
+  }
+  await batch.commit();
 
   try {
     await deleteReportEvidenceForLead(userId, leadId);
