@@ -12,7 +12,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { updateReport } from "@/lib/reports";
-import { uploadUserEvidenceImageForReport } from "@/lib/evidence-storage";
+import { describeManualUploadFailure, uploadUserEvidenceImageForReport } from "@/lib/evidence-storage";
 import { maturityFromDiagnosticScores } from "@/lib/maturity-from-diagnostics";
 import { getUserReportCtaSettings } from "@/lib/user-settings";
 import { resolveReportCtas } from "@/lib/report-cta";
@@ -1941,30 +1941,28 @@ export function RotaDigitalReportView({
       setEvidenceReplaceSlot(slot);
       setFieldError(null);
       try {
-        const url = await uploadUserEvidenceImageForReport({
+        const result = await uploadUserEvidenceImageForReport({
           file,
           userId: report.userId,
           leadId: report.leadId,
           reportId: report.id,
           slotLabel: slot,
         });
-        if (!url) {
-          setFieldError(
-            "Não foi possível enviar a imagem. Use JPG, PNG ou WebP (máx. 15 MB) ou confira permissões do Storage.",
-          );
+        if (!result.ok) {
+          setFieldError(describeManualUploadFailure(result));
           return;
         }
         const baseEv = { ...(report.evidences || {}) };
         if (slot === "logo") {
-          await applyReportPatch({ evidences: { ...baseEv, logoImageUrl: url } });
+          await applyReportPatch({ evidences: { ...baseEv, logoImageUrl: result.url } });
           return;
         }
         if (slot === "instagramProfile") {
-          await applyReportPatch({ evidences: { ...baseEv, instagramProfileImageUrl: url } });
+          await applyReportPatch({ evidences: { ...baseEv, instagramProfileImageUrl: result.url } });
           return;
         }
         if (slot === "instagramSnapshot") {
-          await applyReportPatch({ evidences: { ...baseEv, instagramSnapshotUrl: url } });
+          await applyReportPatch({ evidences: { ...baseEv, instagramSnapshotUrl: result.url } });
           return;
         }
         if (slot === "siteHero") {
@@ -1977,14 +1975,14 @@ export function RotaDigitalReportView({
               const ev = it.evidenceImageUrl?.trim() || "";
               if (ev === prevHero) {
                 touched = true;
-                return { ...it, evidenceImageUrl: url };
+                return { ...it, evidenceImageUrl: result.url };
               }
               return it;
             });
             if (touched) relinkedScores = sortDiagnosticScoresByScoreAsc(mapped);
           }
           const patch: Partial<RotaDigitalReport> = {
-            evidences: { ...baseEv, siteHeroSnapshotUrl: url },
+            evidences: { ...baseEv, siteHeroSnapshotUrl: result.url },
           };
           if (relinkedScores) {
             patch.diagnosticScores = relinkedScores;
@@ -1998,14 +1996,14 @@ export function RotaDigitalReportView({
           return;
         }
         if (slot === "instagramBioLink") {
-          await applyReportPatch({ evidences: { ...baseEv, instagramBioLinkSnapshotUrl: url } });
+          await applyReportPatch({ evidences: { ...baseEv, instagramBioLinkSnapshotUrl: result.url } });
           return;
         }
         if (slot.startsWith("diagnostic:")) {
           const i = Number.parseInt(slot.slice("diagnostic:".length), 10);
           const arr = [...(report.diagnosticScores || [])];
           if (!Number.isFinite(i) || arr[i] === undefined) return;
-          arr[i] = { ...arr[i]!, evidenceImageUrl: url };
+          arr[i] = { ...arr[i]!, evidenceImageUrl: result.url };
           const ordered = sortDiagnosticScoresByScoreAsc(arr);
           const maturityPatch = maturityFromDiagnosticScores(ordered);
           await applyReportPatch(

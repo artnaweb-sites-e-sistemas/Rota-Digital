@@ -6,12 +6,14 @@ import {
   Bot,
   ChevronLeft,
   ChevronRight,
+  FileText,
   LayoutDashboard,
   Users,
   Settings,
   LogOut,
   Sparkles,
   SlidersHorizontal,
+  Building2,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useRouter, usePathname } from "next/navigation";
@@ -25,10 +27,12 @@ const navItems = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Leads", href: "/dashboard/leads", icon: Users },
   { name: "Rotas Digitais", href: "/dashboard/rotas", icon: Sparkles },
+  { name: "Propostas", href: "/dashboard/propostas", icon: FileText },
 ] as const;
 
 const settingsSubItems = [
   { name: "Dados básicos", href: "/dashboard/settings/dados-basicos", icon: SlidersHorizontal },
+  { name: "Sobre a Empresa", href: "/dashboard/settings/sobre-a-empresa", icon: Building2 },
   { name: "Inteligência Artificial", href: "/dashboard/settings/inteligencia-artificial", icon: Bot },
 ] as const;
 

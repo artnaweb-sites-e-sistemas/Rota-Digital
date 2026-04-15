@@ -19,6 +19,35 @@ function isStoragePermissionError(error: unknown): boolean {
   return false;
 }
 
+export type UserManualStorageUploadResult =
+  | { ok: true; url: string }
+  | {
+      ok: false;
+      reason: "not_image" | "too_large" | "upload_failed";
+      message?: string;
+      firebaseCode?: string;
+    };
+
+/** Mensagem curta para exibir no dashboard quando o upload manual falha. */
+export function describeManualUploadFailure(result: Extract<UserManualStorageUploadResult, { ok: false }>): string {
+  if (result.reason === "not_image") {
+    return "Escolha um ficheiro de imagem (JPG, PNG ou WebP).";
+  }
+  if (result.reason === "too_large") {
+    return "A imagem é demasiado grande (máx. 15 MB).";
+  }
+  if (result.firebaseCode === "storage/unauthorized") {
+    return "Sem permissão no Storage (regras ou sessão). Atualize as regras, confirme o bucket no .env e volte a iniciar sessão.";
+  }
+  if (result.firebaseCode === "storage/unauthenticated") {
+    return "Sessão expirou ou não está autenticado. Inicie sessão outra vez e tente enviar.";
+  }
+  if (result.message) {
+    return `Não foi possível enviar a imagem: ${result.message}`;
+  }
+  return "Não foi possível enviar a imagem agora.";
+}
+
 function isFirebaseStorageUrl(url: string): boolean {
   return (
     url.includes("firebasestorage.googleapis.com") ||
@@ -305,33 +334,85 @@ export async function uploadUserEvidenceImageForReport(params: {
   leadId: string;
   reportId: string;
   slotLabel: string;
-}): Promise<string | null> {
+}): Promise<UserManualStorageUploadResult> {
   const { file, userId, leadId, reportId, slotLabel } = params;
-  if (!file.type.startsWith("image/")) return null;
-  if (file.size > USER_EVIDENCE_REPLACE_MAX_BYTES) return null;
-  if (storageWritesBlocked) return null;
+  return uploadUserFileToStorage({
+    file,
+    destinationPath: `users/${userId}/reports/${leadId}/replace/${reportId}/${slotLabel
+      .replace(/[^a-zA-Z0-9_-]/g, "_")
+      .slice(0, 48)}-${Date.now()}`,
+  });
+}
+
+async function uploadUserFileToStorage(params: {
+  file: File;
+  destinationPath: string;
+}): Promise<UserManualStorageUploadResult> {
+  const { file, destinationPath } = params;
+  if (!file.type.startsWith("image/")) {
+    return { ok: false, reason: "not_image" };
+  }
+  if (file.size > USER_EVIDENCE_REPLACE_MAX_BYTES) {
+    return { ok: false, reason: "too_large" };
+  }
 
   const ext = file.type.includes("png")
     ? "png"
     : file.type.includes("jpeg") || file.type.includes("jpg")
       ? "jpg"
       : "webp";
-  const safeSlot = slotLabel.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 48);
-  const path = `users/${userId}/reports/${leadId}/replace/${reportId}/${safeSlot}-${Date.now()}.${ext}`;
+  const path = `${destinationPath}.${ext}`;
   const storageRef = ref(storage, path);
   try {
     await uploadBytes(storageRef, file, {
       contentType: file.type || "image/jpeg",
       cacheControl: "public,max-age=3600",
     });
-    return await getDownloadURL(storageRef);
+    const url = await getDownloadURL(storageRef);
+    return { ok: true, url };
   } catch (error) {
-    if (isStoragePermissionError(error)) {
-      storageWritesBlocked = true;
-    }
     console.error("[evidence-storage] Falha no upload manual de evidência.", serializeUnknownError(error));
-    return null;
+    if (error instanceof FirebaseError) {
+      return {
+        ok: false,
+        reason: "upload_failed",
+        message: error.message,
+        firebaseCode: error.code,
+      };
+    }
+    if (error instanceof Error) {
+      return { ok: false, reason: "upload_failed", message: error.message };
+    }
+    return { ok: false, reason: "upload_failed", message: String(error) };
   }
+}
+
+export async function uploadUserProposalImage(params: {
+  file: File;
+  userId: string;
+  leadId: string;
+  proposalId: string;
+  slotLabel: string;
+}): Promise<UserManualStorageUploadResult> {
+  const { file, userId, leadId, proposalId, slotLabel } = params;
+  const safeSlot = slotLabel.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 48);
+  return uploadUserFileToStorage({
+    file,
+    destinationPath: `users/${userId}/proposals/${leadId}/replace/${proposalId}/${safeSlot}-${Date.now()}`,
+  });
+}
+
+export async function uploadUserSettingsImage(params: {
+  file: File;
+  userId: string;
+  slotLabel: string;
+}): Promise<UserManualStorageUploadResult> {
+  const { file, userId, slotLabel } = params;
+  const safeSlot = slotLabel.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 48);
+  return uploadUserFileToStorage({
+    file,
+    destinationPath: `users/${userId}/settings/${safeSlot}-${Date.now()}`,
+  });
 }
 
 /** Remove imagens de evidência do Storage para o lead (pastas por timestamp). */

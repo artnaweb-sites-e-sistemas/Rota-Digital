@@ -218,6 +218,17 @@ type PreparedEvidencePayload = {
   bioLinkCandidateUrls: Array<string | undefined>;
 };
 
+function buildVisualAnalysisUnavailableNote(kind: "website" | "instagram", snapshotAvailable: boolean): string {
+  if (kind === "website") {
+    return snapshotAvailable
+      ? "A captura do site está disponível nas evidências do relatório, mas não foi enviada à IA nesta execução; use a imagem como apoio visual e considere reprocessar se quiser uma leitura multimodal completa."
+      : "não foi possível analisar visualmente o website porque a captura real não ficou disponível.";
+  }
+  return snapshotAvailable
+    ? "A captura do Instagram está disponível nas evidências do relatório, mas não foi enviada à IA nesta execução; use a imagem como apoio visual e considere reprocessar se quiser uma leitura multimodal completa."
+    : "não foi possível analisar visualmente o Instagram porque a captura real não ficou disponível.";
+}
+
 type GeminiUsageMetadata = {
   promptTokenCount?: number;
   candidatesTokenCount?: number;
@@ -1228,6 +1239,12 @@ async function prepareEvidencePayload(params: {
     instagramBioLinkTargetUrl
   );
   const proxiedInstagramProfileImageUrl = buildImageProxyUrl(instagramEvidence.profileImageUrl);
+  const proxiedInstagramRecentPostUrls =
+    (instagramEvidence.recentPostImageUrls || [])
+      .map((url) => buildImageProxyUrl(url))
+      .filter((value): value is string => Boolean(value));
+  const proxiedInstagramRecentPostUrl =
+    buildImageProxyUrl(instagramEvidence.recentPostImageUrl) || proxiedInstagramRecentPostUrls[0];
   const logoImageUrl = normalizedWebsiteUrl
     ? `https://www.google.com/s2/favicons?sz=256&domain_url=${encodeURIComponent(normalizedWebsiteUrl)}`
     : undefined;
@@ -1251,7 +1268,12 @@ async function prepareEvidencePayload(params: {
   let siteHeroSnapshotUrl = hasBrowserless
     ? internalWebsiteSnapshotUrl || externalWebsiteSnapshotProxyUrl || externalWebsiteSnapshotUrl
     : externalWebsiteSnapshotProxyUrl || externalWebsiteSnapshotUrl || internalWebsiteSnapshotUrl;
-  const instagramSnapshotCandidates = [internalInstagramSnapshotUrl];
+  const instagramSnapshotCandidates = [
+    internalInstagramSnapshotUrl,
+    proxiedInstagramRecentPostUrl,
+    ...proxiedInstagramRecentPostUrls,
+    proxiedInstagramProfileImageUrl,
+  ];
   const instagramSnapshotUrl = instagramSnapshotCandidates.find(Boolean);
   if (siteHeroSnapshotUrl && siteHeroSnapshotUrl === instagramSnapshotUrl) {
     siteHeroSnapshotUrl = undefined;
@@ -2033,10 +2055,8 @@ export async function POST(req: NextRequest) {
             : "Captura usada na análise de posicionamento e conversão do site."),
       };
     });
-    const hasInstagramCapture =
-      Boolean(instagramImagePart) || Boolean(selectedInstagramSnapshotUrl);
-    const hasWebsiteCapture =
-      Boolean(websiteImagePart) || Boolean(selectedWebsiteSnapshotUrl);
+    const hasInstagramCapture = Boolean(instagramImagePart) || Boolean(instagramSnapshotUrl);
+    const hasWebsiteCapture = Boolean(websiteImagePart) || Boolean(siteHeroSnapshotUrl);
 
     const topicKeyForGate = (raw: string) =>
       raw
@@ -2119,11 +2139,11 @@ export async function POST(req: NextRequest) {
       aiData.websiteResearchNote,
       websiteImagePart
         ? buildWebsiteResearchNote(websiteEvidence)
-        : "não foi possível analisar visualmente o website porque a captura real não ficou disponível."
+        : buildVisualAnalysisUnavailableNote("website", Boolean(siteHeroSnapshotUrl))
     );
     const instagramEvidenceNote = instagramImagePart
       ? buildInstagramResearchNote(instagramEvidence)
-      : "não foi possível analisar visualmente o Instagram porque a captura real não ficou disponível.";
+      : buildVisualAnalysisUnavailableNote("instagram", Boolean(instagramSnapshotUrl));
     const instagramNote = alignInstagramTextWithEvidence(buildScoredResearchNote(
       "Instagram",
       instagramScoreText,

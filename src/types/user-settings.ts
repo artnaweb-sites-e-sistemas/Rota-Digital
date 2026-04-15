@@ -12,6 +12,14 @@ export interface UserReportCtaSettings {
   ctaUrl: string;
 }
 
+/** Dados institucionais da agência usados em propostas comerciais. */
+export interface UserCompanyAboutSettings {
+  companyName: string;
+  companySummary: string;
+  primaryImageUrl: string;
+  secondaryImageUrl: string;
+}
+
 /** Livre = IA sugere qualquer canal; restrito = só rótulos selecionados em recommendedChannels. */
 export type AiRecommendedChannelsPolicy = "open" | "restricted";
 

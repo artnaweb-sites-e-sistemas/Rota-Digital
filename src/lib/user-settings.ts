@@ -2,6 +2,7 @@ import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { db } from "./firebase";
 import type {
   UserAiPromptSettings,
+  UserCompanyAboutSettings,
   UserReportCtaSettings,
   UserReportCtaMode,
   UserUiTheme,
@@ -43,6 +44,15 @@ function coerceSettings(raw: Record<string, unknown>): UserReportCtaSettings {
   };
 }
 
+function coerceCompanyAboutSettings(raw: Record<string, unknown>): UserCompanyAboutSettings {
+  return {
+    companyName: typeof raw.companyName === "string" ? raw.companyName : "",
+    companySummary: typeof raw.companySummary === "string" ? raw.companySummary : "",
+    primaryImageUrl: typeof raw.primaryImageUrl === "string" ? raw.primaryImageUrl : "",
+    secondaryImageUrl: typeof raw.secondaryImageUrl === "string" ? raw.secondaryImageUrl : "",
+  };
+}
+
 export async function getUserReportCtaSettings(userId: string): Promise<UserReportCtaSettings | null> {
   const snap = await getDoc(doc(db, USER_SETTINGS_COLLECTION, userId));
   if (!snap.exists()) return null;
@@ -59,6 +69,31 @@ export async function saveUserReportCtaSettings(
       ctaMode: settings.ctaMode,
       whatsappPhone: settings.whatsappPhone,
       ctaUrl: settings.ctaUrl,
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true }
+  );
+}
+
+export async function getUserCompanyAboutSettings(
+  userId: string
+): Promise<UserCompanyAboutSettings | null> {
+  const snap = await getDoc(doc(db, USER_SETTINGS_COLLECTION, userId));
+  if (!snap.exists()) return null;
+  return coerceCompanyAboutSettings(snap.data() as Record<string, unknown>);
+}
+
+export async function saveUserCompanyAboutSettings(
+  userId: string,
+  settings: UserCompanyAboutSettings
+): Promise<void> {
+  await setDoc(
+    doc(db, USER_SETTINGS_COLLECTION, userId),
+    {
+      companyName: settings.companyName,
+      companySummary: settings.companySummary,
+      primaryImageUrl: settings.primaryImageUrl,
+      secondaryImageUrl: settings.secondaryImageUrl,
       updatedAt: serverTimestamp(),
     },
     { merge: true }

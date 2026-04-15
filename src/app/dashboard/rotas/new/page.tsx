@@ -82,6 +82,23 @@ function normalizeSearchText(s: string): string {
     .trim();
 }
 
+function formatLeadLabel(lead: Pick<Lead, "name" | "company">): string {
+  const name = lead.name.trim();
+  const company = lead.company.trim();
+
+  if (!name) return company;
+  if (!company) return name;
+
+  const normalizedName = normalizeSearchText(name);
+  const normalizedCompany = normalizeSearchText(company);
+
+  if (normalizedName === normalizedCompany) return name;
+  if (normalizedName.includes(normalizedCompany)) return name;
+  if (normalizedCompany.includes(normalizedName)) return company;
+
+  return `${name} - ${company}`;
+}
+
 function formatPhoneBr(value: string): string {
   const digits = value.replace(/\D/g, "").slice(0, 11);
   if (!digits) return "";
@@ -259,7 +276,7 @@ export default function NewRotaPage() {
       setInstagramUrl("");
       return;
     }
-    setLeadQuery(`${selectedLead.name} - ${selectedLead.company}`);
+    setLeadQuery(formatLeadLabel(selectedLead));
     setWebsiteUrl(selectedLead.websiteUrl?.trim() ?? "");
     setInstagramUrl(selectedLead.instagramUrl?.trim() ?? "");
   }, [selectedLead?.id]);
@@ -560,7 +577,7 @@ export default function NewRotaPage() {
       const created = freshLeads.find((l) => l.id === newId) ?? null;
       if (created) {
         setLeadId(created.id);
-        setLeadQuery(`${created.name} - ${created.company}`);
+        setLeadQuery(formatLeadLabel(created));
         setWebsiteUrl(created.websiteUrl?.trim() ?? "");
         setInstagramUrl(created.instagramUrl?.trim() ?? "");
       } else {
@@ -659,7 +676,7 @@ export default function NewRotaPage() {
                               onMouseDown={(e) => e.preventDefault()}
                               onClick={() => {
                                 setLeadId(lead.id);
-                                setLeadQuery(`${lead.name} - ${lead.company}`);
+                                setLeadQuery(formatLeadLabel(lead));
                                 setLeadSearchOpen(false);
                               }}
                               className="w-full px-3 py-2 text-left text-sm hover:bg-muted/60"
