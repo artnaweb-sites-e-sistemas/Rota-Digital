@@ -89,7 +89,7 @@ const PRIORITY_COLORS: Record<string, string> = {
 };
 
 /**
- * Aba “Prioridade …” acima do card de canal.
+ * Aba â€œPrioridade â€¦â€ acima do card de canal.
  * Modo claro: fundo suave + texto escuro + borda visível (harmonia no fundo branco do relatório).
  * Modo escuro: mantém o chip escuro com texto claro.
  */
@@ -102,7 +102,7 @@ const CHANNEL_PRIORITY_TAB_SURFACE: Record<string, string> = {
     "!shadow-sm !border-x !border-t !border-b-0 !border-[color:var(--rota-sev-c-border)]/52 !bg-[oklch(0.97_0.018_150)] !text-[color:var(--rota-sev-c-fg)] !font-semibold dark:!shadow-none dark:!border-transparent dark:!bg-[oklch(0.2_0.035_152_/_0.92)] dark:!text-[color:var(--rota-sev-c-fg-dark)]",
 };
 
-/** Borda 1px do BorderGlow em repouso (inline — evita conflito com `border-border` do componente). */
+/** Borda 1px do BorderGlow em repouso (inline â€” evita conflito com `border-border` do componente). */
 const PRIORITY_RESTING_BORDER: Record<string, string> = {
   Alta: "color-mix(in oklch, var(--rota-sev-a-border) 58%, transparent)",
   Média: "color-mix(in oklch, var(--rota-sev-b-border) 58%, transparent)",
@@ -117,7 +117,7 @@ function channelPriorityBadgeLabel(priority: string): string {
   return `Prioridade ${priority}`;
 }
 
-/** Caixa do ícone nas ações do card de canal — harmoniza com a prioridade. */
+/** Caixa do Ã­cone nas aÃ§Ãµes do card de canal â€” harmoniza com a prioridade. */
 const CHANNEL_ACTION_ICON_SHELL: Record<string, string> = {
   Alta:
     "border-[color:var(--rota-sev-a-border)]/35 bg-[color:var(--rota-sev-a-bar)]/10 text-[color:var(--rota-sev-a-fg)] ring-[color:var(--rota-sev-a-border)]/25 dark:text-[color:var(--rota-sev-a-fg-dark)] dark:ring-[color:var(--rota-sev-a-border)]/20",
@@ -131,11 +131,11 @@ const CHANNEL_ACTION_ICON_SHELL: Record<string, string> = {
 const TOPIC_PILL_BRAND =
   "inline-flex max-w-full items-center gap-1.5 rounded-full border border-brand/35 bg-brand/[0.11] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide leading-none text-brand dark:border-brand/45 dark:bg-brand/15 dark:text-brand";
 
-/** Pill “Website” — lavagem azul muito suave + borda discreta (evidências). */
+/** Pill â€œWebsiteâ€ â€” lavagem azul muito suave + borda discreta (evidÃªncias). */
 const TOPIC_PILL_WEBSITE =
   "inline-flex max-w-full items-center gap-1.5 rounded-full border border-sky-300/50 bg-gradient-to-r from-sky-500/[0.08] via-blue-500/[0.07] to-indigo-500/[0.08] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide leading-none text-foreground dark:border-sky-500/30 dark:from-sky-400/[0.12] dark:via-blue-500/[0.10] dark:to-indigo-500/[0.11]";
 
-/** Pill “Instagram” — lavagem rosa/roxo suave + borda discreta (evidências). */
+/** Pill â€œInstagramâ€ â€” lavagem rosa/roxo suave + borda discreta (evidÃªncias). */
 const TOPIC_PILL_INSTAGRAM =
   "inline-flex max-w-full items-center gap-1.5 rounded-full border border-pink-300/45 bg-gradient-to-r from-fuchsia-500/[0.07] via-rose-500/[0.08] to-amber-500/[0.07] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide leading-none text-foreground dark:border-pink-500/28 dark:from-fuchsia-500/[0.11] dark:via-rose-500/[0.10] dark:to-amber-500/[0.09]";
 
@@ -146,7 +146,7 @@ function channelCardPillClass(channelName: string): string {
   return TOPIC_PILL_BRAND;
 }
 
-/** Rótulo ao lado de ícone na pill — desce o texto para alinhar ao centro óptico do glifo. */
+/** RÃ³tulo ao lado de Ã­cone na pill â€” desce o texto para alinhar ao centro Ã³ptico do glifo. */
 const TOPIC_PILL_LABEL_NEXT_TO_ICON = "translate-y-0.5";
 
 /** Mini wrapper de ícone para cabeçalhos de seção (estilo Bento). */
@@ -187,11 +187,11 @@ function InstagramBrandGlyph(props: SVGProps<SVGSVGElement>) {
 }
 
 /**
- * Casco dos blocos principais: só padding vertical extra no Card (sem -mx / calc — isso “comia” a margem lateral).
+ * Casco dos blocos principais: sÃ³ padding vertical extra no Card (sem -mx / calc â€” isso â€œcomiaâ€ a margem lateral).
  */
 const ROTA_REPORT_CARD_BOX = "py-6 sm:py-7";
 
-/** Casco vertical quando o topo do card é “colado” ao primeiro bloco (ex.: faixa de cabeçalho interna). */
+/** Casco vertical quando o topo do card Ã© â€œcoladoâ€ ao primeiro bloco (ex.: faixa de cabeÃ§alho interna). */
 const ROTA_REPORT_CARD_BOX_FLUSH_TOP = "pb-6 pt-0 sm:pb-7 sm:pt-0";
 
 /**
@@ -210,7 +210,7 @@ const ROTA_REPORT_SURFACE_GLOW_INNER = "bg-card dark:bg-background";
 /** SWOT (3 colunas): menos padding vertical + fundo sólido alinhado ao `card` do tema. */
 const ROTA_SWOT_CARD_BOX = "gap-2 py-4 sm:gap-3 sm:py-5";
 
-/** Faixa superior dentro dos cards “O que fazer primeiro” / “Longo prazo” (corpo da lista fica mais claro). */
+/** Faixa superior dentro dos cards â€œO que fazer primeiroâ€ / â€œLongo prazoâ€ (corpo da lista fica mais claro). */
 const ROTA_ACTIONLIST_INNER_HEADER =
   "border-b border-border/65 bg-gradient-to-b from-muted/55 via-muted/38 to-muted/18 px-5 py-4 dark:border-white/[0.08] dark:from-zinc-800/95 dark:via-zinc-900/88 dark:to-zinc-950/90 sm:px-7 sm:py-5 print:border-zinc-200 print:from-zinc-100 print:via-zinc-50 print:to-white";
 
@@ -268,10 +268,10 @@ const MATURITY_CONFIG = {
   },
 };
 
-/** Quebras “manuais” antes de frases que costumam ser recomendações (melhor escaneabilidade). */
+/** Quebras â€œmanuaisâ€ antes de frases que costumam ser recomendaÃ§Ãµes (melhor escaneabilidade). */
 function applyReadingHeuristics(text: string): string {
   return text
-    /* Evitar quebra forçada antes de "Para chegar a 10…" — o prompt já pede uma única abertura; duplicar parágrafos ficava redundante. */
+    /* Evitar quebra forÃ§ada antes de "Para chegar a 10â€¦" â€” o prompt jÃ¡ pede uma Ãºnica abertura; duplicar parÃ¡grafos ficava redundante. */
     .replace(/\s+(O que falta(?: para .*?)?10\/10)/gi, "\n\n$1")
     .replace(/\s+(Enquanto )/g, "\n\n$1");
 }
@@ -331,7 +331,7 @@ function collapseProseToSingleParagraph(raw: string | undefined): string {
 }
 
 /**
- * Divide texto longo da IA em blocos curtos (1–2 frases) para leitura mais fluida.
+ * Divide texto longo da IA em blocos curtos (1â€“2 frases) para leitura mais fluida.
  * Respeita parágrafos explícitos (`\\n\\n`) vindos do modelo.
  */
 function splitIntoReadableBlocks(
@@ -359,7 +359,7 @@ function splitIntoReadableBlocks(
   return blocks;
 }
 
-/** Blocos de texto com respiro entre frases — uso nos cards do relatório. */
+/** Blocos de texto com respiro entre frases â€” uso nos cards do relatÃ³rio. */
 function ReportProseBlocks({
   text,
   sentencesPerBlock = 2,
@@ -563,7 +563,7 @@ function buildInstagramEvidenceSrc(report: RotaDigitalReport): string | undefine
   return report.evidences?.instagramProfileImageUrl;
 }
 
-/** Capturas de página (Microlink etc.): cabem inteiras no quadro com object-contain, sem “scroll” no hover. */
+/** Capturas de pÃ¡gina (Microlink etc.): cabem inteiras no quadro com object-contain, sem â€œscrollâ€ no hover. */
 function isLikelySitePageSnapshot(src?: string): boolean {
   if (!src) return false;
   const lower = src.toLowerCase();
@@ -614,7 +614,7 @@ function getDiagnosticTopicGlow(score: number): {
 } {
   if (score < 4) {
     return {
-      /** H S L para `buildBoxShadow` — matiz terracota (~24°) */
+      /** H S L para `buildBoxShadow` â€” matiz terracota (~24Â°) */
       glowColor: "24 58 48",
       colors: ["#b85c52", "#9e4a42", "#d48072"],
       restingBorderColor: "color-mix(in oklch, var(--rota-sev-a-border) 58%, transparent)",
@@ -887,7 +887,7 @@ function EvidenceImage({
   className?: string;
   frameClassName?: string;
   hoverScroll?: boolean;
-  /** Deslocamento inicial em repouso (0–1 do overflow). Preferir 0 para não cortar o topo da captura. */
+  /** Deslocamento inicial em repouso (0â€“1 do overflow). Preferir 0 para nÃ£o cortar o topo da captura. */
   initialOffsetRatio?: number;
   /** Encolhe a captura inteira dentro do quadro (site/Microlink), sem crop tipo zoom. */
   fitContain?: boolean;
@@ -959,7 +959,7 @@ function EvidenceImage({
     setTransitionMs(Math.min(7000, Math.max(2200, overflow * 8)));
   }, [initialOffsetRatio]);
 
-  /** Scroll no hover: modo scroll “clássico” ou `fitContain` só em `cover` (box preenchida + pan vertical). */
+  /** Scroll no hover: modo scroll â€œclÃ¡ssicoâ€ ou `fitContain` sÃ³ em `cover` (box preenchida + pan vertical). */
   const scrollMeasureActive =
     panInteractive && (!fitContain || (fitContain && fitContainMode === "cover"));
 
@@ -1005,7 +1005,7 @@ function EvidenceImage({
     );
   }
 
-  /** Com hover: do topo ou do meio → desce até o fim; se o repouso já está no rodapé (funil/CTA) → sobe para o topo. */
+  /** Com hover: do topo ou do meio â†’ desce atÃ© o fim; se o repouso jÃ¡ estÃ¡ no rodapÃ© (funil/CTA) â†’ sobe para o topo. */
   const hoverPanTranslateY =
     hovered && scrollOffset > 0
       ? restOffset >= scrollOffset * 0.72
@@ -1039,7 +1039,7 @@ function EvidenceImage({
                 objectFit: "cover",
                 objectPosition: "center top",
                 transform: `translateY(-${hoverPanTranslateY}px)`,
-                // Pan longo só com o mouse em cima; em repouso não “anima” sozinho.
+                // Pan longo sÃ³ com o mouse em cima; em repouso nÃ£o â€œanimaâ€ sozinho.
                 transition: hovered ? `transform ${transitionMs}ms ease-in-out` : "none",
                 willChange: hovered ? "transform" : "auto",
               }}
@@ -1216,7 +1216,7 @@ function formatDiagnosticTopicPillLabel(topic: string): string {
   return topic.replace(/\s+geral\s*$/i, "").trim();
 }
 
-/** Alinhado ao `generate-route`: só Instagram/rede, exceto “consistência … comunicação” (cruzado). */
+/** Alinhado ao `generate-route`: sÃ³ Instagram/rede, exceto â€œconsistÃªncia â€¦ comunicaÃ§Ã£oâ€ (cruzado). */
 function isInstagramOnlyDiagnosticTopic(topicLower: string): boolean {
   const ascii = topicLower
     .normalize("NFD")
@@ -1482,8 +1482,8 @@ function ChannelCard({
   return (
     <div className="relative flex h-full min-h-0 flex-col pt-1 md:self-stretch">
       {/*
-        Aba fora do BorderGlow (z-0): o glow pinta por cima da borda do frame — o selo fica
-        “por trás” da moldura, igual visual mobile/desktop.
+        Aba fora do BorderGlow (z-0): o glow pinta por cima da borda do frame â€” o selo fica
+        â€œpor trÃ¡sâ€ da moldura, igual visual mobile/desktop.
       */}
       <Badge
         className={cn(
@@ -2180,7 +2180,7 @@ export function RotaDigitalReportView({
       if (!row) return;
       list[sortedIndex] = {
         ...row,
-        actions: [...row.actions, "Nova ação — edite o texto."],
+        actions: [...row.actions, "Nova aÃ§Ã£o â€” edite o texto."],
       };
       await applyReportPatch({ recommendedChannels: list });
     },
@@ -2221,7 +2221,7 @@ export function RotaDigitalReportView({
 
   const appendSwotItem = useCallback(
     async (key: SwotListKey) => {
-      const arr = [...report[key], "Novo ponto — edite o texto."];
+      const arr = [...report[key], "Novo ponto â€” edite o texto."];
       await applyReportPatch({ [key]: arr });
     },
     [report, applyReportPatch],
@@ -2249,7 +2249,7 @@ export function RotaDigitalReportView({
 
   const appendReportStringListItem = useCallback(
     async (key: ReportStringListKey) => {
-      const arr = [...report[key], "Novo ponto — edite o texto."];
+      const arr = [...report[key], "Novo ponto â€” edite o texto."];
       await applyReportPatch({ [key]: arr });
     },
     [report, applyReportPatch],
@@ -2371,7 +2371,7 @@ export function RotaDigitalReportView({
 
   const notes = parseResearchNotes(report.evidences?.researchNotes);
   const instagramEvidenceSrc = buildInstagramEvidenceSrc(report);
-  /** Thumbnail do card “Resumo”: prioriza sempre foto de perfil do Instagram quando houver análise IG; logo/favicon do site só se não houver imagem de Instagram. */
+  /** Thumbnail do card â€œResumoâ€: prioriza sempre foto de perfil do Instagram quando houver anÃ¡lise IG; logo/favicon do site sÃ³ se nÃ£o houver imagem de Instagram. */
   const instagramProfileThumb =
     report.evidences?.instagramProfileImageUrl?.trim() ||
     (instagramEvidenceSrc?.startsWith("/api/instagram-profile-snapshot")
@@ -2544,7 +2544,7 @@ export function RotaDigitalReportView({
 
       {/* Print Header (only on print) */}
       <div className="hidden print:block mb-8">
-        <h1 className="text-3xl font-bold">Rota Digital — {report.leadCompany}</h1>
+        <h1 className="text-3xl font-bold">Rota Digital â€” {report.leadCompany}</h1>
         <p className="text-gray-500 mt-1">
           Relatório gerado em{" "}
           {new Date(report.createdAt).toLocaleDateString("pt-BR", {
@@ -2633,7 +2633,7 @@ export function RotaDigitalReportView({
               ariaLabel="Editar perfil da empresa"
             >
               <ReportProseBlocks
-                text={report.companyProfile?.trim() ? report.companyProfile : "—"}
+                text={report.companyProfile?.trim() ? report.companyProfile : "â€”"}
                 size="md"
                 collapseToTwoParagraphs
                 firstProminent={false}
@@ -2792,7 +2792,7 @@ export function RotaDigitalReportView({
           </CardContent>
         </Card>
 
-        {/* Prazo estimado — fundo em destaque + CTA para apoio / especialista */}
+        {/* Prazo estimado â€” fundo em destaque + CTA para apoio / especialista */}
         <Card
           className={cn(
             "relative flex flex-col overflow-hidden border-border bg-gradient-to-b from-muted/45 to-transparent md:col-span-3 print-white dark:border-white/[0.06] dark:from-zinc-900/85 dark:to-transparent",
@@ -3034,7 +3034,7 @@ export function RotaDigitalReportView({
                 ariaLabel="Editar serviços oferecidos"
               >
                 <ReportProseBlocks
-                  text={report.brief?.servicesOffered?.trim() ? report.brief.servicesOffered : "—"}
+                  text={report.brief?.servicesOffered?.trim() ? report.brief.servicesOffered : "â€”"}
                   size="sm"
                   collapseToTwoParagraphs
                   firstProminent={false}
@@ -3062,7 +3062,7 @@ export function RotaDigitalReportView({
                 ariaLabel="Editar objetivo do briefing"
               >
                 <ReportProseBlocks
-                  text={report.brief?.objective?.trim() ? report.brief.objective : "—"}
+                  text={report.brief?.objective?.trim() ? report.brief.objective : "â€”"}
                   size="sm"
                   collapseToTwoParagraphs
                   firstProminent={false}
@@ -3234,7 +3234,7 @@ export function RotaDigitalReportView({
             }`}
           >
             <div className="flex h-full min-h-0 flex-col gap-3">
-              {/* Mobile: bio em texto duplica a captura do perfil — só mostrar a partir de md. */}
+              {/* Mobile: bio em texto duplica a captura do perfil â€” sÃ³ mostrar a partir de md. */}
               <div className="flex flex-col gap-3 max-md:hidden">
                 <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Bio do Instagram</p>
                 <div
@@ -3272,7 +3272,7 @@ export function RotaDigitalReportView({
                       {report.evidences.instagramBioExcerpt?.trim()
                         ? report.evidences.instagramBioExcerpt
                         : report.evidences.instagramSnapshotUrl
-                          ? "A bio não foi extraída em texto na coleta automática — confira a captura do perfil ao lado para ler a bio e as métricas na imagem."
+                          ? "A bio nÃ£o foi extraÃ­da em texto na coleta automÃ¡tica â€” confira a captura do perfil ao lado para ler a bio e as mÃ©tricas na imagem."
                           : "Bio não disponível na coleta automática."}
                     </p>
                   </DashboardEditableRegion>
@@ -3519,7 +3519,7 @@ export function RotaDigitalReportView({
         </Card>
       ) : null}
 
-      {/* SWOT — moldura com BorderGlow (antes eram só Card, sem hover na borda). */}
+      {/* SWOT â€” moldura com BorderGlow (antes eram sÃ³ Card, sem hover na borda). */}
       <div className="grid min-w-0 grid-cols-1 gap-5 md:grid-cols-3 md:items-stretch [--rota-swot-surface:var(--card)] dark:[--rota-swot-surface:#09090b]">
         <BorderGlow
           edgeSensitivity={30}
@@ -3562,7 +3562,7 @@ export function RotaDigitalReportView({
             >
               <ul className="space-y-0">
                 {report.strengths.length === 0 && strengthsTopicMode ? (
-                  <li className="py-3 text-sm text-muted-foreground">Sem itens — use “Adicionar força”.</li>
+                  <li className="py-3 text-sm text-muted-foreground">Sem itens â€” use â€œAdicionar forÃ§aâ€.</li>
                 ) : null}
                 {report.strengths.map((s, i) => (
                   <li
@@ -3674,7 +3674,7 @@ export function RotaDigitalReportView({
             >
               <ul className="space-y-0">
                 {report.weaknesses.length === 0 && weaknessesTopicMode ? (
-                  <li className="py-3 text-sm text-muted-foreground">Sem itens — use “Adicionar fraqueza”.</li>
+                  <li className="py-3 text-sm text-muted-foreground">Sem itens â€” use â€œAdicionar fraquezaâ€.</li>
                 ) : null}
                 {report.weaknesses.map((w, i) => (
                   <li
@@ -3786,7 +3786,7 @@ export function RotaDigitalReportView({
             >
               <ul className="space-y-0">
                 {report.opportunities.length === 0 && opportunitiesTopicMode ? (
-                  <li className="py-3 text-sm text-muted-foreground">Sem itens — use “Adicionar oportunidade”.</li>
+                  <li className="py-3 text-sm text-muted-foreground">Sem itens â€” use â€œAdicionar oportunidadeâ€.</li>
                 ) : null}
                 {report.opportunities.map((o, i) => (
                   <li
@@ -3886,7 +3886,7 @@ export function RotaDigitalReportView({
         </CardContent>
       </Card>
 
-      {/* Quick wins / longo prazo: apoio à leitura — contraste melhor que muted/50, sem competir com Próximos passos (spotlight + linhas com marca). */}
+      {/* Quick wins / longo prazo: apoio Ã  leitura â€” contraste melhor que muted/50, sem competir com PrÃ³ximos passos (spotlight + linhas com marca). */}
       <div className="grid min-w-0 grid-cols-1 gap-5 md:grid-cols-2">
         <Card
           className={cn(
@@ -3911,18 +3911,18 @@ export function RotaDigitalReportView({
           >
             <ul className="space-y-0">
               {report.quickWins.length === 0 && quickWinsTopicMode ? (
-                <li className="py-3 text-sm text-muted-foreground">Sem itens — use “Adicionar”.</li>
+                <li className="py-3 text-sm text-muted-foreground">Sem itens â€” use â€œAdicionarâ€.</li>
               ) : null}
               {report.quickWins.map((win, i) => (
                 <li
                   key={i}
                   className={cn(
-                    "relative flex items-start gap-3 py-3.5 text-[14px] leading-relaxed text-foreground sm:gap-4 sm:py-4 dark:text-zinc-200/95",
+                    "relative flex items-center gap-3 py-3.5 text-[14px] leading-relaxed text-foreground sm:gap-4 sm:py-4 dark:text-zinc-200/95",
                     i > 0 &&
                       "before:pointer-events-none before:absolute before:left-0 before:right-[8%] before:top-0 before:h-px before:rounded-full before:bg-gradient-to-r before:from-border before:via-border/70 before:to-transparent before:content-[''] dark:before:from-white/22 dark:before:via-white/12 print:before:hidden",
                   )}
                 >
-                  <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-border bg-background text-[11px] font-semibold tabular-nums text-foreground/90 ring-1 ring-border/80 dark:border-border dark:bg-background dark:text-zinc-300 dark:ring-border">
+                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-border bg-background text-[11px] font-semibold tabular-nums text-foreground/90 ring-1 ring-border/80 dark:border-border dark:bg-background dark:text-zinc-300 dark:ring-border">
                     {i + 1}
                   </div>
                   <div className="min-w-0 flex-1">
@@ -4003,18 +4003,18 @@ export function RotaDigitalReportView({
           >
             <ul className="space-y-0">
               {report.longTermActions.length === 0 && longTermTopicMode ? (
-                <li className="py-3 text-sm text-muted-foreground">Sem itens — use “Adicionar”.</li>
+                <li className="py-3 text-sm text-muted-foreground">Sem itens â€” use â€œAdicionarâ€.</li>
               ) : null}
               {report.longTermActions.map((action, i) => (
                 <li
                   key={i}
                   className={cn(
-                    "relative flex items-start gap-3 py-3.5 text-[14px] leading-relaxed text-foreground sm:gap-4 sm:py-4 dark:text-zinc-200/95",
+                    "relative flex items-center gap-3 py-3.5 text-[14px] leading-relaxed text-foreground sm:gap-4 sm:py-4 dark:text-zinc-200/95",
                     i > 0 &&
                       "before:pointer-events-none before:absolute before:left-0 before:right-[8%] before:top-0 before:h-px before:rounded-full before:bg-gradient-to-r before:from-border before:via-border/70 before:to-transparent before:content-[''] dark:before:from-white/22 dark:before:via-white/12 print:before:hidden",
                   )}
                 >
-                  <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-border bg-background text-[11px] font-semibold tabular-nums text-foreground/90 ring-1 ring-border/80 dark:border-border dark:bg-background dark:text-zinc-300 dark:ring-border">
+                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-border bg-background text-[11px] font-semibold tabular-nums text-foreground/90 ring-1 ring-border/80 dark:border-border dark:bg-background dark:text-zinc-300 dark:ring-border">
                     {i + 1}
                   </div>
                   <div className="min-w-0 flex-1">
@@ -4073,7 +4073,7 @@ export function RotaDigitalReportView({
         </Card>
       </div>
 
-      {/* Próximos passos — spotlight ao hover */}
+      {/* PrÃ³ximos passos â€” spotlight ao hover */}
       <CardSpotlight className={cn("scroll-mt-6 w-full print:border-zinc-200 print:bg-white", ROTA_REPORT_CARD_BOX)}>
         <Card
           id="report-proximos-passos"
@@ -4094,17 +4094,53 @@ export function RotaDigitalReportView({
             <CardContent className="px-4 pb-0 sm:px-7">
             <div className="space-y-3">
               {report.nextSteps.length === 0 && nextStepsTopicMode ? (
-                <p className="text-sm text-muted-foreground">Sem passos — use “Adicionar passo”.</p>
+                <p className="text-sm text-muted-foreground">Sem passos â€” use â€œAdicionar passoâ€.</p>
               ) : null}
               {report.nextSteps.map((step, i) => (
-                <div
-                  key={i}
-                  className="relative flex min-w-0 w-full items-start gap-3 rounded-xl border border-border/90 bg-card/75 p-4 transition-colors hover:border-brand/40 dark:border-border dark:bg-secondary/55 sm:gap-4"
-                >
-                  <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-brand/40 bg-brand/10">
-                    <span className="text-[11px] font-bold text-brand dark:text-brand">{i + 1}</span>
-                  </div>
-                  <div className="min-w-0 flex-1">
+                <div key={i} className="group/step relative min-w-0 w-full pl-3 sm:pl-4">
+                  {/* 
+                    Layout de "Borda Contínua": 
+                    A caixa principal tem um recorte circular à esquerda e o número está envolto 
+                    por uma borda que se conecta perfeitamente à caixa fazendo a curva em S.
+                  */}
+                  <div
+                    className={cn(
+                      "relative min-w-0 rounded-md border border-border border-l-transparent bg-card/80 py-4 pl-8 pr-4 sm:pr-6",
+                      "shadow-sm transition-[border-color,box-shadow] duration-300",
+                      "group-hover/step:border-brand/45 group-hover/step:shadow-md group-hover/step:shadow-brand/5",
+                      "dark:border-border dark:bg-secondary/60 dark:group-hover/step:border-brand/35",
+                      // Curvas superior/inferior: só borda horizontal + canto arredondado (sem border-r — evita linha vertical no meio do número).
+                      "before:pointer-events-none before:absolute before:-left-[20px] before:top-1/2 before:h-10 before:w-6 before:-translate-y-full before:rounded-br-md before:border-b before:border-border before:content-[''] dark:before:border-border group-hover/step:before:border-brand/45",
+                      "after:pointer-events-none after:absolute after:-left-[20px] after:top-1/2 after:h-10 after:w-6 after:rounded-tr-md after:border-t after:border-border after:content-[''] dark:after:border-border group-hover/step:after:border-brand/45",
+                    )}
+                  >
+                    {/* Número: anel exterior só na metade direita (metade esquerda “entra” na caixa); interior inteiro por cima. */}
+                    <div className="absolute -left-[21px] top-1/2 z-30 -translate-y-1/2">
+                      <div className="relative size-11 rounded-full bg-card transition-transform duration-300 group-hover/step:scale-110 dark:bg-zinc-950">
+                        <div
+                          className="pointer-events-none absolute inset-0 overflow-hidden [clip-path:inset(0_0_0_50%)]"
+                          aria-hidden
+                        >
+                          <div
+                            className={cn(
+                              "absolute left-1/2 top-1/2 size-11 -translate-x-1/2 -translate-y-1/2 rounded-full border border-border/90 bg-card shadow-sm",
+                              "dark:border-zinc-600/80 dark:bg-zinc-950",
+                              "transition-[border-color,box-shadow] duration-300 group-hover/step:border-brand/50 group-hover/step:shadow-brand/20",
+                            )}
+                          />
+                        </div>
+                        <div
+                          className={cn(
+                            "absolute left-1/2 top-1/2 z-10 flex size-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-brand/30 bg-card text-[13px] font-black tabular-nums text-brand",
+                            "dark:border-brand/35 dark:bg-zinc-900",
+                          )}
+                        >
+                          {i + 1}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="min-w-0">
                     {nextStepsTopicMode ? (
                       <DashboardEditableRegion
                         density="compact"
@@ -4130,6 +4166,7 @@ export function RotaDigitalReportView({
                     ) : (
                       <p className="m-0 text-[14.5px] leading-relaxed text-foreground">{step}</p>
                     )}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -4210,3 +4247,4 @@ export function RotaDigitalReportView({
     </div>
   );
 }
+

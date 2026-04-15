@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
   type KeyboardEvent,
+  type MouseEvent,
   type SVGProps,
 } from "react";
 import { useSearchParams } from "next/navigation";
@@ -17,6 +18,7 @@ import { getLeads, createLead, updateLead } from "@/lib/leads";
 import { deleteReportsByLead, getReportsByUser } from "@/lib/reports";
 import type { RotaDigitalReport } from "@/types/report";
 import { buildWhatsAppHref, maskWhatsappBRDisplay, onlyDigitsPhone } from "@/lib/report-cta";
+import { useLeadTableColumnWidths } from "@/lib/leads-table-column-widths";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -39,7 +41,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { isLeadStatusSelectable, leadHasGeneratedRoute } from "@/lib/lead-status-rules";
-import { getLeadFollowupDay, statusUsesFollowupUrgencyColor } from "@/lib/lead-followup";
+import {
+  compareLeadsForTableSort,
+  getLeadFollowupDay,
+  statusUsesFollowupUrgencyColor,
+} from "@/lib/lead-followup";
 import {
   LEAD_STATUS_DOT_CLASSES,
   LEAD_STATUS_MENU_DOT_CLASSES,
@@ -580,6 +586,40 @@ function LeadTableSharedRouteLink({
   );
 }
 
+function LeadTableColumnResizeHandle({
+  leftColumnIndex,
+  onResizerMouseDown,
+}: {
+  leftColumnIndex: number;
+  onResizerMouseDown: (leftColumnIndex: number, e: MouseEvent<HTMLButtonElement>) => void;
+}) {
+  return (
+    <button
+      type="button"
+      tabIndex={-1}
+      aria-label="Arrastar para redimensionar a coluna"
+      title="Redimensionar coluna"
+      className={cn(
+        "group absolute inset-y-2 right-0 z-10 flex w-2.5 cursor-col-resize items-center justify-center border-0 bg-transparent p-0",
+        "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/45",
+      )}
+      onMouseDown={(e) => onResizerMouseDown(leftColumnIndex, e)}
+    >
+      {/* Linha fina mas legível; o botão largo só define a zona de arrasto. */}
+      <span
+        className={cn(
+          "pointer-events-none block h-[min(64%,2.25rem)] w-px shrink-0 origin-center scale-x-[0.55]",
+          "bg-foreground/[0.14] transition-[transform,background-color] duration-150 ease-out",
+          "group-hover:scale-x-100 group-hover:bg-foreground/[0.24]",
+          "group-active:bg-foreground/[0.3]",
+          "dark:bg-white/[0.16] dark:group-hover:bg-white/[0.26] dark:group-active:bg-white/[0.32]",
+        )}
+        aria-hidden
+      />
+    </button>
+  );
+}
+
 function LeadTablePhoneCell({
   leadId,
   phone,
@@ -597,23 +637,21 @@ function LeadTablePhoneCell({
   if (!trimmed) {
     return (
       <div className="flex w-full min-w-0 items-center gap-2">
+        <span
+          className="inline-flex size-[22px] shrink-0 items-center justify-center rounded-md border border-border/50 bg-muted/35 text-muted-foreground/45"
+          aria-hidden
+          title="Telefone indisponível"
+        >
+          <Copy className="size-3" aria-hidden />
+        </span>
         <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">Sem telefone</span>
-        <div className="inline-flex shrink-0 items-center gap-1.5">
-          <span
-            className="inline-flex size-[22px] items-center justify-center rounded-md border border-border/50 bg-muted/35 text-muted-foreground/45"
-            aria-hidden
-            title="Telefone indisponível"
-          >
-            <Copy className="size-3" aria-hidden />
-          </span>
-          <span
-            className="inline-flex size-[22px] items-center justify-center rounded-md border border-border/50 bg-muted/35 text-muted-foreground/45"
-            aria-hidden
-            title="WhatsApp indisponível"
-          >
-            <WhatsAppIcon className="size-3" aria-hidden />
-          </span>
-        </div>
+        <span
+          className="inline-flex size-[22px] shrink-0 items-center justify-center rounded-md border border-border/50 bg-muted/35 text-muted-foreground/45"
+          aria-hidden
+          title="WhatsApp indisponível"
+        >
+          <WhatsAppIcon className="size-3" aria-hidden />
+        </span>
       </div>
     );
   }
@@ -623,77 +661,75 @@ function LeadTablePhoneCell({
   const displayPlus55 = maskWhatsappBRDisplay(waDigits);
   return (
     <div className="flex w-full min-w-0 items-center gap-2">
+      {copyDigits ? (
+        <span className="relative inline-flex shrink-0 items-center">
+          <span
+            className={cn(
+              "pointer-events-none absolute -top-6 left-1/2 -translate-x-1/2 rounded-md border border-emerald-500/40 bg-emerald-500/12 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-emerald-200 transition-all duration-200",
+              copied ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0",
+            )}
+            aria-hidden
+          >
+            Copiado
+          </span>
+          <button
+            type="button"
+            className={cn(
+              "inline-flex size-[22px] shrink-0 items-center justify-center rounded-md border border-border bg-background/70 text-muted-foreground transition-[color,transform] duration-200 hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/40 active:scale-[0.92]",
+            )}
+            aria-label={`Copiar telefone ${displayPlus55}`}
+            title="Copiar telefone sem +55"
+            onClick={(e) => {
+              e.stopPropagation();
+              void navigator.clipboard.writeText(copyDigits).then(() => {
+                onPhoneCopied();
+                setCopied(true);
+                window.setTimeout(() => setCopied(false), 1200);
+              });
+            }}
+          >
+            <Copy
+              className={cn(
+                "size-3 transition-colors duration-200",
+                isLastCopiedRow && "text-emerald-600 dark:text-emerald-400",
+              )}
+              aria-hidden
+            />
+          </button>
+        </span>
+      ) : (
+        <span
+          className="inline-flex size-[22px] shrink-0 items-center justify-center rounded-md border border-border/50 bg-muted/35 text-muted-foreground/45"
+          aria-hidden
+          title="Copiar indisponível"
+        >
+          <Copy className="size-3" aria-hidden />
+        </span>
+      )}
       <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground" title={displayPlus55}>
         {displayPlus55 || trimmed}
       </span>
-      <div className="inline-flex shrink-0 items-center gap-1.5">
-        {copyDigits ? (
-          <span className="relative inline-flex shrink-0 items-center">
-            <span
-              className={cn(
-                "pointer-events-none absolute -top-6 left-1/2 -translate-x-1/2 rounded-md border border-emerald-500/40 bg-emerald-500/12 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-emerald-200 transition-all duration-200",
-                copied ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0",
-              )}
-              aria-hidden
-            >
-              Copiado
-            </span>
-            <button
-              type="button"
-              className={cn(
-                "inline-flex size-[22px] items-center justify-center rounded-md border border-border bg-background/70 text-muted-foreground transition-[color,transform] duration-200 hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/40 active:scale-[0.92]",
-              )}
-              aria-label={`Copiar telefone ${displayPlus55}`}
-              title="Copiar telefone sem +55"
-              onClick={(e) => {
-                e.stopPropagation();
-                void navigator.clipboard.writeText(copyDigits).then(() => {
-                  onPhoneCopied();
-                  setCopied(true);
-                  window.setTimeout(() => setCopied(false), 1200);
-                });
-              }}
-            >
-              <Copy
-                className={cn(
-                  "size-3 transition-colors duration-200",
-                  isLastCopiedRow && "text-emerald-600 dark:text-emerald-400",
-                )}
-                aria-hidden
-              />
-            </button>
-          </span>
-        ) : (
-          <span
-            className="inline-flex size-[22px] items-center justify-center rounded-md border border-border/50 bg-muted/35 text-muted-foreground/45"
-            aria-hidden
-            title="Copiar indisponível"
-          >
-            <Copy className="size-3" aria-hidden />
-          </span>
-        )}
-        {waHref ? (
-          <a
-            href={waHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={TABLE_EXTERNAL_LINK_CHIP_CLASS}
-            aria-label={`Abrir WhatsApp ${displayPlus55}`}
-            title="Abrir no WhatsApp"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <WhatsAppIcon className="size-3" aria-hidden />
-          </a>
-        ) : (
-          <span
-            className="inline-flex size-[22px] items-center justify-center rounded-md border border-border/50 bg-muted/35 text-muted-foreground/45"
-            aria-hidden
-            title="WhatsApp indisponível"
-          >
-            <WhatsAppIcon className="size-3" aria-hidden />
-          </span>
-        )}
-      </div>
+      {waHref ? (
+        <a
+          href={waHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={TABLE_EXTERNAL_LINK_CHIP_CLASS}
+          aria-label={`Abrir WhatsApp ${displayPlus55}`}
+          title="Abrir no WhatsApp"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <WhatsAppIcon className="size-3" aria-hidden />
+        </a>
+      ) : (
+        <span
+          className="inline-flex size-[22px] shrink-0 items-center justify-center rounded-md border border-border/50 bg-muted/35 text-muted-foreground/45"
+          aria-hidden
+          title="WhatsApp indisponível"
+        >
+          <WhatsAppIcon className="size-3" aria-hidden />
+        </span>
+      )}
     </div>
   );
 }
@@ -704,7 +740,7 @@ function LeadsPageContent() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [reports, setReports] = useState<RotaDigitalReport[]>([]);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("Novo Lead");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(STATUS_FILTER_TODOS);
   const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
   const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -717,6 +753,9 @@ function LeadsPageContent() {
   const [deleteTarget, setDeleteTarget] = useState<Lead | null>(null);
   /** Último lead em que o utilizador copiou o telefone (destaque no ícone até outro clique). */
   const [lastPhoneCopyLeadId, setLastPhoneCopyLeadId] = useState<string | null>(null);
+  const leadsTableRef = useRef<HTMLTableElement | null>(null);
+  const [leadTableColWidthsPct, { onResizerMouseDown: onLeadTableColResizeMouseDown }] =
+    useLeadTableColumnWidths(leadsTableRef);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -848,6 +887,7 @@ function LeadsPageContent() {
   useEffect(() => {
     const parsed = statusFromQueryParam(statusQuery);
     if (parsed) setStatusFilter(parsed);
+    else setStatusFilter(STATUS_FILTER_TODOS);
   }, [statusQuery]);
 
   const filteredLeads = useMemo(
@@ -860,11 +900,7 @@ function LeadsPageContent() {
           if (statusFilter !== STATUS_FILTER_TODOS && lead.status !== statusFilter) return false;
           return true;
         })
-        .sort((a, b) => {
-          const dayDiff = getLeadFollowupDay(b) - getLeadFollowupDay(a);
-          if (dayDiff !== 0) return dayDiff;
-          return b.updatedAt - a.updatedAt;
-        }),
+        .sort(compareLeadsForTableSort),
     [leads, search, statusFilter],
   );
 
@@ -1757,28 +1793,57 @@ function LeadsPageContent() {
             <Loader2 className="animate-spin text-muted-foreground" size={40} />
           </div>
         ) : (
-          <Table className="table-fixed">
+          <Table ref={leadsTableRef} className="table-fixed">
+            <colgroup>
+              {leadTableColWidthsPct.map((pct, i) => (
+                <col key={i} style={{ width: `${pct}%` }} />
+              ))}
+            </colgroup>
             <TableHeader>
               <TableRow className="border-border bg-muted/40 hover:bg-transparent dark:border-white/5 dark:bg-white/[0.03]">
-                <TableHead className="h-auto w-[10%] py-3 pl-6 pr-3 align-middle text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                <TableHead className="relative h-auto py-3 pl-6 pr-3 align-middle text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                   Followup
+                  <LeadTableColumnResizeHandle
+                    leftColumnIndex={0}
+                    onResizerMouseDown={onLeadTableColResizeMouseDown}
+                  />
                 </TableHead>
-                <TableHead className="h-auto w-[17%] px-3 py-3 align-middle text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                <TableHead className="relative h-auto px-3 py-3 align-middle text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                   Nome
+                  <LeadTableColumnResizeHandle
+                    leftColumnIndex={1}
+                    onResizerMouseDown={onLeadTableColResizeMouseDown}
+                  />
                 </TableHead>
-                <TableHead className="h-auto w-[18%] px-3 py-3 align-middle text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                <TableHead className="relative h-auto px-3 py-3 align-middle text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                   Empresa
+                  <LeadTableColumnResizeHandle
+                    leftColumnIndex={2}
+                    onResizerMouseDown={onLeadTableColResizeMouseDown}
+                  />
                 </TableHead>
-                <TableHead className="h-auto w-[22%] px-3 py-3 align-middle text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                <TableHead className="relative h-auto px-3 py-3 align-middle text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                   E-mail
+                  <LeadTableColumnResizeHandle
+                    leftColumnIndex={3}
+                    onResizerMouseDown={onLeadTableColResizeMouseDown}
+                  />
                 </TableHead>
-                <TableHead className="h-auto w-[16%] px-3 py-3 align-middle text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                <TableHead className="relative h-auto px-3 py-3 align-middle text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                   Telefone/Whatsapp
+                  <LeadTableColumnResizeHandle
+                    leftColumnIndex={4}
+                    onResizerMouseDown={onLeadTableColResizeMouseDown}
+                  />
                 </TableHead>
-                <TableHead className="h-auto w-[12%] px-3 py-3 align-middle text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                <TableHead className="relative h-auto px-3 py-3 align-middle text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                   Status
+                  <LeadTableColumnResizeHandle
+                    leftColumnIndex={5}
+                    onResizerMouseDown={onLeadTableColResizeMouseDown}
+                  />
                 </TableHead>
-                <TableHead className="h-auto w-[5%] min-w-[4rem] py-3 pl-3 pr-6 align-middle" />
+                <TableHead className="h-auto min-w-[3rem] py-3 pl-3 pr-6 align-middle" />
               </TableRow>
             </TableHeader>
             <TableBody>
