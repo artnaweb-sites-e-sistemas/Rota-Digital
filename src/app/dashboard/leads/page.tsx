@@ -40,7 +40,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { isLeadStatusSelectable, leadHasGeneratedRoute } from "@/lib/lead-status-rules";
+import {
+  isLeadStatusSelectable,
+  isNovoLeadBlockedFromCurrent,
+  leadHasGeneratedRoute,
+} from "@/lib/lead-status-rules";
 import {
   compareLeadsForTableSort,
   getLeadFollowupDay,
@@ -966,11 +970,13 @@ function LeadsPageContent() {
     const hasRoute = editingLead
       ? leadHasGeneratedRoute({ reportDocumentExists: false, reportIdOnLead: editingLead.reportId })
       : false;
-    if (!isLeadStatusSelectable(status, hasRoute)) {
+    if (!isLeadStatusSelectable(status, hasRoute, editingLead?.status)) {
       setSaveError(
-        hasRoute
-          ? "Com rota gerada não é possível voltar o status para Novo Lead ou Em Contato."
-          : "O status Rota Gerada só fica disponível depois de gerar o relatório para este lead.",
+        status === "Novo Lead" && isNovoLeadBlockedFromCurrent(editingLead?.status)
+          ? "Não é possível voltar para “Novo Lead” a partir de “Em Contato”, “Proposta”, “Convertido” ou “Perdido”."
+          : hasRoute
+            ? "Com rota gerada não é possível voltar o status para Novo Lead ou Em Contato."
+            : "O status Rota Gerada só fica disponível depois de gerar o relatório para este lead.",
       );
       return;
     }
@@ -1058,7 +1064,7 @@ function LeadsPageContent() {
       reportDocumentExists: false,
       reportIdOnLead: leadRow.reportId,
     });
-    if (!isLeadStatusSelectable(next, hasRoute)) return;
+    if (!isLeadStatusSelectable(next, hasRoute, leadRow.status)) return;
     try {
       await updateLead(leadRow.id, { status: next });
       await fetchLeads();
@@ -1395,7 +1401,11 @@ function LeadsPageContent() {
                           })
                         : false;
                       return ALL_STATUSES.map((s) => (
-                        <SelectItem key={s} value={s} disabled={!isLeadStatusSelectable(s, hasRouteForDialog)}>
+                        <SelectItem
+                          key={s}
+                          value={s}
+                          disabled={!isLeadStatusSelectable(s, hasRouteForDialog, editingLead?.status)}
+                        >
                           {s}
                         </SelectItem>
                       ));
@@ -1992,7 +2002,7 @@ function LeadsPageContent() {
                               <DropdownMenuItem
                                 key={s}
                                 disabled={
-                                  lead.status === s || !isLeadStatusSelectable(s, rowHasRoute)
+                                  lead.status === s || !isLeadStatusSelectable(s, rowHasRoute, lead.status)
                                 }
                                 className="gap-2.5 rounded-md py-2"
                                 onClick={() => void handleLeadStatusChange(lead, s)}

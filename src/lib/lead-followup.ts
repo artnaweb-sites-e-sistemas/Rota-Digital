@@ -1,6 +1,6 @@
 import type { Lead, LeadStatus } from "@/types/lead";
 
-const FOLLOWUP_COLOR_STATUSES: LeadStatus[] = ["Em Contato", "Rota Gerada"];
+const FOLLOWUP_COLOR_STATUSES: LeadStatus[] = ["Em Contato", "Rota Gerada", "Proposta"];
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export function shouldResetFollowupOnStatus(nextStatus: LeadStatus): boolean {
@@ -8,7 +8,7 @@ export function shouldResetFollowupOnStatus(nextStatus: LeadStatus): boolean {
 }
 
 export function shouldTrackFollowupStatus(status: LeadStatus): boolean {
-  return status === "Em Contato" || status === "Rota Gerada";
+  return status === "Em Contato" || status === "Rota Gerada" || status === "Proposta";
 }
 
 export function statusUsesFollowupUrgencyColor(status: LeadStatus): boolean {
@@ -38,7 +38,7 @@ export function getLeadFollowupDay(lead: Lead, nowMs: number = Date.now()): numb
  * fica no topo; "Convertido"/"Perdido" não sobem só por terem D maior.
  */
 export function leadTableSortRank(status: LeadStatus): 0 | 1 | 2 {
-  if (status === "Em Contato" || status === "Rota Gerada") return 0;
+  if (status === "Em Contato" || status === "Rota Gerada" || status === "Proposta") return 0;
   if (status === "Novo Lead") return 1;
   return 2;
 }

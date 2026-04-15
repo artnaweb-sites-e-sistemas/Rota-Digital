@@ -26,7 +26,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { leadHasGeneratedRoute, isLeadStatusSelectable } from "@/lib/lead-status-rules";
+import {
+  isLeadStatusSelectable,
+  isNovoLeadBlockedFromCurrent,
+  leadHasGeneratedRoute,
+} from "@/lib/lead-status-rules";
 import { buildWhatsAppHref, maskWhatsappBRDisplay, onlyDigitsPhone } from "@/lib/report-cta";
 import { WhatsAppIcon } from "@/components/icons/whatsapp-icon";
 import { LEAD_STATUS_MENU_DOT_CLASSES, leadStatusDropdownTriggerSurface } from "@/lib/lead-status-ui";
@@ -166,11 +170,13 @@ export default function LeadDetailPage() {
       reportDocumentExists: Boolean(existingReport),
       reportIdOnLead: lead.reportId,
     });
-    if (!isLeadStatusSelectable(editStatus, hasRouteNow)) {
+    if (!isLeadStatusSelectable(editStatus, hasRouteNow, lead.status)) {
       setEditError(
-        hasRouteNow
-          ? "Com rota gerada não é possível voltar o status para Novo Lead ou Em Contato."
-          : "O status Rota Gerada só fica disponível depois de gerar o relatório para este lead.",
+        editStatus === "Novo Lead" && isNovoLeadBlockedFromCurrent(lead.status)
+          ? "Não é possível voltar para “Novo Lead” a partir de “Em Contato”, “Proposta”, “Convertido” ou “Perdido”."
+          : hasRouteNow
+            ? "Com rota gerada não é possível voltar o status para Novo Lead ou Em Contato."
+            : "O status Rota Gerada só fica disponível depois de gerar o relatório para este lead.",
       );
       return;
     }
@@ -202,7 +208,7 @@ export default function LeadDetailPage() {
       reportDocumentExists: Boolean(existingReport),
       reportIdOnLead: lead.reportId,
     });
-    if (!isLeadStatusSelectable(next, hasRouteNow)) return;
+    if (!isLeadStatusSelectable(next, hasRouteNow, lead.status)) return;
     try {
       await updateLead(lead.id, { status: next });
       setLead((prev) => (prev ? { ...prev, status: next } : prev));
@@ -287,7 +293,7 @@ export default function LeadDetailPage() {
               {LEAD_STATUSES.map((s) => (
                 <DropdownMenuItem
                   key={s}
-                  disabled={lead.status === s || !isLeadStatusSelectable(s, hasRoute)}
+                  disabled={lead.status === s || !isLeadStatusSelectable(s, hasRoute, lead.status)}
                   className="gap-2.5 rounded-md py-2"
                   onClick={() => void handleStatusPick(s)}
                 >
@@ -445,7 +451,7 @@ export default function LeadDetailPage() {
                   </SelectTrigger>
                   <SelectContent sideOffset={8}>
                     {LEAD_STATUSES.map((s) => (
-                      <SelectItem key={s} value={s} disabled={!isLeadStatusSelectable(s, hasRoute)}>
+                      <SelectItem key={s} value={s} disabled={!isLeadStatusSelectable(s, hasRoute, lead.status)}>
                         {s}
                       </SelectItem>
                     ))}

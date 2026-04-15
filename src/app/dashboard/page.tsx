@@ -8,10 +8,11 @@ import {
   Compass,
   CheckCircle,
   MessageCircle,
-  Sparkles,
+  Send,
   Loader2,
   ChevronRight,
   Plus,
+  XCircle,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { getLeads } from "@/lib/leads";
@@ -201,9 +202,12 @@ export default function DashboardPage() {
     const total = leads.length;
     const novos = leads.filter((l) => l.status === "Novo Lead").length;
     const emContato = leads.filter((l) => l.status === "Em Contato").length;
+    const propostasCount = leads.filter((l) => l.status === "Proposta").length;
     const convertidos = leads.filter((l) => l.status === "Convertido").length;
-    const taxa =
-      total > 0 ? Math.round((convertidos / total) * 100) : 0;
+    const perdidos = leads.filter((l) => l.status === "Perdido").length;
+    /** % de convertidos sobre a quantidade de rotas geradas (denominador = relatórios na conta). */
+    const taxaConvertidosSobreRotas =
+      reportCount > 0 ? Math.round((convertidos / reportCount) * 100) : 0;
 
     return [
       {
@@ -211,8 +215,8 @@ export default function DashboardPage() {
         value: formatInt(novos),
         description:
           novos === 0
-            ? "Nenhum lead em status “Novo Lead”"
-            : `${formatInt(novos)} lead(s) em status “Novo Lead”`,
+            ? "Ninguém nesta etapa — hora de captar ou qualificar."
+            : "Entrada do funil: ainda sem contacto ou sem avanço.",
         icon: Users,
         color: "text-muted-foreground",
         href: `/dashboard/leads?status=${encodeURIComponent("Novo Lead")}`,
@@ -222,21 +226,35 @@ export default function DashboardPage() {
         value: formatInt(emContato),
         description:
           emContato === 0
-            ? "Nenhum lead em status “Em Contato”"
-            : `${formatInt(emContato)} lead(s) em status “Em Contato”`,
+            ? "Nenhuma conversa ativa nesta fase."
+            : "Follow-up em curso — mantenha o ritmo de contacto.",
         icon: MessageCircle,
-        color: "text-brand",
+        color: "text-muted-foreground",
         href: `/dashboard/leads?status=${encodeURIComponent("Em Contato")}`,
       },
       {
         title: "Rotas Digitais",
         value: formatInt(reportCount),
         description:
-          reportCount === 0 ? "Nenhum relatório gerado ainda" : "Relatórios gerados na sua conta",
-        icon: Sparkles,
+          reportCount === 0
+            ? "Ainda sem relatórios — gere a primeira rota a partir dos leads."
+            : "Inteligência de rota já entregue para estes negócios.",
+        icon: Compass,
         color: "text-brand",
         brandIconAccent: true,
         href: `/dashboard/leads?status=${encodeURIComponent("Rota Gerada")}`,
+      },
+      {
+        title: "Propostas enviadas",
+        value: formatInt(propostasCount),
+        description:
+          propostasCount === 0
+            ? "Nenhuma proposta registada nesta etapa."
+            : "Aguardando retorno, negociação ou fecho.",
+        icon: Send,
+        color: "text-brand",
+        brandIconAccent: true,
+        href: `/dashboard/leads?status=${encodeURIComponent("Proposta")}`,
       },
       {
         title: "Leads convertidos",
@@ -244,13 +262,127 @@ export default function DashboardPage() {
         description:
           total === 0
             ? "Cadastre leads para acompanhar conversões"
-            : `${taxa}% da base com status “Convertido”`,
+            : reportCount === 0
+              ? "Gere rotas digitais — a taxa usa o total de rotas geradas como base"
+              : `${taxaConvertidosSobreRotas}% em relação às ${formatInt(reportCount)} rota(s) gerada(s)`,
         icon: CheckCircle,
         color: "text-green-500",
         href: "/dashboard/leads?status=Convertido",
       },
+      {
+        title: "Leads perdidos",
+        value: formatInt(perdidos),
+        description:
+          perdidos === 0
+            ? "Sem oportunidades marcadas como perdidas."
+            : "Encerrados sem venda",
+        icon: XCircle,
+        color: "text-red-500",
+        href: "/dashboard/leads?status=Perdido",
+      },
     ] as const;
   }, [leads, reportCount]);
+
+  const statusStats = stats.slice(0, 2);
+  const rotasDigitaisStat = stats.find((stat) => stat.title === "Rotas Digitais");
+  const propostaStat = stats.find((stat) => stat.title === "Propostas enviadas");
+  const leadsConvertidosStat = stats.find((stat) => stat.title === "Leads convertidos");
+  const leadsPerdidosStat = stats.find((stat) => stat.title === "Leads perdidos");
+
+  /** Ordem em linhas no desktop: linha1 Novo|Rotas|Convertidos · linha2 Contato|Propostas|Perdidos */
+  const kpiDesktopRowMajor = [
+    stats[0],
+    stats[2],
+    stats[4],
+    stats[1],
+    stats[3],
+    stats[5],
+  ] as const;
+
+  const renderStatCard = (stat: (typeof stats)[number], options?: { compact?: boolean; stretch?: boolean }) => (
+    <Link
+      key={stat.title}
+      href={stat.href}
+      className={cn(
+        "group block min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:focus-visible:ring-offset-zinc-950",
+        options?.stretch && "flex h-full min-h-0 min-w-0 flex-1 flex-col",
+      )}
+    >
+      <Card
+        className={cn(
+          "overflow-visible border border-border bg-card shadow-lg transition-all duration-300 hover:bg-muted/40 dark:border-white/5 dark:bg-white/[0.02] dark:hover:bg-white/[0.04]",
+          options?.stretch && "h-full min-h-0 w-full min-w-0 flex-1",
+        )}
+      >
+        <CardHeader
+          className={cn(
+            "flex flex-row items-center justify-between space-y-0",
+            options?.compact ? "pb-1" : "pb-2",
+          )}
+        >
+          <CardTitle
+            className={cn(
+              "font-bold uppercase tracking-widest text-muted-foreground transition-colors group-hover:text-foreground/80",
+              options?.compact ? "text-[10px]" : "text-xs",
+            )}
+          >
+            {stat.title}
+          </CardTitle>
+          <div
+            className={cn(
+              "flex items-center justify-center rounded-lg transition-all duration-300 group-hover:scale-110",
+              options?.compact ? "h-7 w-7" : "h-8 w-8",
+              stat.color === "text-brand" && "brandIconAccent" in stat && stat.brandIconAccent
+                ? "bg-brand/[0.14] ring-1 ring-brand/32 group-hover:bg-brand/[0.18] group-hover:ring-brand/40 dark:bg-brand/[0.15] dark:ring-brand/34 dark:group-hover:bg-brand/[0.19] dark:group-hover:ring-brand/46"
+                : stat.color === "text-brand"
+                  ? "bg-brand/10 ring-1 ring-brand/25 group-hover:ring-brand/40 dark:bg-brand/[0.12] dark:ring-brand/30 dark:group-hover:ring-brand/45"
+                  : stat.color === "text-muted-foreground"
+                    ? "bg-muted/70 ring-1 ring-border/80 group-hover:ring-border dark:bg-white/[0.06] dark:ring-white/10 dark:group-hover:ring-white/18"
+                    : "bg-muted ring-1 ring-border group-hover:ring-border/80 dark:bg-white/5 dark:ring-white/10 dark:group-hover:ring-white/20",
+              stat.color,
+            )}
+          >
+            <stat.icon className={cn("shrink-0", options?.compact ? "h-3.5 w-3.5" : "h-4 w-4")} aria-hidden />
+          </div>
+        </CardHeader>
+        <CardContent
+          className={cn(
+            options?.compact ? "pt-1" : "pt-2",
+            options?.stretch && "flex min-h-0 flex-1 flex-col",
+          )}
+        >
+          {loading ? (
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Loader2 className="size-5 shrink-0 animate-spin" aria-hidden />
+            </div>
+          ) : (
+            <>
+              <div
+                className={cn(
+                  "font-bold tracking-tight",
+                  options?.compact ? "text-2xl" : "text-3xl",
+                  stat.color === "text-green-500" && "text-green-600 dark:text-green-400",
+                  stat.color === "text-red-500" && "text-red-600 dark:text-red-400",
+                  stat.color !== "text-green-500" && stat.color !== "text-red-500" && "text-foreground",
+                )}
+              >
+                {stat.value}
+              </div>
+              <p
+                className={cn(
+                  "font-medium leading-relaxed text-muted-foreground",
+                  options?.compact ? "mt-1 text-[11px]" : "mt-2 text-xs",
+                  options?.stretch && "mt-auto",
+                )}
+              >
+                {stat.description}
+              </p>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </Link>
+  );
 
   return (
     <div className="space-y-8">
@@ -259,49 +391,23 @@ export default function DashboardPage() {
         <p className="text-lg text-muted-foreground">Bem-vindo à sua central de inteligência digital.</p>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat, i) => (
-          <Link
-            key={i}
-            href={stat.href}
-            className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:focus-visible:ring-offset-zinc-950"
-          >
-            <Card className="h-full overflow-visible border border-border bg-card shadow-lg transition-all duration-300 hover:bg-muted/40 dark:border-white/5 dark:bg-white/[0.02] dark:hover:bg-white/[0.04]">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-xs font-bold uppercase tracking-widest text-muted-foreground transition-colors group-hover:text-foreground/80">
-                  {stat.title}
-                </CardTitle>
-                <div
-                  className={cn(
-                    "flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-300 group-hover:scale-110",
-                    stat.color === "text-brand" && "brandIconAccent" in stat && stat.brandIconAccent
-                      ? "bg-brand/[0.14] ring-1 ring-brand/32 group-hover:bg-brand/[0.18] group-hover:ring-brand/40 dark:bg-brand/[0.15] dark:ring-brand/34 dark:group-hover:bg-brand/[0.19] dark:group-hover:ring-brand/46"
-                      : stat.color === "text-brand"
-                        ? "bg-brand/10 ring-1 ring-brand/25 group-hover:ring-brand/40 dark:bg-brand/[0.12] dark:ring-brand/30 dark:group-hover:ring-brand/45"
-                        : stat.color === "text-muted-foreground"
-                          ? "bg-muted/70 ring-1 ring-border/80 group-hover:ring-border dark:bg-white/[0.06] dark:ring-white/10 dark:group-hover:ring-white/18"
-                          : "bg-muted ring-1 ring-border group-hover:ring-border/80 dark:bg-white/5 dark:ring-white/10 dark:group-hover:ring-white/20",
-                    stat.color,
-                  )}
-                >
-                  <stat.icon className="h-4 w-4 shrink-0" aria-hidden />
-                </div>
-              </CardHeader>
-              <CardContent className="pt-2">
-                {loading ? (
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Loader2 className="size-5 shrink-0 animate-spin" aria-hidden />
-                  </div>
-                ) : (
-                  <>
-                    <div className="text-3xl font-bold tracking-tight text-foreground">{stat.value}</div>
-                    <p className="mt-2 text-xs font-medium leading-relaxed text-muted-foreground">{stat.description}</p>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          </Link>
-        ))}
+      {/* Mobile/tablet: três blocos empilhados (leitura por funil). Desktop: grid 3×2 com trilhas iguais e gaps uniformes. */}
+      <div className="flex flex-col gap-6 lg:hidden">
+        <div className="flex min-h-0 min-w-0 flex-col gap-6">
+          {statusStats.map((stat) => renderStatCard(stat, { compact: true, stretch: true }))}
+        </div>
+        <div className="flex min-h-0 min-w-0 flex-col gap-6">
+          {rotasDigitaisStat ? renderStatCard(rotasDigitaisStat, { compact: true, stretch: true }) : null}
+          {propostaStat ? renderStatCard(propostaStat, { compact: true, stretch: true }) : null}
+        </div>
+        <div className="flex min-h-0 min-w-0 flex-col gap-6">
+          {leadsConvertidosStat ? renderStatCard(leadsConvertidosStat, { compact: true, stretch: true }) : null}
+          {leadsPerdidosStat ? renderStatCard(leadsPerdidosStat, { compact: true, stretch: true }) : null}
+        </div>
+      </div>
+
+      <div className="hidden min-w-0 grid-cols-3 grid-rows-2 items-stretch gap-6 lg:grid [&>*]:min-w-0">
+        {kpiDesktopRowMajor.map((stat) => renderStatCard(stat, { compact: true, stretch: true }))}
       </div>
 
       <div className="grid gap-6 md:grid-cols-7">

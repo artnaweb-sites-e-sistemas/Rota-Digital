@@ -9,6 +9,7 @@ export const LEAD_STATUS_DOT_CLASSES: Record<LeadStatus, string> = {
   "Em Contato": "bg-sky-600 dark:bg-sky-400",
   /** Sobre fundo `brand` sólido: ponto claro para leitura em claro e escuro. */
   "Rota Gerada": "bg-white/90 ring-1 ring-black/10 dark:bg-zinc-950/35 dark:ring-white/25",
+  Proposta: "bg-violet-600 dark:bg-violet-400",
   Convertido: "bg-emerald-600 dark:bg-emerald-400",
   Perdido: "bg-red-600 dark:bg-red-400",
 };
@@ -22,6 +23,8 @@ export const LEAD_STATUS_BADGE_SURFACE_CLASSES: Record<LeadStatus, string> = {
   /** Base tipográfica; fundo vivo + animação vêm de `LEAD_STATUS_ROTA_GERADA_BADGE_CLASS`. */
   "Rota Gerada":
     "border border-zinc-900 font-semibold text-brand-foreground shadow-sm dark:border-white",
+  Proposta:
+    "border border-violet-700/40 bg-violet-500/12 text-violet-950 dark:border-violet-400/45 dark:bg-violet-500/16 dark:text-violet-100",
   Convertido:
     "border border-emerald-700 bg-emerald-500/12 text-emerald-950 dark:border-emerald-400 dark:bg-emerald-500/18 dark:text-emerald-100",
   Perdido:
@@ -33,6 +36,7 @@ export const LEAD_STATUS_MENU_DOT_CLASSES: Record<LeadStatus, string> = {
   "Novo Lead": "bg-zinc-500 dark:bg-zinc-400",
   "Em Contato": "bg-sky-600 dark:bg-sky-400",
   "Rota Gerada": "bg-brand dark:bg-[#c4b27a]",
+  Proposta: "bg-violet-600 dark:bg-violet-400",
   Convertido: "bg-emerald-600 dark:bg-emerald-400",
   Perdido: "bg-red-600 dark:bg-red-400",
 };
