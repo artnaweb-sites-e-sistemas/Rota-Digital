@@ -68,13 +68,10 @@ function bucketLeadsLast7Days(leads: Lead[]): DayBucket[] {
   return buckets;
 }
 
-const WEEK_CHART_TRACK_PX = 168;
-const CHART_GRID_ROWS = 4;
 const CHART_GAP = "gap-1.5 sm:gap-2";
 
 /** Fundo quadriculado (linhas horizontais + verticais) só na área das barras. */
 function WeeklyChartPlotGrid({ className }: { className?: string }) {
-  const stepY = WEEK_CHART_TRACK_PX / CHART_GRID_ROWS;
   return (
     <div
       aria-hidden
@@ -84,9 +81,9 @@ function WeeklyChartPlotGrid({ className }: { className?: string }) {
           `repeating-linear-gradient(
             0deg,
             transparent 0,
-            transparent ${stepY - 1}px,
-            color-mix(in oklch, var(--border) 55%, transparent) ${stepY - 1}px,
-            color-mix(in oklch, var(--border) 55%, transparent) ${stepY}px
+            transparent calc(25% - 1px),
+            color-mix(in oklch, var(--border) 55%, transparent) calc(25% - 1px),
+            color-mix(in oklch, var(--border) 55%, transparent) 25%
           )`,
           `repeating-linear-gradient(
             90deg,
@@ -107,56 +104,81 @@ function WeeklyLeadsChart({ data, loading }: { data: DayBucket[]; loading: boole
 
   if (loading) {
     return (
-      <div className="flex h-[280px] items-center justify-center text-muted-foreground">
+      <div className="flex min-h-[240px] flex-1 items-center justify-center text-muted-foreground">
         <Loader2 className="size-8 animate-spin shrink-0" aria-hidden />
       </div>
     );
   }
 
   return (
-    <div className="mx-4 mb-4 mt-0 space-y-3">
-      <p className="text-xs text-muted-foreground">
+    <div className="flex h-full min-h-0 flex-1 flex-col gap-3">
+      <p className="shrink-0 text-xs text-muted-foreground">
         {totalWeek === 0
           ? "Nenhum lead novo cadastrado nesta semana."
           : `${formatInt(totalWeek)} lead(s) novo(s) nos últimos 7 dias.`}
       </p>
       <div
-        className="relative rounded-md bg-muted/15 px-1 py-2 ring-1 ring-inset ring-border/40"
+        className="relative flex min-h-0 flex-1 flex-col rounded-md bg-muted/15 px-1 py-2 ring-1 ring-inset ring-border/40"
         role="img"
         aria-label={`Leads novos por dia na semana: ${data.map((d) => `${d.weekday} ${d.count}`).join(", ")}`}
       >
-        <div className={`grid grid-cols-7 ${CHART_GAP} relative z-10`}>
+        <div className={`relative z-10 grid shrink-0 grid-cols-7 ${CHART_GAP}`}>
           {data.map((d) => (
             <span key={`n-${d.key}`} className="text-center text-[10px] font-medium tabular-nums text-foreground">
               {d.count}
             </span>
           ))}
         </div>
-        <div className="relative mt-1.5">
+        <div className="relative mt-1.5 min-h-[8rem] flex-1">
           <WeeklyChartPlotGrid className="pointer-events-none absolute inset-0 z-0 rounded-sm opacity-90 dark:opacity-80" />
-          <div
-            className={`relative z-10 grid grid-cols-7 ${CHART_GAP}`}
-            style={{ height: WEEK_CHART_TRACK_PX }}
-          >
+          <div className={`relative z-10 grid h-full min-h-[8rem] grid-cols-7 ${CHART_GAP}`}>
             {data.map((d) => {
-              const barPx =
-                d.count === 0 ? 3 : Math.max(8, Math.round((d.count / max) * WEEK_CHART_TRACK_PX));
+              const share = max > 0 ? d.count / max : 0;
+              const barPct = d.count === 0 ? 0 : Math.max(share * 100, 8);
+              const tooltipBottom =
+                d.count === 0 ? "calc(3px + 0.5rem)" : `calc(${barPct}% + 0.5rem)`;
               return (
                 <div
                   key={d.key}
-                  className="flex min-w-0 flex-col justify-end"
-                  title={`${d.label}: ${d.count} lead(s)`}
+                  className="group/col relative flex h-full min-h-0 min-w-0 flex-col justify-end rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-brand/45 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  aria-label={`${d.weekday}, ${d.label}: ${formatInt(d.count)} ${d.count === 1 ? "lead novo" : "leads novos"}`}
+                  tabIndex={0}
                 >
                   <div
-                    className="mx-auto w-full max-w-10 rounded-t-md bg-brand/85 shadow-sm dark:bg-brand/70"
-                    style={{ height: barPx }}
+                    className={cn(
+                      "pointer-events-none absolute left-1/2 z-30 w-[11.5rem] max-w-[70vw] -translate-x-1/2 rounded-lg border border-border/80 bg-popover px-3 py-2.5 text-left opacity-0 shadow-lg ring-1 ring-black/5 transition-[opacity,transform] duration-150 ease-out",
+                      "group-hover/col:pointer-events-none group-hover/col:opacity-100 group-hover/col:duration-75",
+                      "group-focus-within/col:opacity-100",
+                      "dark:border-white/12 dark:bg-zinc-950 dark:ring-white/10",
+                    )}
+                    style={{ bottom: tooltipBottom }}
+                    role="tooltip"
+                  >
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-brand">
+                      {d.weekday.charAt(0).toUpperCase() + d.weekday.slice(1)}
+                    </p>
+                    <p className="mt-0.5 text-xs font-medium text-foreground">{d.label}</p>
+                    <p className="mt-1.5 border-t border-border/60 pt-1.5 text-[11px] tabular-nums text-muted-foreground dark:border-white/10">
+                      <span className="font-semibold text-foreground">{formatInt(d.count)}</span>
+                      {d.count === 1 ? " cadastro neste dia" : " cadastros neste dia"}
+                    </p>
+                    <span
+                      aria-hidden
+                      className="absolute left-1/2 top-full -translate-x-1/2 border-[6px] border-transparent border-t-border/80 dark:border-t-white/12"
+                    />
+                  </div>
+                  <div
+                    className="mx-auto w-full max-w-10 rounded-t-md bg-brand/85 shadow-sm transition-[filter] duration-150 group-hover/col:brightness-110 dark:bg-brand/70 dark:group-hover/col:brightness-125"
+                    style={{
+                      height: d.count === 0 ? 3 : `${barPct}%`,
+                    }}
                   />
                 </div>
               );
             })}
           </div>
         </div>
-        <div className={`relative z-10 mt-1.5 grid grid-cols-7 ${CHART_GAP}`}>
+        <div className={`relative z-10 mt-1.5 grid shrink-0 grid-cols-7 ${CHART_GAP}`}>
           {data.map((d) => (
             <span key={`w-${d.key}`} className="truncate text-center text-[10px] capitalize text-muted-foreground">
               {d.weekday}
@@ -410,22 +432,22 @@ export default function DashboardPage() {
         {kpiDesktopRowMajor.map((stat) => renderStatCard(stat, { compact: true, stretch: true }))}
       </div>
 
-      <div className="grid gap-6 md:grid-cols-7">
-        <Card className="overflow-hidden border border-border bg-card shadow-xl dark:border-white/5 dark:bg-white/[0.02] md:col-span-4">
-          <CardHeader className="pb-6">
+      <div className="grid gap-6 md:grid-cols-7 md:items-stretch">
+        <Card className="h-full min-h-0 overflow-visible border border-border bg-card shadow-xl dark:border-white/5 dark:bg-white/[0.02] md:col-span-4">
+          <CardHeader className="shrink-0 px-6 pb-6">
             <CardTitle className="text-lg font-bold text-foreground">Desempenho semanal</CardTitle>
             <CardDescription>Acompanhamento de novos leads nos últimos 7 dias</CardDescription>
           </CardHeader>
-          <CardContent className="p-0">
-            <div className="px-6 pb-6">
-              <div className="rounded-md border border-border bg-muted/50 p-2 shadow-inner dark:border-white/5 dark:bg-zinc-900/40">
+          <CardContent className="flex min-h-0 flex-1 flex-col p-0">
+            <div className="flex min-h-0 flex-1 flex-col px-6 pb-6">
+              <div className="flex min-h-[18rem] flex-1 flex-col rounded-md border border-border bg-muted/50 p-2 shadow-inner dark:border-white/5 dark:bg-zinc-900/40 md:min-h-[20rem]">
                 <WeeklyLeadsChart data={weekBuckets} loading={loading} />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="gap-0 overflow-hidden border border-border bg-card pt-0 pb-4 shadow-xl dark:border-white/5 dark:bg-white/[0.02] md:col-span-3">
+        <Card className="h-full min-h-0 gap-0 overflow-hidden border border-border bg-card pt-0 pb-4 shadow-xl dark:border-white/5 dark:bg-white/[0.02] md:col-span-3">
           <div className="border-b border-brand/25 bg-gradient-to-br from-brand/16 via-brand/9 to-brand/[0.04] px-5 py-3.5 dark:border-brand/35 dark:from-brand/18 dark:via-brand/11 dark:to-brand/[0.06]">
             <h2 className="text-lg font-bold tracking-tight text-zinc-950 dark:text-zinc-50">Últimas rotas</h2>
             <p className="mt-1 text-sm leading-snug text-zinc-700 dark:text-zinc-400">

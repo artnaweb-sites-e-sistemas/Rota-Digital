@@ -139,6 +139,8 @@ function splitToList(raw: string): string[] {
 type CaptureTagInputProps = {
   id: string;
   tags: string[];
+  draft: string;
+  onDraftChange: (next: string) => void;
   onChange: (next: string[]) => void;
   placeholder: string;
   minHeightClassName: string;
@@ -147,11 +149,12 @@ type CaptureTagInputProps = {
 function CaptureTagInput({
   id,
   tags,
+  draft,
+  onDraftChange,
   onChange,
   placeholder,
   minHeightClassName,
 }: CaptureTagInputProps) {
-  const [draft, setDraft] = useState("");
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editingValue, setEditingValue] = useState("");
 
@@ -169,15 +172,15 @@ function CaptureTagInput({
     const value = draft.trim();
     if (!value) return;
     appendTagsFromRaw(value);
-    setDraft("");
-  }, [appendTagsFromRaw, draft]);
+    onDraftChange("");
+  }, [appendTagsFromRaw, draft, onDraftChange]);
 
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Enter" || event.key === ",") {
       event.preventDefault();
       commitDraft();
     }
-    if (event.key === "Backspace" && !draft && tags.length > 0) {
+    if (event.key === "Backspace" && !draft.trim() && tags.length > 0) {
       onChange(tags.slice(0, -1));
     }
   };
@@ -284,10 +287,10 @@ function CaptureTagInput({
           const nextValue = event.target.value;
           if (/[,\n;]/.test(nextValue)) {
             appendTagsFromRaw(nextValue);
-            setDraft("");
+            onDraftChange("");
             return;
           }
-          setDraft(nextValue);
+          onDraftChange(nextValue);
         }}
         onKeyDown={handleKeyDown}
         onBlur={commitDraft}
@@ -765,7 +768,9 @@ function LeadsPageContent() {
 
   const [captureOpen, setCaptureOpen] = useState(false);
   const [captureNiches, setCaptureNiches] = useState<string[]>([]);
+  const [captureNichesDraft, setCaptureNichesDraft] = useState("");
   const [captureCities, setCaptureCities] = useState<string[]>([]);
+  const [captureCitiesDraft, setCaptureCitiesDraft] = useState("");
   const [captureMax, setCaptureMax] = useState(25);
   const [captureBusy, setCaptureBusy] = useState(false);
   const [captureProgress, setCaptureProgress] = useState(0);
@@ -839,7 +844,9 @@ function LeadsPageContent() {
     try {
       const parsed = JSON.parse(raw) as {
         niches?: unknown;
+        nichesDraft?: unknown;
         cities?: unknown;
+        citiesDraft?: unknown;
         max?: unknown;
       };
       if (Array.isArray(parsed.niches)) {
@@ -847,6 +854,12 @@ function LeadsPageContent() {
       }
       if (Array.isArray(parsed.cities)) {
         setCaptureCities(splitToList(parsed.cities.join(",")));
+      }
+      if (typeof parsed.nichesDraft === "string") {
+        setCaptureNichesDraft(parsed.nichesDraft);
+      }
+      if (typeof parsed.citiesDraft === "string") {
+        setCaptureCitiesDraft(parsed.citiesDraft);
       }
       if (typeof parsed.max === "number" && Number.isFinite(parsed.max)) {
         setCaptureMax(Math.min(50, Math.max(1, Math.floor(parsed.max))));
@@ -861,11 +874,13 @@ function LeadsPageContent() {
       LEADS_CAPTURE_FORM_STORAGE_KEY,
       JSON.stringify({
         niches: captureNiches,
+        nichesDraft: captureNichesDraft,
         cities: captureCities,
+        citiesDraft: captureCitiesDraft,
         max: captureMax,
       }),
     );
-  }, [captureCities, captureMax, captureNiches]);
+  }, [captureCities, captureCitiesDraft, captureMax, captureNiches, captureNichesDraft]);
 
   useEffect(() => {
     if (!captureBusy) return;
@@ -1080,8 +1095,12 @@ function LeadsPageContent() {
 
   const runCapture = async () => {
     if (!user) return;
-    const niches = captureNiches;
-    const cities = captureCities;
+    const niches = Array.from(new Set([...captureNiches, ...splitToList(captureNichesDraft)])).slice(0, 40);
+    const cities = Array.from(new Set([...captureCities, ...splitToList(captureCitiesDraft)])).slice(0, 40);
+    if (niches.length !== captureNiches.length) setCaptureNiches(niches);
+    if (cities.length !== captureCities.length) setCaptureCities(cities);
+    if (captureNichesDraft.trim()) setCaptureNichesDraft("");
+    if (captureCitiesDraft.trim()) setCaptureCitiesDraft("");
     if (!niches.length || !cities.length) {
       setCaptureError("Informe ao menos um nicho e uma cidade (linhas ou separados por vírgula).");
       return;
@@ -1553,6 +1572,8 @@ function LeadsPageContent() {
               <CaptureTagInput
                 id="capture-niches"
                 tags={captureNiches}
+                draft={captureNichesDraft}
+                onDraftChange={setCaptureNichesDraft}
                 onChange={setCaptureNiches}
                 placeholder="Ex.: clínica dentária"
                 minHeightClassName="min-h-[88px]"
@@ -1569,6 +1590,8 @@ function LeadsPageContent() {
               <CaptureTagInput
                 id="capture-cities"
                 tags={captureCities}
+                draft={captureCitiesDraft}
+                onDraftChange={setCaptureCitiesDraft}
                 onChange={setCaptureCities}
                 placeholder="Campinas"
                 minHeightClassName="min-h-[72px]"
