@@ -160,7 +160,7 @@ function ProposalNextStepsSpotlight({
 }) {
   const mail = leadEmail.trim();
   const mailtoHref = mail
-    ? `mailto:${encodeURIComponent(mail)}?subject=${encodeURIComponent("Re: Proposta comercial")}`
+    ? `mailto:${encodeURIComponent(mail)}?subject=${encodeURIComponent("Re: Proposta personalizada")}`
     : undefined;
 
   const ctaCopy = proposalNextStepsCtaCopy(bottomCta);
@@ -1883,7 +1883,7 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
             <div className="flex min-w-0 items-start justify-between gap-x-3 gap-y-2 max-lg:items-center">
               <div className="flex min-w-0 flex-wrap items-center gap-2">
                 <Badge variant="outline" className="rounded-full border-brand/20 bg-brand/10 px-3 py-1 text-xs font-semibold text-brand">
-                  Proposta comercial
+                  Rota Digital
                 </Badge>
               </div>
               <div className="no-print z-30 flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center sm:justify-end sm:gap-5 lg:absolute lg:right-7 lg:top-5 xl:right-8 xl:top-7">
@@ -1898,7 +1898,7 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
               </div>
               <div className="min-w-0">
                 <h1 className="break-words text-3xl font-extrabold tracking-tight text-foreground text-balance sm:text-4xl">
-                  Proposta Comercial
+                  Proposta Personalizada
                 </h1>
                 <p className="mt-3 max-w-3xl break-words text-sm leading-relaxed text-muted-foreground sm:text-base">
                   Uma proposta pensada exclusivamente para você.
