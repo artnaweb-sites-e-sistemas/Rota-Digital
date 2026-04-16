@@ -104,7 +104,7 @@ export default async function PublicProposalPage({
         id="rota-report-scroll-root"
         className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-background"
       >
-        <div className="mx-auto w-full min-h-0 min-w-0 max-w-[1760px] px-6 py-8 sm:px-8 md:px-10">
+        <div className="mx-auto w-full min-h-0 min-w-0 max-w-[1760px] px-4 py-8 sm:px-6 md:px-8 lg:px-10">
           <RotaDigitalReportView
             variant="public"
             report={report}
