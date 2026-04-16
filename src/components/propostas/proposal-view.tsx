@@ -194,13 +194,16 @@ function ProposalNextStepsSpotlight({
                 <div key={i} className="group/step relative min-w-0 w-full pl-3 sm:pl-4">
                   <div
                     className={cn(
-                      "relative min-w-0 rounded-md border border-border border-l-transparent bg-card/80 py-4 pl-8 pr-4 sm:pr-6",
+                      "relative min-w-0 rounded-md border border-l-transparent bg-card/80 py-4 pl-8 pr-4 sm:pr-6",
                       editing && "pr-12 sm:pr-14",
-                      "shadow-sm transition-[border-color,box-shadow] duration-300",
-                      "group-hover/step:border-brand/45 group-hover/step:shadow-md group-hover/step:shadow-brand/5",
-                      "dark:border-border dark:bg-secondary/60 dark:group-hover/step:border-brand/35",
-                      "before:pointer-events-none before:absolute before:-left-[20px] before:top-1/2 before:h-10 before:w-6 before:-translate-y-full before:rounded-br-md before:border-b before:border-border before:content-[''] dark:before:border-border group-hover/step:before:border-brand/45",
-                      "after:pointer-events-none after:absolute after:-left-[20px] after:top-1/2 after:h-10 after:w-6 after:rounded-tr-md after:border-t after:border-border after:content-[''] dark:after:border-border group-hover/step:after:border-brand/45",
+                      "transition-[border-color,box-shadow] duration-300",
+                      // Modo claro: mesma borda/sombra que antes só no hover
+                      "border-brand/45 shadow-md shadow-brand/5",
+                      // Modo escuro: neutro até hover
+                      "dark:border-border dark:bg-secondary/60 dark:shadow-sm",
+                      "dark:group-hover/step:border-brand/35 dark:group-hover/step:shadow-md dark:group-hover/step:shadow-brand/5",
+                      "before:pointer-events-none before:absolute before:-left-[20px] before:top-1/2 before:h-10 before:w-6 before:-translate-y-full before:rounded-br-md before:border-b before:border-brand/45 before:content-[''] dark:before:border-border dark:group-hover/step:before:border-brand/45",
+                      "after:pointer-events-none after:absolute after:-left-[20px] after:top-1/2 after:h-10 after:w-6 after:rounded-tr-md after:border-t after:border-brand/45 after:content-[''] dark:after:border-border dark:group-hover/step:after:border-brand/45",
                     )}
                   >
                     <div className="absolute -left-[21px] top-1/2 z-30 -translate-y-1/2">
@@ -211,9 +214,9 @@ function ProposalNextStepsSpotlight({
                         >
                           <div
                             className={cn(
-                              "absolute left-1/2 top-1/2 size-11 -translate-x-1/2 -translate-y-1/2 rounded-full border border-border/90 bg-card shadow-sm",
-                              "dark:border-zinc-600/80 dark:bg-zinc-950",
-                              "transition-[border-color,box-shadow] duration-300 group-hover/step:border-brand/50 group-hover/step:shadow-brand/20",
+                              "absolute left-1/2 top-1/2 size-11 -translate-x-1/2 -translate-y-1/2 rounded-full border border-brand/50 bg-card shadow-sm shadow-brand/20",
+                              "dark:border-zinc-600/80 dark:bg-zinc-950 dark:shadow-sm",
+                              "transition-[border-color,box-shadow] duration-300 dark:group-hover/step:border-brand/50 dark:group-hover/step:shadow-brand/20",
                             )}
                           />
                         </div>
@@ -1871,21 +1874,22 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
           aria-hidden
         />
         <div className="relative z-10">
-          <div className="no-print absolute right-3 top-3 z-20 flex flex-col items-end gap-2 sm:right-7 sm:top-5 sm:flex-row sm:items-center sm:justify-end sm:gap-5">
-            {variant === "public" ? <PublicThemeToggleHint /> : null}
-            <PublicThemeToggle className="shrink-0" />
-          </div>
           <div
             className={cn(
-              "grid min-w-0 gap-6 px-4 py-6 sm:gap-8 sm:px-8 sm:py-7 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,30rem)] lg:items-stretch lg:gap-8",
-              "pt-14 sm:pt-16",
+              "grid min-w-0 gap-6 px-4 py-6 sm:gap-8 sm:px-8 sm:py-7 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,30rem)] lg:items-stretch lg:gap-8 lg:pt-16",
             )}
           >
-          <div className="flex min-h-0 min-w-0 flex-col space-y-5 lg:min-h-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="outline" className="rounded-full border-brand/20 bg-brand/10 px-3 py-1 text-xs font-semibold text-brand">
-                Proposta comercial
-              </Badge>
+          <div className="flex min-h-0 min-w-0 flex-col space-y-4 lg:min-h-0">
+            <div className="flex min-w-0 items-start justify-between gap-x-3 gap-y-2 max-lg:items-center">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <Badge variant="outline" className="rounded-full border-brand/20 bg-brand/10 px-3 py-1 text-xs font-semibold text-brand">
+                  Proposta comercial
+                </Badge>
+              </div>
+              <div className="no-print z-30 flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center sm:justify-end sm:gap-5 lg:absolute lg:right-7 lg:top-5 xl:right-8 xl:top-7">
+                {variant === "public" ? <PublicThemeToggleHint /> : null}
+                <PublicThemeToggle className="shrink-0" />
+              </div>
             </div>
 
             <div className="min-w-0 space-y-3">
@@ -1995,13 +1999,18 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
               </div>
             </div>
           </div>
-        </div>
+          </div>
         </div>
       </section>
 
       <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
         <Card className="min-w-0 overflow-hidden border-border bg-card shadow-xl dark:border-white/5 dark:bg-white/[0.02]">
-          <CardHeader className="border-b border-border pb-5 dark:border-white/5">
+          <CardHeader
+            className={cn(
+              "rounded-t-md border-b border-border pb-5 pt-5 dark:border-white/10 sm:pb-6 sm:pt-6",
+              "bg-gradient-to-b from-brand/[0.14] via-brand/[0.06] to-brand/[0.02] dark:from-brand/20 dark:via-brand/12 dark:to-brand/[0.06]",
+            )}
+          >
             <div className="flex min-w-0 items-start justify-between gap-4">
               <div className="min-w-0 flex-1">
                 <CardTitle className="text-xl font-bold text-foreground">Perfil da empresa</CardTitle>
