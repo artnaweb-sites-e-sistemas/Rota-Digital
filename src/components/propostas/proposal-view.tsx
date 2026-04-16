@@ -30,6 +30,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 
 import { PlanPriceHero } from "@/components/propostas/plan-installment-summary";
+import { DeliverablesFormatHint } from "@/components/propostas/deliverables-format-hint";
 import { PlanPaymentMethodsChips, PlanPaymentMethodsPicker, normalizePlanPaymentMethods, sortPaymentMethods } from "@/components/propostas/plan-payment-methods";
 import type { Lead } from "@/types/lead";
 import type { Proposal, ProposalAgencySnapshot, ProposalLeadSnapshot, ProposalPlan } from "@/types/proposal";
@@ -57,6 +58,7 @@ import {
 import { DEFAULT_PROPOSAL_NEXT_STEPS } from "@/lib/proposal-default-next-steps";
 import { createEmptyProposalPlan, planLooksEmpty } from "@/lib/proposal-plan-factory";
 import { PROPOSAL_PLAN_MAX_INSTALLMENTS, normalizeInstallmentCount } from "@/lib/proposal-plan-installments";
+import { parsePlanDeliverablesForDisplay } from "@/lib/proposal-plan-deliverables-display";
 import { cn } from "@/lib/utils";
 import { getLead } from "@/lib/leads";
 import {
@@ -453,8 +455,9 @@ function buildAgencyContactRows(
   live: UserCompanyAboutSettings | null,
   isDashboard: boolean,
 ): AgencyContactRow[] {
+  /** Com configurações carregadas no dashboard, vazio nas Configurações = não mostrar (não voltar ao snapshot antigo). */
   const pick = (liveVal?: string | null, snapVal?: string | null) =>
-    (isDashboard && live ? liveVal?.trim() : "") || snapVal?.trim() || "";
+    isDashboard && live ? (liveVal ?? "").trim() : (snapVal ?? "").trim();
 
   const phone = pick(live?.companyPhone, snap.companyPhone);
   const whatsApp = pick(live?.whatsApp, snap.whatsApp);
@@ -654,15 +657,17 @@ function parseAgencyServiceTopics(text: string): string[] {
   return trimmed ? [trimmed] : [];
 }
 
-function planToEditDraft(p: ProposalPlan): ProposalPlan {
+function planToEditDraft(p: ProposalPlan, kind: "spot" | "recurring"): ProposalPlan {
+  const recurring = kind === "recurring";
   return {
     ...p,
     price: p.price.trim() ? normalizePriceForCurrencyInput(p.price) : "",
     promotionalPrice: p.promotionalPrice?.trim()
       ? normalizePriceForCurrencyInput(p.promotionalPrice)
       : "",
+    cashPrice: recurring ? "" : p.cashPrice?.trim() ? normalizePriceForCurrencyInput(p.cashPrice) : "",
     paymentMethods: sortPaymentMethods(normalizePlanPaymentMethods(p.paymentMethods)),
-    installmentCount: normalizeInstallmentCount(p.installmentCount),
+    installmentCount: recurring ? 1 : normalizeInstallmentCount(p.installmentCount),
   };
 }
 
@@ -714,27 +719,30 @@ function ProposalPlanCard({
   /** Remove o plano após confirmação (dashboard). */
   onDeletePlan?: () => void | Promise<void>;
 }) {
-  const [editing, setEditing] = useState(!readOnly && planLooksEmpty(plan));
+  const [editing, setEditing] = useState(!readOnly && planLooksEmpty(plan, kind));
   const [saving, setSaving] = useState(false);
   const [removing, setRemoving] = useState(false);
-  const [draft, setDraft] = useState<ProposalPlan>(() => planToEditDraft(plan));
+  const [draft, setDraft] = useState<ProposalPlan>(() => planToEditDraft(plan, kind));
 
   useEffect(() => {
     if (!editing) {
-      setDraft(planToEditDraft(plan));
+      setDraft(planToEditDraft(plan, kind));
     }
-  }, [plan, editing]);
+  }, [plan, editing, kind]);
 
-  const lines = parseDeliverableLines(editing ? draft.deliverables : plan.deliverables);
+  const deliverablesDisplay = useMemo(
+    () => parsePlanDeliverablesForDisplay(editing ? draft.deliverables : plan.deliverables),
+    [editing, draft.deliverables, plan.deliverables],
+  );
   const isSpot = kind === "spot";
   const promoOfferActive = planHasValidPromotionalOffer(editing ? draft : plan);
 
   const cancelEdit = () => {
-    if (planLooksEmpty(plan) && onAbandonEmptyPlan) {
+    if (planLooksEmpty(plan, kind) && onAbandonEmptyPlan) {
       void onAbandonEmptyPlan();
       return;
     }
-    setDraft(planToEditDraft(plan));
+    setDraft(planToEditDraft(plan, kind));
     setEditing(false);
   };
 
@@ -742,13 +750,16 @@ function ProposalPlanCard({
     if (!onSave) return;
     setSaving(true);
     try {
+      const recurring = kind === "recurring";
+      const inst = recurring ? 1 : normalizeInstallmentCount(draft.installmentCount);
       await onSave({
         ...plan,
         title: draft.title.trim(),
         deliverables: draft.deliverables.trim(),
         price: draft.price.trim(),
         promotionalPrice: (draft.promotionalPrice ?? "").trim(),
-        installmentCount: normalizeInstallmentCount(draft.installmentCount),
+        cashPrice: recurring ? "" : inst > 1 ? (draft.cashPrice ?? "").trim() : "",
+        installmentCount: inst,
         paymentTerms: draft.paymentTerms.trim(),
         paymentMethods: sortPaymentMethods(normalizePlanPaymentMethods(draft.paymentMethods)),
       });
@@ -812,7 +823,7 @@ function ProposalPlanCard({
             size="icon"
             className="size-8 shrink-0 border-border/80 bg-background/95 shadow-sm backdrop-blur-sm dark:bg-background/90"
             onClick={() => {
-              setDraft(planToEditDraft(plan));
+              setDraft(planToEditDraft(plan, kind));
               setEditing(true);
             }}
             disabled={removing}
@@ -881,18 +892,29 @@ function ProposalPlanCard({
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor={`plan-deliverables-${plan.id}`} className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Entregas
-              </Label>
+              <div className="flex items-center gap-2">
+                <Label
+                  htmlFor={`plan-deliverables-${plan.id}`}
+                  className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
+                  Entregas
+                </Label>
+                <DeliverablesFormatHint />
+              </div>
               <Textarea
                 id={`plan-deliverables-${plan.id}`}
                 value={draft.deliverables}
                 onChange={(e) => setDraft((d) => ({ ...d, deliverables: e.target.value }))}
                 className="min-h-24 resize-y text-sm"
-                placeholder="Uma entrega por linha (ou parágrafos separados)."
+                placeholder="Liste os entregáveis incluídos neste plano."
               />
             </div>
-            <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(7.25rem,8.5rem)]">
+            <div
+              className={cn(
+                "grid gap-3 grid-cols-1 sm:grid-cols-2",
+                isSpot && "lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(7.25rem,8.5rem)]",
+              )}
+            >
               <div className="space-y-2">
                 <Label htmlFor={`plan-price-${plan.id}`} className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Valor
@@ -923,29 +945,58 @@ function ProposalPlanCard({
                   className="h-10"
                 />
               </div>
-              <div className="space-y-2 sm:col-span-2 lg:col-span-1">
-                <Label htmlFor={`plan-installments-${plan.id}`} className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Parcelas
-                </Label>
-                <Select
-                  value={String(normalizeInstallmentCount(draft.installmentCount))}
-                  onValueChange={(v) =>
-                    setDraft((d) => ({ ...d, installmentCount: normalizeInstallmentCount(Number(v)) }))
-                  }
-                  disabled={saving}
-                >
-                  <SelectTrigger id={`plan-installments-${plan.id}`} className="h-10 w-full lg:max-w-none">
-                    <SelectValue placeholder="Parcelas" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.from({ length: PROPOSAL_PLAN_MAX_INSTALLMENTS }, (_, i) => i + 1).map((n) => (
-                      <SelectItem key={n} value={String(n)}>
-                        {n === 1 ? "À vista" : `${n}×`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {isSpot ? (
+                <>
+                  <div className="space-y-2 sm:col-span-2 lg:col-span-1">
+                    <Label htmlFor={`plan-installments-${plan.id}`} className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Parcelas
+                    </Label>
+                    <Select
+                      value={String(normalizeInstallmentCount(draft.installmentCount))}
+                      onValueChange={(v) => {
+                        const n = normalizeInstallmentCount(Number(v));
+                        setDraft((d) => ({
+                          ...d,
+                          installmentCount: n,
+                          ...(n <= 1 ? { cashPrice: "" } : {}),
+                        }));
+                      }}
+                      disabled={saving}
+                    >
+                      <SelectTrigger id={`plan-installments-${plan.id}`} className="h-10 w-full lg:max-w-none">
+                        <SelectValue placeholder="Parcelas" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: PROPOSAL_PLAN_MAX_INSTALLMENTS }, (_, i) => i + 1).map((n) => (
+                          <SelectItem key={n} value={String(n)}>
+                            {n === 1 ? "À vista" : `${n}×`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {normalizeInstallmentCount(draft.installmentCount) > 1 ? (
+                    <div className="col-span-full space-y-2">
+                      <Label htmlFor={`plan-cash-${plan.id}`} className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        À vista <span className="font-normal normal-case text-muted-foreground/80">(opcional)</span>
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Valor único se for menor que o total parcelado (ex.: à vista sem juros).
+                      </p>
+                      <Input
+                        id={`plan-cash-${plan.id}`}
+                        value={draft.cashPrice ?? ""}
+                        inputMode="numeric"
+                        autoComplete="off"
+                        placeholder="R$ 0,00"
+                        onChange={(e) => setDraft((d) => ({ ...d, cashPrice: formatCurrencyInput(e.target.value) }))}
+                        className="h-10 w-full"
+                        disabled={saving}
+                      />
+                    </div>
+                  ) : null}
+                </>
+              ) : null}
             </div>
             <div className="space-y-2">
               <Label htmlFor={`plan-terms-${plan.id}`} className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -971,14 +1022,24 @@ function ProposalPlanCard({
           <>
             <div className="min-w-0 space-y-1">
               <div className="flex items-start gap-2">
-                <h3 className="min-w-0 flex-1 text-lg font-bold leading-snug tracking-tight text-foreground sm:text-xl">
-                  {plan.title}
-                </h3>
+                <div className="flex min-w-0 flex-1 items-baseline gap-2">
+                  <span
+                    className={cn(
+                      "shrink-0 text-sm font-semibold tracking-wide sm:text-[0.9375rem]",
+                      isSpot ? "text-brand/80 dark:text-brand/75" : "text-emerald-700/85 dark:text-emerald-400/80",
+                    )}
+                  >
+                    Plano
+                  </span>
+                  <h3 className="min-w-0 flex-1 text-lg font-bold leading-snug tracking-tight text-foreground sm:text-xl">
+                    {plan.title}
+                  </h3>
+                </div>
                 {dashboardActions}
               </div>
-              {lines.length > 0 ? (
+              {deliverablesDisplay.kind === "flat" && deliverablesDisplay.lines.length > 0 ? (
                 <ul className="mt-3 space-y-2.5 text-sm leading-relaxed text-muted-foreground">
-                  {lines.map((line, index) => (
+                  {deliverablesDisplay.lines.map((line, index) => (
                     <li key={`${plan.id}-${index}-${line.slice(0, 24)}`} className="flex gap-2.5">
                       <ListChecks
                         className={cn(
@@ -991,6 +1052,52 @@ function ProposalPlanCard({
                     </li>
                   ))}
                 </ul>
+              ) : deliverablesDisplay.kind === "sections" && deliverablesDisplay.sections.length > 0 ? (
+                <div className="mt-3 space-y-4 text-sm leading-relaxed">
+                  {deliverablesDisplay.sections.map((section, sIndex) => (
+                    <div key={`${plan.id}-del-${sIndex}-${section.title.slice(0, 16)}`} className="min-w-0">
+                      <div className="flex gap-2.5">
+                        <ListChecks
+                          className={cn(
+                            "mt-0.5 size-4 shrink-0",
+                            isSpot ? "text-brand" : "text-emerald-600 dark:text-emerald-400",
+                          )}
+                          aria-hidden
+                        />
+                        <div className="min-w-0 flex-1 space-y-2">
+                          {section.title ? (
+                            <p className="font-semibold text-foreground">{section.title}</p>
+                          ) : null}
+                          {section.items.length > 0 ? (
+                            <ul
+                              className={cn(
+                                "space-y-1.5 border-l-2 pl-3.5",
+                                isSpot
+                                  ? "border-brand/40 text-muted-foreground"
+                                  : "border-emerald-600/40 text-muted-foreground dark:border-emerald-500/45",
+                              )}
+                            >
+                              {section.items.map((item, iIndex) => (
+                                <li key={`${plan.id}-del-${sIndex}-sub-${iIndex}-${item.slice(0, 20)}`} className="flex gap-2">
+                                  <span
+                                    className={cn(
+                                      "mt-0.5 shrink-0 select-none font-bold leading-none",
+                                      isSpot ? "text-brand/70" : "text-emerald-600/80 dark:text-emerald-400/85",
+                                    )}
+                                    aria-hidden
+                                  >
+                                    •
+                                  </span>
+                                  <span className="min-w-0">{item}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               ) : null}
             </div>
 
@@ -1016,9 +1123,11 @@ function ProposalPlanCard({
                           <PlanPriceHero
                             priceText={displayPriceText}
                             struckOriginalText={struckOriginalText}
-                            installmentCount={plan.installmentCount}
+                            installmentCount={isSpot ? plan.installmentCount : 1}
+                            cashPriceText={isSpot ? plan.cashPrice : undefined}
                             accent={isSpot ? "brand" : "emerald"}
                             className="shrink-0"
+                            priceSuffix={isSpot ? undefined : "/mensal"}
                           />
                         ) : null}
 

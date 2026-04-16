@@ -6,6 +6,7 @@ import {
   getDoc,
   getDocs,
   limit,
+  orderBy,
   query,
   updateDoc,
   where,
@@ -67,6 +68,7 @@ export async function getProposalByLead(leadId: string, userId: string): Promise
     collection(db, PROPOSALS_COLLECTION),
     where("leadId", "==", leadId),
     where("userId", "==", userId),
+    orderBy("createdAt", "desc"),
     limit(1),
   );
   const snapshot = await getDocs(q);

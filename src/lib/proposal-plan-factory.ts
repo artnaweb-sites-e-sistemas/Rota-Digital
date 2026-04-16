@@ -15,15 +15,19 @@ export function createEmptyProposalPlan(): ProposalPlan {
   };
 }
 
-export function planLooksEmpty(plan: ProposalPlan): boolean {
+export function planLooksEmpty(plan: ProposalPlan, kind: "spot" | "recurring" = "spot"): boolean {
   const installments = normalizeInstallmentCount(plan.installmentCount);
+  const recurring = kind === "recurring";
+  const installmentsMatter = !recurring && installments > 1;
+  const cashMatter = !recurring && Boolean(plan.cashPrice?.trim());
   return !(
     plan.title.trim() ||
     plan.deliverables.trim() ||
     plan.price.trim() ||
     plan.promotionalPrice?.trim() ||
+    cashMatter ||
     plan.paymentTerms.trim() ||
     (plan.paymentMethods?.length ?? 0) > 0 ||
-    installments > 1
+    installmentsMatter
   );
 }

@@ -1,12 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Bot, Briefcase, Check, ListTree, Loader2, Scale } from "lucide-react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -20,6 +19,7 @@ import type {
   AiRecommendedChannelsPolicy,
   AiScoringStrictness,
   AiServicesFocusPolicy,
+  UserAiPromptSettings,
 } from "@/types/user-settings";
 import { sanitizeAiScoringStrictness } from "@/lib/ai-scoring-strictness-prompt";
 import { sanitizeAiOpenRecommendedChannelCount } from "@/lib/ai-recommended-channels-prompt";
@@ -91,6 +91,8 @@ export function AiPromptSettingsForm() {
   const [scoringStrictness, setScoringStrictness] = useState<AiScoringStrictness>("free");
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
+  const hydratedRef = useRef(false);
+  const lastSavedJsonRef = useRef<string>("");
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -137,43 +139,29 @@ export function AiPromptSettingsForm() {
     return () => window.clearTimeout(id);
   }, [savedAt]);
 
-  const toggleChannel = (id: string) => {
-    setChannelIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
-  };
+  useEffect(() => {
+    hydratedRef.current = false;
+    lastSavedJsonRef.current = "";
+  }, [user?.uid]);
 
-  const toggleService = (id: string) => {
-    setServiceIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
-  };
+  useEffect(() => {
+    if (!user || loading) return;
 
-  const handleSave = async () => {
-    if (!user) return;
-    const trimmed = guidelines.trim();
-    if (trimmed.length > MAX_GUIDELINES_LENGTH) {
-      setError(`Limite de ${MAX_GUIDELINES_LENGTH} caracteres nas diretrizes.`);
-      return;
-    }
-    if (channelPolicy === "restricted" && channelIds.length === 0) {
-      setError("Com política restrita em canais, marque ao menos um canal da lista ou escolha “livre”.");
-      return;
-    }
-    const parsedServicesCustom =
-      servicesPolicy === "restricted" && servicesOthersEnabled
-        ? parseCustomServiceLabelsFromMultiline(servicesOthersText)
-        : [];
-    if (servicesPolicy === "restricted" && serviceIds.length === 0 && parsedServicesCustom.length === 0) {
-      setError(
-        "Com foco restrito em serviços, marque ao menos um serviço da lista, use “Outros serviços” com texto, ou escolha “livre”.",
-      );
-      return;
-    }
-    if (servicesPolicy === "restricted" && servicesOthersEnabled && parsedServicesCustom.length === 0) {
-      setError("Preencha os serviços personalizados em “Outros” ou desmarque a opção.");
-      return;
-    }
-    setError(null);
-    setSaving(true);
-    try {
-      await saveUserAiPromptSettings(user.uid, {
+    const tryBuildPayload = (): UserAiPromptSettings | null => {
+      const trimmed = guidelines.trim();
+      if (trimmed.length > MAX_GUIDELINES_LENGTH) return null;
+      if (channelPolicy === "restricted" && channelIds.length === 0) return null;
+      const parsedServicesCustom =
+        servicesPolicy === "restricted" && servicesOthersEnabled
+          ? parseCustomServiceLabelsFromMultiline(servicesOthersText)
+          : [];
+      if (servicesPolicy === "restricted" && serviceIds.length === 0 && parsedServicesCustom.length === 0) {
+        return null;
+      }
+      if (servicesPolicy === "restricted" && servicesOthersEnabled && parsedServicesCustom.length === 0) {
+        return null;
+      }
+      return {
         aiBasePromptGuidelines: trimmed,
         aiRecommendedChannelsPolicy: channelPolicy,
         aiRecommendedChannelIds: channelPolicy === "restricted" ? channelIds : [],
@@ -182,26 +170,88 @@ export function AiPromptSettingsForm() {
         aiServiceOfferingIds: servicesPolicy === "restricted" ? serviceIds : [],
         aiCustomServiceLabels: servicesPolicy === "restricted" ? parsedServicesCustom : [],
         aiScoringStrictness: scoringStrictness,
-      });
-      setGuidelines(trimmed);
-      if (channelPolicy === "open") setChannelIds([]);
-      if (servicesPolicy === "open") {
-        setServiceIds([]);
-        setServicesOthersText("");
-        setServicesOthersEnabled(false);
-      } else if (!servicesOthersEnabled) {
-        setServicesOthersText("");
-      } else {
-        setServicesOthersText(parsedServicesCustom.join("\n"));
-      }
-      setSavedAt(Date.now());
-    } catch (e) {
-      console.error(e);
-      setSavedAt(null);
-      setError("Não foi possível salvar. Tente novamente.");
-    } finally {
-      setSaving(false);
+      };
+    };
+
+    if (!hydratedRef.current) {
+      hydratedRef.current = true;
+      const initial = tryBuildPayload();
+      lastSavedJsonRef.current = JSON.stringify(
+        initial ?? {
+          aiBasePromptGuidelines: guidelines.trim(),
+          aiRecommendedChannelsPolicy: channelPolicy,
+          aiRecommendedChannelIds: channelIds,
+          aiOpenRecommendedChannelCount: openChannelCount,
+          aiServicesFocusPolicy: servicesPolicy,
+          aiServiceOfferingIds: serviceIds,
+          aiCustomServiceLabels: [],
+          aiScoringStrictness: scoringStrictness,
+        },
+      );
+      return;
     }
+
+    const payload = tryBuildPayload();
+    if (!payload) return;
+    const nextJson = JSON.stringify(payload);
+    if (nextJson === lastSavedJsonRef.current) return;
+
+    const t = window.setTimeout(() => {
+      void (async () => {
+        if (!user) return;
+        const again = tryBuildPayload();
+        if (!again) return;
+        const json = JSON.stringify(again);
+        if (json === lastSavedJsonRef.current) return;
+        setSaving(true);
+        setError(null);
+        try {
+          await saveUserAiPromptSettings(user.uid, again);
+          const trimmed = again.aiBasePromptGuidelines;
+          setGuidelines(trimmed);
+          if (again.aiRecommendedChannelsPolicy === "open") setChannelIds([]);
+          if (again.aiServicesFocusPolicy === "open") {
+            setServiceIds([]);
+            setServicesOthersText("");
+            setServicesOthersEnabled(false);
+          } else if (again.aiCustomServiceLabels.length === 0) {
+            setServicesOthersText("");
+          } else {
+            setServicesOthersText(again.aiCustomServiceLabels.join("\n"));
+            setServicesOthersEnabled(true);
+          }
+          lastSavedJsonRef.current = json;
+          setSavedAt(Date.now());
+        } catch (e) {
+          console.error(e);
+          setSavedAt(null);
+          setError("Não foi possível salvar. Tente novamente.");
+        } finally {
+          setSaving(false);
+        }
+      })();
+    }, 850);
+    return () => window.clearTimeout(t);
+  }, [
+    user,
+    loading,
+    guidelines,
+    channelPolicy,
+    channelIds,
+    openChannelCount,
+    servicesPolicy,
+    serviceIds,
+    servicesOthersEnabled,
+    servicesOthersText,
+    scoringStrictness,
+  ]);
+
+  const toggleChannel = (id: string) => {
+    setChannelIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
+  const toggleService = (id: string) => {
+    setServiceIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
 
   if (loading) {
@@ -568,34 +618,26 @@ export function AiPromptSettingsForm() {
           {error}
         </p>
       ) : null}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <Button
-          type="button"
-          variant="cta"
-          size="lg"
-          onClick={() => void handleSave()}
-          disabled={saving}
-          className="gap-2"
-        >
-          {saving ? (
-            <>
-              <Loader2 className="size-4 animate-spin shrink-0" aria-hidden />
-              Salvando...
-            </>
-          ) : (
-            "Salvar configurações de IA"
-          )}
-        </Button>
-        {savedAt && !error ? (
-          <span
-            className="inline-flex max-w-full items-center gap-1.5 text-xs text-muted-foreground motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
-            role="status"
-            aria-live="polite"
-          >
-            <Check className="size-3.5 shrink-0 opacity-50 text-emerald-700 dark:text-emerald-500/80" aria-hidden />
-            Configurações salvas.
+      <div
+        className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-muted-foreground"
+        role="status"
+        aria-live="polite"
+      >
+        {saving ? (
+          <span className="inline-flex items-center gap-1.5">
+            <Loader2 className="size-3.5 animate-spin shrink-0 text-brand" aria-hidden />
+            A guardar…
           </span>
-        ) : null}
+        ) : savedAt && !error ? (
+          <span className="inline-flex max-w-full items-center gap-1.5 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
+            <Check className="size-3.5 shrink-0 text-emerald-700 dark:text-emerald-500/80" aria-hidden />
+            Guardado automaticamente.
+          </span>
+        ) : (
+          <span className="text-muted-foreground/80">
+            Guarda automática: combinações inválidas (ex.: restrito sem itens) não são enviadas até ficarem válidas.
+          </span>
+        )}
       </div>
     </div>
   );

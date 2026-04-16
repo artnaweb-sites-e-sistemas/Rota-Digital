@@ -5,7 +5,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Building2, Check, FileText, ImagePlus, Loader2, Repeat2, Upload } from "lucide-react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,7 +13,13 @@ import { ProposalPlanSectionEditor } from "@/components/propostas/proposal-plan-
 import { sortPaymentMethods } from "@/components/propostas/plan-payment-methods";
 import { describeManualUploadFailure, uploadUserSettingsImage } from "@/lib/evidence-storage";
 import { createEmptyProposalPlan } from "@/lib/proposal-plan-factory";
+import { normalizeRecurringPlansForSave } from "@/lib/proposal-plan-coerce";
 import { normalizeInstallmentCount } from "@/lib/proposal-plan-installments";
+import {
+  DEFAULT_COMPANY_ABOUT_NAME,
+  resolveCompanyAboutNameForSave,
+  resolveCompanyAboutSummaryForSave,
+} from "@/lib/company-about-defaults";
 import { getUserCompanyAboutSettings, saveUserCompanyAboutSettings } from "@/lib/user-settings";
 import {
   digitsFromPhoneInput,
@@ -27,7 +32,7 @@ import type { UserCompanyAboutSettings } from "@/types/user-settings";
 import { cn } from "@/lib/utils";
 
 const DEFAULT_FORM: UserCompanyAboutSettings = {
-  companyName: "Rota Digital",
+  companyName: DEFAULT_COMPANY_ABOUT_NAME,
   companySummary: "",
   primaryImageUrl: "",
   secondaryImageUrl: "",
@@ -138,6 +143,10 @@ export function CompanyAboutSettingsForm() {
   const [uploadingSlot, setUploadingSlot] = useState<"primary" | "secondary" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
+  const formRef = useRef(form);
+  formRef.current = form;
+  const hydratedRef = useRef(false);
+  const lastSavedJsonRef = useRef<string>("");
 
   const hasAnyContent = useMemo(
     () =>
@@ -172,13 +181,13 @@ export function CompanyAboutSettingsForm() {
           data.defaultRecurringPlans.length > 0 ? data.defaultRecurringPlans : [createEmptyProposalPlan()];
         setForm({
           ...data,
-          companyName: data.companyName.trim() || DEFAULT_FORM.companyName,
+          companyName: data.companyName.trim() || DEFAULT_COMPANY_ABOUT_NAME,
           companyPhone: onlyDigitsPhone(data.companyPhone ?? "").slice(0, 15),
           whatsApp: data.whatsApp?.trim()
             ? normalizeWhatsappDigitsForStorage(onlyDigitsPhone(data.whatsApp))
             : "",
           defaultSpotPlans: spot,
-          defaultRecurringPlans: recurring,
+          defaultRecurringPlans: normalizeRecurringPlansForSave(recurring),
         });
       }
     } catch (e) {
@@ -200,6 +209,72 @@ export function CompanyAboutSettingsForm() {
     return () => window.clearTimeout(id);
   }, [savedAt]);
 
+  useEffect(() => {
+    hydratedRef.current = false;
+    lastSavedJsonRef.current = "";
+  }, [user?.uid]);
+
+  const buildCompanyAboutPayload = useCallback((f: UserCompanyAboutSettings): UserCompanyAboutSettings => {
+    const companyName = resolveCompanyAboutNameForSave(f.companyName);
+    const companySummary = resolveCompanyAboutSummaryForSave(f.companySummary);
+    return {
+      companyName,
+      companySummary,
+      primaryImageUrl: f.primaryImageUrl.trim(),
+      secondaryImageUrl: f.secondaryImageUrl.trim(),
+      companyPhone: f.companyPhone.trim() ? onlyDigitsPhone(f.companyPhone).slice(0, 15) : "",
+      whatsApp: f.whatsApp.trim() ? normalizeWhatsappDigitsForStorage(f.whatsApp) : "",
+      address: f.address.trim(),
+      websiteUrl: f.websiteUrl.trim(),
+      instagramUrl: f.instagramUrl.trim(),
+      youtubeUrl: f.youtubeUrl.trim(),
+      services: f.services.trim(),
+      defaultSpotPlans: f.defaultSpotPlans,
+      defaultRecurringPlans: normalizeRecurringPlansForSave(f.defaultRecurringPlans),
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!user || loading) return;
+    const f = formRef.current;
+    if (!hydratedRef.current) {
+      hydratedRef.current = true;
+      const initial = buildCompanyAboutPayload(f);
+      lastSavedJsonRef.current = JSON.stringify(initial);
+      return;
+    }
+    const payload = buildCompanyAboutPayload(f);
+    const nextJson = JSON.stringify(payload);
+    if (nextJson === lastSavedJsonRef.current) return;
+    const t = window.setTimeout(() => {
+      void (async () => {
+        if (!user) return;
+        const latest = formRef.current;
+        const p = buildCompanyAboutPayload(latest);
+        const json = JSON.stringify(p);
+        if (json === lastSavedJsonRef.current) return;
+        setSaving(true);
+        setError(null);
+        try {
+          await saveUserCompanyAboutSettings(user.uid, p);
+          setForm({
+            ...p,
+            companyName: latest.companyName.trim() ? p.companyName : "",
+            companySummary: latest.companySummary.trim() ? p.companySummary : "",
+          });
+          lastSavedJsonRef.current = json;
+          setSavedAt(Date.now());
+        } catch (e) {
+          console.error(e);
+          setError("Não foi possível salvar o bloco institucional.");
+        } finally {
+          setSaving(false);
+        }
+      })();
+    }, 850);
+    return () => window.clearTimeout(t);
+  }, [form, loading, user, buildCompanyAboutPayload]);
+
   const updateDefaultPlan = useCallback(
     (kind: "spot" | "recurring", planId: string, field: keyof ProposalPlan, value: string) => {
       const key = kind === "spot" ? "defaultSpotPlans" : "defaultRecurringPlans";
@@ -217,7 +292,9 @@ export function CompanyAboutSettingsForm() {
       const n = normalizeInstallmentCount(count);
       setForm((prev) => ({
         ...prev,
-        [key]: prev[key].map((plan) => (plan.id === planId ? { ...plan, installmentCount: n } : plan)),
+        [key]: prev[key].map((plan) =>
+          plan.id === planId ? { ...plan, installmentCount: n, ...(n <= 1 ? { cashPrice: "" } : {}) } : plan,
+        ),
       }));
     },
     [],
@@ -275,48 +352,6 @@ export function CompanyAboutSettingsForm() {
     }
   };
 
-  const handleSave = async () => {
-    if (!user) return;
-    const companyName = form.companyName.trim();
-    const companySummary = form.companySummary.trim();
-    if (!companyName) {
-      setError("Informe o nome da empresa/agência.");
-      return;
-    }
-    if (!companySummary) {
-      setError("Escreva um resumo curto sobre a empresa.");
-      return;
-    }
-
-    setSaving(true);
-    setError(null);
-    try {
-      const payload: UserCompanyAboutSettings = {
-        companyName,
-        companySummary,
-        primaryImageUrl: form.primaryImageUrl.trim(),
-        secondaryImageUrl: form.secondaryImageUrl.trim(),
-        companyPhone: form.companyPhone.trim() ? onlyDigitsPhone(form.companyPhone).slice(0, 15) : "",
-        whatsApp: form.whatsApp.trim() ? normalizeWhatsappDigitsForStorage(form.whatsApp) : "",
-        address: form.address.trim(),
-        websiteUrl: form.websiteUrl.trim(),
-        instagramUrl: form.instagramUrl.trim(),
-        youtubeUrl: form.youtubeUrl.trim(),
-        services: form.services.trim(),
-        defaultSpotPlans: form.defaultSpotPlans,
-        defaultRecurringPlans: form.defaultRecurringPlans,
-      };
-      await saveUserCompanyAboutSettings(user.uid, payload);
-      setForm(payload);
-      setSavedAt(Date.now());
-    } catch (e) {
-      console.error(e);
-      setError("Não foi possível salvar o bloco institucional.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
   return (
     <Card className="overflow-hidden border-border bg-card shadow-xl dark:border-white/5 dark:bg-white/[0.02]">
       <CardHeader className="space-y-2 border-b border-border pb-4 dark:border-white/5">
@@ -344,26 +379,28 @@ export function CompanyAboutSettingsForm() {
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="company-about-name" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                  Nome da empresa
+                  Nome da empresa{" "}
+                  <span className="font-normal normal-case text-muted-foreground/80">(opcional)</span>
                 </Label>
                 <Input
                   id="company-about-name"
                   value={form.companyName}
                   onChange={(e) => setForm((prev) => ({ ...prev, companyName: e.target.value }))}
-                  placeholder="Ex.: Rota Digital"
+                  placeholder={`Vazio = “${DEFAULT_COMPANY_ABOUT_NAME}” na proposta`}
                   className="h-11"
                 />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="company-about-summary" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                  Resumo institucional
+                  Resumo institucional{" "}
+                  <span className="font-normal normal-case text-muted-foreground/80">(opcional)</span>
                 </Label>
                 <Textarea
                   id="company-about-summary"
                   value={form.companySummary}
                   onChange={(e) => setForm((prev) => ({ ...prev, companySummary: e.target.value }))}
-                  placeholder="Explique em poucas linhas o que a sua agência faz, para quem e qual diferencial entrega."
+                  placeholder="O que a agência faz e para quem. Se deixar vazio, guardamos um resumo de apoio sobre a Rota Digital (dois parágrafos) para usar nas propostas."
                   className="min-h-40 resize-y"
                 />
               </div>
@@ -512,6 +549,7 @@ export function CompanyAboutSettingsForm() {
                 description="Modelos de planos contínuos ou mensais; copiados ao criar uma proposta nova."
                 icon={Repeat2}
                 plans={form.defaultRecurringPlans}
+                hideInstallments
                 onChange={(planId, field, value) => updateDefaultPlan("recurring", planId, field, value)}
                 onInstallmentCountChange={(planId, count) => updateDefaultInstallments("recurring", planId, count)}
                 onPaymentMethodsChange={(planId, methods) => updateDefaultPaymentMethods("recurring", planId, methods)}
@@ -532,17 +570,23 @@ export function CompanyAboutSettingsForm() {
               </p>
             ) : null}
 
-            <div className="flex flex-wrap items-center gap-3">
-              <Button type="button" variant="cta" size="lg" className="gap-2" onClick={() => void handleSave()} disabled={saving}>
-                {saving ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
-                {saving ? "Salvando…" : "Salvar informações"}
-              </Button>
-              {savedAt && !error ? (
-                <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground" role="status" aria-live="polite">
-                  <Check className="size-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden />
-                  Informações salvas.
+            <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground" role="status" aria-live="polite">
+              {saving ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <Loader2 className="size-3.5 animate-spin text-brand" aria-hidden />
+                  A guardar…
                 </span>
-              ) : null}
+              ) : savedAt && !error ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <Check className="size-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden />
+                  Guardado automaticamente.
+                </span>
+              ) : (
+                <span className="text-muted-foreground/80">
+                  As alterações guardam-se sozinhas. Nome vazio usa “{DEFAULT_COMPANY_ABOUT_NAME}”; resumo vazio usa
+                  um texto de apoio padrão na proposta.
+                </span>
+              )}
             </div>
           </>
         )}

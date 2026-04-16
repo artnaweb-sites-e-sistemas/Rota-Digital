@@ -1,10 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
 import { getUserReportCtaSettings, saveUserReportCtaSettings } from "@/lib/user-settings";
 import {
@@ -59,6 +58,10 @@ export function ReportCtaSettingsForm() {
   const [form, setForm] = useState<UserReportCtaSettings>(DEFAULT_FORM);
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
+  const formRef = useRef(form);
+  formRef.current = form;
+  const hydratedRef = useRef(false);
+  const lastSavedJsonRef = useRef<string>("");
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -86,65 +89,72 @@ export function ReportCtaSettingsForm() {
     return () => window.clearTimeout(id);
   }, [savedAt]);
 
+  useEffect(() => {
+    hydratedRef.current = false;
+    lastSavedJsonRef.current = "";
+  }, [user?.uid]);
+
+  const buildReportCtaPayload = useCallback((f: UserReportCtaSettings): UserReportCtaSettings | null => {
+    if (f.ctaMode === "whatsapp") {
+      const normalized = normalizeWhatsappDigitsForStorage(f.whatsappPhone);
+      if (normalized.length < 12 || !buildWhatsAppHref(normalized)) return null;
+      return { ctaMode: "whatsapp", whatsappPhone: normalized, ctaUrl: "" };
+    }
+    const t = f.ctaUrl.trim();
+    if (!t) return null;
+    const withProto = /^https?:\/\//i.test(t) ? t : `https://${t.replace(/^\/+/, "")}`;
+    try {
+      new URL(withProto);
+    } catch {
+      return null;
+    }
+    return { ctaMode: "url", whatsappPhone: "", ctaUrl: withProto };
+  }, []);
+
+  useEffect(() => {
+    if (!user || loading) return;
+    const f = formRef.current;
+    if (!hydratedRef.current) {
+      hydratedRef.current = true;
+      const initial = buildReportCtaPayload(f);
+      lastSavedJsonRef.current = JSON.stringify(initial ?? f);
+      return;
+    }
+    const payload = buildReportCtaPayload(f);
+    if (!payload) return;
+    const nextJson = JSON.stringify(payload);
+    if (nextJson === lastSavedJsonRef.current) return;
+    const t = window.setTimeout(() => {
+      void (async () => {
+        if (!user) return;
+        const latest = formRef.current;
+        const p = buildReportCtaPayload(latest);
+        if (!p) return;
+        const json = JSON.stringify(p);
+        if (json === lastSavedJsonRef.current) return;
+        setSaving(true);
+        setError(null);
+        try {
+          await saveUserReportCtaSettings(user.uid, p);
+          setForm(p);
+          lastSavedJsonRef.current = json;
+          setSavedAt(Date.now());
+        } catch (e) {
+          console.error(e);
+          setSavedAt(null);
+          setError("Não foi possível salvar. Tente de novo.");
+        } finally {
+          setSaving(false);
+        }
+      })();
+    }, 850);
+    return () => window.clearTimeout(t);
+  }, [form, loading, user, buildReportCtaPayload]);
+
   const setMode = (ctaMode: UserReportCtaMode) => {
     setForm((f) => ({ ...f, ctaMode }));
     setError(null);
     setSavedAt(null);
-  };
-
-  const handleSave = async () => {
-    if (!user) return;
-    setError(null);
-
-    if (form.ctaMode === "whatsapp") {
-      const normalized = normalizeWhatsappDigitsForStorage(form.whatsappPhone);
-      if (normalized.length < 12 || !buildWhatsAppHref(normalized)) {
-        setError("WhatsApp incompleto. Ex.: +55 (11) 98765-4321");
-        return;
-      }
-    } else {
-      const t = form.ctaUrl.trim();
-      if (!t) {
-        setError("Informe uma URL de destino (ex.: link do Calendly ou página de contato).");
-        return;
-      }
-      const withProto = /^https?:\/\//i.test(t) ? t : `https://${t.replace(/^\/+/, "")}`;
-      try {
-        new URL(withProto);
-      } catch {
-        setError("URL inválida. Use algo como https://seusite.com/contato");
-        return;
-      }
-    }
-
-    setSaving(true);
-    try {
-      const toSave: UserReportCtaSettings =
-        form.ctaMode === "whatsapp"
-          ? {
-              ctaMode: "whatsapp",
-              whatsappPhone: normalizeWhatsappDigitsForStorage(form.whatsappPhone),
-              ctaUrl: "",
-            }
-          : (() => {
-              const t = form.ctaUrl.trim();
-              const normalized = /^https?:\/\//i.test(t) ? t : `https://${t.replace(/^\/+/, "")}`;
-              return {
-                ctaMode: "url" as const,
-                whatsappPhone: "",
-                ctaUrl: normalized,
-              };
-            })();
-      await saveUserReportCtaSettings(user.uid, toSave);
-      setForm(toSave);
-      setSavedAt(Date.now());
-    } catch (e) {
-      console.error(e);
-      setSavedAt(null);
-      setError("Não foi possível salvar. Tente de novo.");
-    } finally {
-      setSaving(false);
-    }
   };
 
   return (
@@ -226,34 +236,26 @@ export function ReportCtaSettingsForm() {
             {error ? (
               <p className="rounded-md border border-red-500/35 bg-red-500/10 px-3 py-2 text-sm text-red-800 dark:text-red-300">{error}</p>
             ) : null}
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-              <Button
-                type="button"
-                variant="cta"
-                size="lg"
-                className="w-full gap-2 sm:w-auto"
-                onClick={() => void handleSave()}
-                disabled={saving}
-              >
-                {saving ? (
-                  <>
-                    <Loader2 className="size-4 animate-spin shrink-0" aria-hidden />
-                    Salvando…
-                  </>
-                ) : (
-                  "Salvar alterações"
-                )}
-              </Button>
-              {savedAt && !error ? (
-                <span
-                  className="inline-flex max-w-full items-center gap-1.5 text-xs text-muted-foreground motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
-                  role="status"
-                  aria-live="polite"
-                >
-                  <Check className="size-3.5 shrink-0 opacity-50 text-emerald-700 dark:text-emerald-500/80" aria-hidden />
-                  Preferências salvas.
+            <div
+              className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-muted-foreground"
+              role="status"
+              aria-live="polite"
+            >
+              {saving ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <Loader2 className="size-3.5 animate-spin shrink-0 text-brand" aria-hidden />
+                  A guardar…
                 </span>
-              ) : null}
+              ) : savedAt && !error ? (
+                <span className="inline-flex max-w-full items-center gap-1.5 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
+                  <Check className="size-3.5 shrink-0 text-emerald-700 dark:text-emerald-500/80" aria-hidden />
+                  Guardado automaticamente.
+                </span>
+              ) : (
+                <span className="text-muted-foreground/80">
+                  Guarda automática quando o WhatsApp ou a URL estiver válidos.
+                </span>
+              )}
             </div>
           </>
         )}

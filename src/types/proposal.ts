@@ -10,6 +10,11 @@ export type ProposalPlan = {
   promotionalPrice?: string;
   /** Número de parcelas (1 = à vista). Opcional em propostas antigas. */
   installmentCount?: number;
+  /**
+   * Valor à vista quando há parcelamento (opcional).
+   * Se preenchido, substitui a linha “Total” por “Ou à vista sem juros” na visualização.
+   */
+  cashPrice?: string;
   paymentTerms: string;
   /** Meios de pagamento aceites (PIX, cartão, boleto). Opcional para propostas antigas. */
   paymentMethods?: ProposalPaymentMethodId[];

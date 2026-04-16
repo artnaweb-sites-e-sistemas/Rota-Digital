@@ -23,6 +23,7 @@ export function coerceProposalPlan(raw: unknown): ProposalPlan | null {
   const paymentTerms = typeof o.paymentTerms === "string" ? o.paymentTerms : "";
 
   const promotionalPrice = typeof o.promotionalPrice === "string" ? o.promotionalPrice : "";
+  const cashPrice = typeof o.cashPrice === "string" ? o.cashPrice : "";
 
   let installmentCount: number | undefined;
   if (typeof o.installmentCount === "number" && Number.isFinite(o.installmentCount)) {
@@ -45,6 +46,7 @@ export function coerceProposalPlan(raw: unknown): ProposalPlan | null {
     price,
     promotionalPrice,
     installmentCount,
+    ...(cashPrice.trim() ? { cashPrice } : {}),
     paymentTerms,
     paymentMethods,
   };
@@ -69,6 +71,19 @@ export function clonePlansForNewProposal(plans: ProposalPlan[]): ProposalPlan[] 
   }));
 }
 
+/** Planos recorrentes: preço mensal — não persistir parcelas nem valor “à vista” parcelado. */
+export function normalizeRecurringPlanForSave(plan: ProposalPlan): ProposalPlan {
+  return {
+    ...plan,
+    installmentCount: 1,
+    cashPrice: "",
+  };
+}
+
+export function normalizeRecurringPlansForSave(plans: ProposalPlan[]): ProposalPlan[] {
+  return plans.map(normalizeRecurringPlanForSave);
+}
+
 /** Objeto seguro para gravar no Firestore (sem `undefined`). */
 export function proposalPlanToFirestoreValue(plan: ProposalPlan): Record<string, unknown> {
   return {
@@ -78,6 +93,7 @@ export function proposalPlanToFirestoreValue(plan: ProposalPlan): Record<string,
     price: plan.price,
     promotionalPrice: plan.promotionalPrice ?? "",
     installmentCount: normalizeInstallmentCount(plan.installmentCount),
+    cashPrice: plan.cashPrice?.trim() ?? "",
     paymentTerms: plan.paymentTerms,
     paymentMethods: plan.paymentMethods ?? [],
   };

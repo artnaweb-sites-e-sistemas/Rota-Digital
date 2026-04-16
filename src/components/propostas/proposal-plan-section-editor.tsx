@@ -1,8 +1,10 @@
 "use client";
 
+import { useCallback, useEffect, useState } from "react";
 import type { LucideIcon } from "lucide-react";
-import { Plus, Trash2 } from "lucide-react";
+import { ChevronDown, Plus, Trash2 } from "lucide-react";
 
+import { DeliverablesFormatHint } from "@/components/propostas/deliverables-format-hint";
 import { PlanPaymentMethodsPicker, normalizePlanPaymentMethods, sortPaymentMethods } from "@/components/propostas/plan-payment-methods";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import { formatCurrencyInput } from "@/lib/currency-brl-input";
 import { PROPOSAL_PLAN_MAX_INSTALLMENTS, normalizeInstallmentCount } from "@/lib/proposal-plan-installments";
 import type { ProposalPaymentMethodId, ProposalPlan } from "@/types/proposal";
@@ -24,6 +27,7 @@ export function ProposalPlanSectionEditor({
   onPaymentMethodsChange,
   onAdd,
   onRemove,
+  hideInstallments = false,
 }: {
   title: string;
   description: string;
@@ -34,7 +38,30 @@ export function ProposalPlanSectionEditor({
   onPaymentMethodsChange: (planId: string, methods: ProposalPaymentMethodId[]) => void;
   onAdd: () => void;
   onRemove: (planId: string) => void;
+  /** Planos recorrentes: sem parcelas / à vista (valor mensal). */
+  hideInstallments?: boolean;
 }) {
+  const [collapsedByPlanId, setCollapsedByPlanId] = useState<Record<string, boolean>>({});
+
+  const setPlanCollapsed = useCallback((planId: string, collapsed: boolean) => {
+    setCollapsedByPlanId((prev) => ({ ...prev, [planId]: collapsed }));
+  }, []);
+
+  useEffect(() => {
+    const ids = new Set(plans.map((p) => p.id));
+    setCollapsedByPlanId((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      for (const key of Object.keys(next)) {
+        if (!ids.has(key)) {
+          delete next[key];
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [plans]);
+
   return (
     <Card className="overflow-hidden border-border bg-card shadow-xl dark:border-white/5 dark:bg-white/[0.02]">
       <CardHeader className="border-b border-border pb-5 dark:border-white/5">
@@ -58,31 +85,72 @@ export function ProposalPlanSectionEditor({
       </CardHeader>
 
       <CardContent className="space-y-4 pt-6">
-        {plans.map((plan, index) => (
+        {plans.map((plan, index) => {
+          const isCollapsed = collapsedByPlanId[plan.id] === true;
+          const summaryTitle = plan.title.trim() || "Sem título";
+
+          return (
           <div
             key={plan.id}
-            className="space-y-4 rounded-2xl border border-border bg-background/70 p-5 dark:border-white/10 dark:bg-white/[0.03]"
+            className="rounded-2xl border border-border bg-background/70 p-5 dark:border-white/10 dark:bg-white/[0.03]"
           >
             <div className="flex items-center justify-between gap-3">
-              <div>
+              <button
+                type="button"
+                onClick={() => setPlanCollapsed(plan.id, !isCollapsed)}
+                aria-expanded={!isCollapsed}
+                className="min-w-0 flex-1 rounded-md text-left outline-none ring-brand/40 focus-visible:ring-2"
+              >
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                   Plano {index + 1}
                 </p>
-                <p className="mt-1 text-sm text-muted-foreground">Defina escopo, valor e forma de pagamento.</p>
-              </div>
-              {plans.length > 1 ? (
-                <Button
+                {isCollapsed ? (
+                  <p className="mt-1 truncate text-sm font-medium text-foreground">{summaryTitle}</p>
+                ) : (
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Defina escopo, valor e forma de pagamento.
+                  </p>
+                )}
+              </button>
+              <div className="flex shrink-0 items-center gap-2">
+                {plans.length > 1 ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="gap-2 text-red-600 hover:text-red-700 dark:text-red-300"
+                    onClick={() => onRemove(plan.id)}
+                  >
+                    <Trash2 className="size-4" aria-hidden />
+                    Remover
+                  </Button>
+                ) : null}
+                <button
                   type="button"
-                  variant="ghost"
-                  className="gap-2 text-red-600 hover:text-red-700 dark:text-red-300"
-                  onClick={() => onRemove(plan.id)}
+                  onClick={() => setPlanCollapsed(plan.id, !isCollapsed)}
+                  aria-expanded={!isCollapsed}
+                  aria-label={isCollapsed ? "Expandir plano" : "Recolher plano"}
+                  className={cn(
+                    "inline-flex size-9 shrink-0 items-center justify-center rounded-lg",
+                    "border border-border/70 bg-muted/45 text-muted-foreground",
+                    "ring-brand/40 transition-transform duration-200",
+                    "hover:bg-muted/65 dark:border-white/12 dark:bg-white/[0.07] dark:hover:bg-white/[0.11]",
+                    "focus-visible:outline-none focus-visible:ring-2",
+                  )}
                 >
-                  <Trash2 className="size-4" aria-hidden />
-                  Remover
-                </Button>
-              ) : null}
+                  <ChevronDown
+                    className={cn("size-5 transition-transform duration-200", isCollapsed && "-rotate-90")}
+                    aria-hidden
+                  />
+                </button>
+              </div>
             </div>
 
+            <div
+              className={cn(
+                "mt-4 space-y-4 border-t border-border/60 pt-4 dark:border-white/10",
+                isCollapsed && "hidden",
+              )}
+            >
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2 md:col-span-2">
                 <Label htmlFor={`${plan.id}-title`}>Título do plano</Label>
@@ -94,7 +162,12 @@ export function ProposalPlanSectionEditor({
                   className="h-10"
                 />
               </div>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(7.25rem,8.5rem)] md:col-span-2">
+              <div
+                className={cn(
+                  "grid grid-cols-1 gap-4 sm:grid-cols-2 md:col-span-2",
+                  !hideInstallments && "lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(7.25rem,8.5rem)]",
+                )}
+              >
                 <div className="space-y-2">
                   <Label htmlFor={`${plan.id}-price`}>Valor</Label>
                   <Input
@@ -119,35 +192,58 @@ export function ProposalPlanSectionEditor({
                     className="h-10"
                   />
                 </div>
-                <div className="space-y-2 sm:col-span-2 lg:col-span-1">
-                  <Label htmlFor={`${plan.id}-installments`}>Parcelas</Label>
-                  <Select
-                    value={String(normalizeInstallmentCount(plan.installmentCount))}
-                    onValueChange={(v) => onInstallmentCountChange(plan.id, Number(v))}
-                  >
-                    <SelectTrigger id={`${plan.id}-installments`} className="h-10 w-full">
-                      <SelectValue placeholder="Parcelas" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Array.from({ length: PROPOSAL_PLAN_MAX_INSTALLMENTS }, (_, i) => i + 1).map((n) => (
-                        <SelectItem key={n} value={String(n)}>
-                          {n === 1 ? "À vista" : `${n}×`}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {!hideInstallments ? (
+                  <div className="space-y-2 sm:col-span-2 lg:col-span-1">
+                    <Label htmlFor={`${plan.id}-installments`}>Parcelas</Label>
+                    <Select
+                      value={String(normalizeInstallmentCount(plan.installmentCount))}
+                      onValueChange={(v) => onInstallmentCountChange(plan.id, Number(v))}
+                    >
+                      <SelectTrigger id={`${plan.id}-installments`} className="h-10 w-full">
+                        <SelectValue placeholder="Parcelas" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: PROPOSAL_PLAN_MAX_INSTALLMENTS }, (_, i) => i + 1).map((n) => (
+                          <SelectItem key={n} value={String(n)}>
+                            {n === 1 ? "À vista" : `${n}×`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : null}
               </div>
+              {!hideInstallments && normalizeInstallmentCount(plan.installmentCount) > 1 ? (
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor={`${plan.id}-cash`}>
+                    À vista <span className="font-normal text-muted-foreground">(opcional)</span>
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Valor se pagar em uma só vez, quando for diferente do total parcelado (ex.: sem juros do cartão).
+                  </p>
+                  <Input
+                    id={`${plan.id}-cash`}
+                    value={plan.cashPrice ?? ""}
+                    inputMode="numeric"
+                    onChange={(e) => onChange(plan.id, "cashPrice", formatCurrencyInput(e.target.value))}
+                    placeholder="Ex.: R$ 1.200,00"
+                    className="h-10 max-w-md"
+                  />
+                </div>
+              ) : null}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor={`${plan.id}-deliverables`}>Entregáveis</Label>
+              <div className="flex items-center gap-2">
+                <Label htmlFor={`${plan.id}-deliverables`}>Entregáveis</Label>
+                <DeliverablesFormatHint />
+              </div>
               <Textarea
                 id={`${plan.id}-deliverables`}
                 value={plan.deliverables}
                 onChange={(e) => onChange(plan.id, "deliverables", e.target.value)}
                 className="min-h-28"
-                placeholder="Liste os entregáveis deste plano. Pode usar linhas separadas."
+                placeholder="Liste os entregáveis incluídos neste plano."
               />
             </div>
 
@@ -169,8 +265,10 @@ export function ProposalPlanSectionEditor({
                 onChange={(next) => onPaymentMethodsChange(plan.id, next)}
               />
             </div>
+            </div>
           </div>
-        ))}
+        );
+        })}
       </CardContent>
     </Card>
   );

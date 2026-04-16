@@ -11,9 +11,13 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth-context";
 import { createEmptyProposalPlan } from "@/lib/proposal-plan-factory";
 import { normalizeInstallmentCount } from "@/lib/proposal-plan-installments";
-import { clonePlansForNewProposal } from "@/lib/proposal-plan-coerce";
+import { clonePlansForNewProposal, normalizeRecurringPlansForSave } from "@/lib/proposal-plan-coerce";
 import { createLead, getLeads } from "@/lib/leads";
 import { getReportByLead } from "@/lib/reports";
+import {
+  resolveCompanyAboutNameForSave,
+  resolveCompanyAboutSummaryForSave,
+} from "@/lib/company-about-defaults";
 import { getUserCompanyAboutSettings } from "@/lib/user-settings";
 import { newProposalPublicSlug } from "@/lib/proposals";
 import { ProposalPlanSectionEditor } from "@/components/propostas/proposal-plan-section-editor";
@@ -117,6 +121,7 @@ function planHasContent(plan: ProposalPlan): boolean {
       plan.deliverables.trim() ||
       plan.price.trim() ||
       plan.promotionalPrice?.trim() ||
+      plan.cashPrice?.trim() ||
       plan.paymentTerms.trim() ||
       (plan.paymentMethods?.length ?? 0) > 0,
   );
@@ -233,7 +238,9 @@ export default function NewProposalPage() {
           const spotTpl = companyAbout?.defaultSpotPlans ?? [];
           const recTpl = companyAbout?.defaultRecurringPlans ?? [];
           setSpotPlans(spotTpl.length > 0 ? clonePlansForNewProposal(spotTpl) : [newPlan()]);
-          setRecurringPlans(recTpl.length > 0 ? clonePlansForNewProposal(recTpl) : [newPlan()]);
+          setRecurringPlans(
+            recTpl.length > 0 ? normalizeRecurringPlansForSave(clonePlansForNewProposal(recTpl)) : [newPlan()],
+          );
         }
       } catch (e) {
         console.error(e);
@@ -272,7 +279,11 @@ export default function NewProposalPage() {
     const setter = kind === "spot" ? setSpotPlans : setRecurringPlans;
     const n = normalizeInstallmentCount(count);
     setter((prev) =>
-      prev.map((plan) => (plan.id === planId ? { ...plan, installmentCount: n } : plan)),
+      prev.map((plan) =>
+        plan.id === planId
+          ? { ...plan, installmentCount: n, ...(n <= 1 ? { cashPrice: "" } : {}) }
+          : plan,
+      ),
     );
   };
 
@@ -359,8 +370,8 @@ export default function NewProposalPage() {
       return;
     }
     const validUntilDays = diffDaysFromToday(validUntilDate);
-    const companyName = companyAboutSettings?.companyName?.trim() || "Rota Digital";
-    const companySummary = companyAboutSettings?.companySummary?.trim() || "";
+    const companyName = resolveCompanyAboutNameForSave(companyAboutSettings?.companyName);
+    const companySummary = resolveCompanyAboutSummaryForSave(companyAboutSettings?.companySummary);
 
     const leadSnapshot = {
       name: selectedLead.name,
@@ -437,7 +448,7 @@ export default function NewProposalPage() {
       validUntilDate,
       lead: leadSnapshot,
       spotPlans: cleanSpotPlans,
-      recurringPlans: cleanRecurringPlans,
+      recurringPlans: normalizeRecurringPlansForSave(cleanRecurringPlans),
       companyProfile: linkedReport
         ? {
             source: "route",
@@ -699,6 +710,7 @@ export default function NewProposalPage() {
         description="Planos de acompanhamento contínuo com frequência e valor recorrente."
         icon={Repeat2}
         plans={recurringPlans}
+        hideInstallments
         onChange={(planId, field, value) => updatePlan("recurring", planId, field, value)}
         onInstallmentCountChange={(planId, count) => updatePlanInstallmentCount("recurring", planId, count)}
         onPaymentMethodsChange={(planId, methods) => updatePlanPaymentMethods("recurring", planId, methods)}

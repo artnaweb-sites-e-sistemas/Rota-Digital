@@ -11,6 +11,7 @@ import {
   type SVGProps,
 } from "react";
 import { useRouter } from "next/navigation";
+import { getProposalByLead } from "@/lib/proposals";
 import { updateReport } from "@/lib/reports";
 import { describeManualUploadFailure, uploadUserEvidenceImageForReport } from "@/lib/evidence-storage";
 import { maturityFromDiagnosticScores } from "@/lib/maturity-from-diagnostics";
@@ -1835,6 +1836,8 @@ export function RotaDigitalReportView({
   /** Modo tópico-a-tópico só depois de abrir a secção com o lápis da caixa. */
   const [listSectionEditOpen, setListSectionEditOpen] = useState<DashboardListSectionKey | null>(null);
   const [evidenceReplaceSlot, setEvidenceReplaceSlot] = useState<EvidenceManualSlot | null>(null);
+  const [leadProposalId, setLeadProposalId] = useState<string | null>(null);
+  const [leadProposalLoading, setLeadProposalLoading] = useState(false);
 
   const reportCta = useMemo(
     () => resolveReportCtas(ctaSettings, process.env.NEXT_PUBLIC_ROTA_REPORT_CTA_URL),
@@ -1868,6 +1871,32 @@ export function RotaDigitalReportView({
     if (variant !== "public") return;
     setCtaSettings(initialCtaSettings ?? null);
   }, [variant, initialCtaSettings]);
+
+  useEffect(() => {
+    if (!isDashboard || !report.leadId?.trim() || !report.userId) {
+      setLeadProposalId(null);
+      setLeadProposalLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setLeadProposalLoading(true);
+    void getProposalByLead(report.leadId.trim(), report.userId)
+      .then((proposal) => {
+        if (!cancelled) {
+          setLeadProposalId(proposal?.id ?? null);
+          setLeadProposalLoading(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setLeadProposalId(null);
+          setLeadProposalLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isDashboard, report.leadId, report.userId]);
 
   useEffect(() => {
     if (variant === "public") return;
@@ -2470,6 +2499,32 @@ export function RotaDigitalReportView({
         </div>
         {isDashboard ? (
           <div className="flex flex-wrap items-center gap-2.5">
+            {leadProposalLoading ? (
+              <Button type="button" variant="outline" disabled className="gap-2 no-print">
+                <Loader2 size={16} className="animate-spin" />
+                Proposta…
+              </Button>
+            ) : leadProposalId ? (
+              <LinkButton
+                href={`/dashboard/propostas/${leadProposalId}`}
+                variant="outline"
+                size="default"
+                className="gap-2 no-print"
+              >
+                <FileText size={16} />
+                Ver Proposta
+              </LinkButton>
+            ) : (
+              <LinkButton
+                href={`/dashboard/propostas/new?leadId=${encodeURIComponent(report.leadId)}`}
+                variant="outline"
+                size="default"
+                className="gap-2 no-print"
+              >
+                <FileText size={16} />
+                Gerar Proposta
+              </LinkButton>
+            )}
             <Button
               type="button"
               variant="ctaMotion"
