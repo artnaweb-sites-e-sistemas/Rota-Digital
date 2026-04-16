@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
   Building2,
@@ -60,6 +60,7 @@ import { createEmptyProposalPlan, planLooksEmpty } from "@/lib/proposal-plan-fac
 import { PROPOSAL_PLAN_MAX_INSTALLMENTS, normalizeInstallmentCount } from "@/lib/proposal-plan-installments";
 import { parsePlanDeliverablesForDisplay } from "@/lib/proposal-plan-deliverables-display";
 import { cn } from "@/lib/utils";
+import { proposalPlanPromoBadgeClassName } from "@/lib/proposal-floating-badges";
 import { getLead } from "@/lib/leads";
 import {
   proposalLeadSnapshotFromLead,
@@ -543,13 +544,11 @@ function buildAgencyContactRows(
   return rows;
 }
 
-function validityTone(validUntilDate: number): {
-  label: string;
-  className: string;
-} {
+/** Estado da data de validade para o selo no cartão «Validade». */
+function validityTone(validUntilDate: number): { label: string; className: string } {
   if (validUntilDate < Date.now()) {
     return {
-      label: "Inválida",
+      label: "Expirada",
       className:
         "border-red-500/30 bg-red-500/10 text-red-700 dark:border-red-500/25 dark:bg-red-500/15 dark:text-red-200",
     };
@@ -569,6 +568,8 @@ function IdentityThumb({
   busy = false,
   onPickFile,
   replaceButtonSide = "right",
+  /** Quando true, o círculo encolhe em ecrãs estreitos (hero da proposta) para caber sem scroll horizontal. */
+  shrinkOnNarrow = false,
 }: {
   title: string;
   imageUrl?: string;
@@ -577,7 +578,24 @@ function IdentityThumb({
   busy?: boolean;
   onPickFile?: (file: File) => void;
   replaceButtonSide?: "left" | "right";
+  shrinkOnNarrow?: boolean;
 }) {
+  const ringClass = shrinkOnNarrow
+    ? "relative flex aspect-square h-auto w-[min(9rem,max(7.25rem,calc((100dvw-3rem)/2.08)))] items-center justify-center overflow-hidden border-2 shadow-lg sm:aspect-auto sm:h-44 sm:w-44 md:h-48 md:w-48 lg:h-56 lg:w-56"
+    : "relative flex h-44 w-44 items-center justify-center overflow-hidden border-2 shadow-lg sm:h-48 sm:w-48 lg:h-56 lg:w-56";
+
+  const initialsClass = shrinkOnNarrow
+    ? "text-[clamp(1.5rem,7.5vw,2.75rem)] font-bold tracking-wide text-foreground sm:text-5xl sm:tracking-wide md:text-[3.25rem] lg:text-[3.5rem]"
+    : "text-5xl font-bold tracking-wide text-foreground sm:text-[3.25rem] lg:text-[3.5rem]";
+
+  const editBtnCorner = shrinkOnNarrow
+    ? replaceButtonSide === "left"
+      ? "top-2 left-2 sm:top-5 sm:left-5 lg:top-6 lg:left-6"
+      : "top-2 right-2 sm:top-5 sm:right-5 lg:top-6 lg:right-6"
+    : replaceButtonSide === "left"
+      ? "top-4 left-4 sm:top-5 sm:left-5 lg:top-6 lg:left-6"
+      : "top-4 right-4 sm:top-5 sm:right-5 lg:top-6 lg:right-6";
+
   return (
     <div
       className={cn(
@@ -587,10 +605,10 @@ function IdentityThumb({
           : "rounded-full bg-gradient-to-tr from-muted/90 to-background dark:from-white/[0.08] dark:to-white/[0.04]",
       )}
     >
-      <div className="relative w-full">
+      <div className="relative w-full max-w-full">
         <div
           className={cn(
-            "relative flex h-44 w-44 items-center justify-center overflow-hidden border-2 shadow-lg sm:h-48 sm:w-48 lg:h-56 lg:w-56",
+            ringClass,
             tone === "brand"
               ? "rounded-full border-brand/20 bg-gradient-to-br from-brand/20 via-brand/10 to-transparent"
               : "rounded-full border-border bg-gradient-to-br from-muted via-muted/80 to-background dark:border-white/10",
@@ -600,9 +618,7 @@ function IdentityThumb({
           {imageUrl ? (
             <img src={imageUrl} alt={title} className="h-full w-full object-cover" />
           ) : (
-            <span className="text-5xl font-bold tracking-wide text-foreground sm:text-[3.25rem] lg:text-[3.5rem]">
-              {getInitials(fallback)}
-            </span>
+            <span className={initialsClass}>{getInitials(fallback)}</span>
           )}
         </div>
 
@@ -610,9 +626,7 @@ function IdentityThumb({
           <label
             className={cn(
               "absolute z-[35] cursor-pointer",
-              replaceButtonSide === "left"
-                ? "top-4 left-4 sm:top-5 sm:left-5 lg:top-6 lg:left-6"
-                : "top-4 right-4 sm:top-5 sm:right-5 lg:top-6 lg:right-6",
+              editBtnCorner,
             )}
           >
             <input
@@ -850,13 +864,25 @@ function ProposalPlanCard({
   );
 
   return (
-    <article
-      className={cn(
-        "group relative overflow-hidden border bg-background/80 shadow-sm transition-[box-shadow,transform] duration-200 dark:bg-white/[0.03]",
-        RR.panel,
-        "border-border/80 hover:border-brand/25 hover:shadow-md dark:border-white/10 dark:hover:border-brand/20",
-      )}
-    >
+    <div className="relative isolate pt-1">
+      {promoOfferActive ? (
+        <Badge
+          variant="default"
+          className={cn(proposalPlanPromoBadgeClassName(), "font-bold uppercase tracking-wider")}
+        >
+          Promoção
+        </Badge>
+      ) : null}
+      <article
+        className={cn(
+          "group relative z-10 overflow-hidden border shadow-sm transition-[box-shadow,transform] duration-200",
+          RR.panel,
+          isSpot
+            ? "bg-card hover:border-brand/25 dark:bg-card dark:border-white/10 dark:hover:border-brand/20"
+            : "bg-emerald-50/95 hover:border-emerald-600/40 dark:bg-emerald-950/50 dark:border-emerald-500/25 dark:hover:border-emerald-400/45",
+          "border-border/80 hover:shadow-md",
+        )}
+      >
       <div
         className={cn(
           "pointer-events-none absolute left-0 top-0 h-full w-1 bg-gradient-to-b",
@@ -864,16 +890,6 @@ function ProposalPlanCard({
         )}
         aria-hidden
       />
-      {promoOfferActive ? (
-        <div className="pointer-events-none absolute right-3 top-3 z-10 sm:right-4 sm:top-4">
-          <Badge
-            variant="outline"
-            className="rounded-md border-red-500/35 bg-red-600/12 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-red-700 shadow-sm dark:border-red-500/40 dark:bg-red-500/15 dark:text-red-300"
-          >
-            Promoção
-          </Badge>
-        </div>
-      ) : null}
       <div className="relative space-y-4 p-5 pl-6 pr-5 sm:p-6 sm:pl-7 sm:pr-7">
         {editing ? (
           <div className="space-y-4">
@@ -1022,16 +1038,16 @@ function ProposalPlanCard({
           <>
             <div className="min-w-0 space-y-1">
               <div className="flex items-start gap-2">
-                <div className="flex min-w-0 flex-1 items-baseline gap-2">
+                <div className="flex min-w-0 flex-1 flex-col items-start gap-1.5">
                   <span
                     className={cn(
-                      "shrink-0 text-sm font-semibold tracking-wide sm:text-[0.9375rem]",
+                      "text-sm font-semibold tracking-wide sm:text-[0.9375rem]",
                       isSpot ? "text-brand/80 dark:text-brand/75" : "text-emerald-700/85 dark:text-emerald-400/80",
                     )}
                   >
                     Plano
                   </span>
-                  <h3 className="min-w-0 flex-1 text-lg font-bold leading-snug tracking-tight text-foreground sm:text-xl">
+                  <h3 className="min-w-0 w-full text-lg font-bold leading-snug tracking-tight text-foreground sm:text-xl">
                     {plan.title}
                   </h3>
                 </div>
@@ -1176,6 +1192,7 @@ function ProposalPlanCard({
         )}
       </div>
     </article>
+    </div>
   );
 }
 
@@ -1228,7 +1245,7 @@ function ProposalPlansSection({
 
         <div className="grid gap-10 lg:grid-cols-2 lg:gap-12">
           {showSpotColumn ? (
-            <div className="min-w-0 space-y-4">
+            <div className="min-w-0 space-y-6">
               <div className="flex items-center gap-2.5">
                 <div
                   className={cn(
@@ -1243,21 +1260,31 @@ function ProposalPlansSection({
                   <p className="text-sm font-semibold text-foreground">Investimento pontual</p>
                 </div>
               </div>
-              <div className="space-y-4">
-                {spots.map((plan) => (
-                  <ProposalPlanCard
-                    key={plan.id}
-                    plan={plan}
-                    kind="spot"
-                    readOnly={readOnly}
-                    onSave={readOnly ? undefined : (next) => onSavePlan?.("spot", next)}
-                    onAbandonEmptyPlan={
-                      readOnly || !onAbandonEmptyPlan ? undefined : () => void onAbandonEmptyPlan("spot", plan.id)
-                    }
-                    onDeletePlan={
-                      readOnly || !onDeletePlan ? undefined : () => void onDeletePlan("spot", plan.id)
-                    }
-                  />
+              <div className="flex flex-col">
+                {spots.map((plan, index) => (
+                  <Fragment key={plan.id}>
+                    {index > 0 ? (
+                      <div
+                        className="relative my-10 shrink-0"
+                        role="separator"
+                        aria-orientation="horizontal"
+                      >
+                        <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-gradient-to-r from-transparent via-border to-transparent dark:via-white/12" />
+                      </div>
+                    ) : null}
+                    <ProposalPlanCard
+                      plan={plan}
+                      kind="spot"
+                      readOnly={readOnly}
+                      onSave={readOnly ? undefined : (next) => onSavePlan?.("spot", next)}
+                      onAbandonEmptyPlan={
+                        readOnly || !onAbandonEmptyPlan ? undefined : () => void onAbandonEmptyPlan("spot", plan.id)
+                      }
+                      onDeletePlan={
+                        readOnly || !onDeletePlan ? undefined : () => void onDeletePlan("spot", plan.id)
+                      }
+                    />
+                  </Fragment>
                 ))}
               </div>
               {showAdd ? (
@@ -1275,7 +1302,7 @@ function ProposalPlansSection({
           ) : null}
 
           {showRecurringColumn ? (
-            <div className="min-w-0 space-y-4">
+            <div className="min-w-0 space-y-6">
               <div className="flex items-center gap-2.5">
                 <div
                   className={cn(
@@ -1290,21 +1317,31 @@ function ProposalPlansSection({
                   <p className="text-sm font-semibold text-foreground">Planos contínuos</p>
                 </div>
               </div>
-              <div className="space-y-4">
-                {recurring.map((plan) => (
-                  <ProposalPlanCard
-                    key={plan.id}
-                    plan={plan}
-                    kind="recurring"
-                    readOnly={readOnly}
-                    onSave={readOnly ? undefined : (next) => onSavePlan?.("recurring", next)}
-                    onAbandonEmptyPlan={
-                      readOnly || !onAbandonEmptyPlan ? undefined : () => void onAbandonEmptyPlan("recurring", plan.id)
-                    }
-                    onDeletePlan={
-                      readOnly || !onDeletePlan ? undefined : () => void onDeletePlan("recurring", plan.id)
-                    }
-                  />
+              <div className="flex flex-col">
+                {recurring.map((plan, index) => (
+                  <Fragment key={plan.id}>
+                    {index > 0 ? (
+                      <div
+                        className="relative my-10 shrink-0"
+                        role="separator"
+                        aria-orientation="horizontal"
+                      >
+                        <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-gradient-to-r from-transparent via-emerald-500/35 to-transparent dark:via-emerald-400/25" />
+                      </div>
+                    ) : null}
+                    <ProposalPlanCard
+                      plan={plan}
+                      kind="recurring"
+                      readOnly={readOnly}
+                      onSave={readOnly ? undefined : (next) => onSavePlan?.("recurring", next)}
+                      onAbandonEmptyPlan={
+                        readOnly || !onAbandonEmptyPlan ? undefined : () => void onAbandonEmptyPlan("recurring", plan.id)
+                      }
+                      onDeletePlan={
+                        readOnly || !onDeletePlan ? undefined : () => void onDeletePlan("recurring", plan.id)
+                      }
+                    />
+                  </Fragment>
                 ))}
               </div>
               {showAdd ? (
@@ -1336,10 +1373,7 @@ function SummaryStat({
   label: string;
   value: string;
   icon: typeof CalendarDays;
-  badge?: {
-    label: string;
-    className: string;
-  };
+  badge?: { label: string; className: string };
   className?: string;
 }) {
   return (
@@ -1350,21 +1384,24 @@ function SummaryStat({
         className,
       )}
     >
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-muted-foreground">
+      <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2 text-muted-foreground">
           <Icon className="size-5 shrink-0 text-brand sm:size-4" aria-hidden />
-          <span className="text-xs font-semibold uppercase tracking-widest">{label}</span>
+          <span className="min-w-0 text-xs font-semibold uppercase tracking-widest">{label}</span>
         </div>
         {badge ? (
           <Badge
             variant="outline"
-            className={cn("inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold", badge.className)}
+            className={cn(
+              "shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-semibold sm:text-[11px]",
+              badge.className,
+            )}
           >
             {badge.label}
           </Badge>
         ) : null}
       </div>
-      <p className="mt-2 text-sm font-semibold text-foreground">{value}</p>
+      <p className="mt-2 break-words text-sm font-semibold text-foreground">{value}</p>
     </div>
   );
 }
@@ -1494,7 +1531,7 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
   }, []);
 
   const publicHref = proposal.publicSlug ? `/p/${proposal.publicSlug}` : undefined;
-  const status = validityTone(proposal.validUntilDate);
+  const validityStatus = validityTone(proposal.validUntilDate);
   const spotCount = proposal.spotPlans.length;
   const recurringCount = proposal.recurringPlans.length;
 
@@ -1805,39 +1842,42 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
   };
 
   return (
-    <div className="space-y-8">
-      <section className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-xl dark:border-white/5 dark:bg-white/[0.02]">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(190,149,83,0.18),transparent_42%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.08),transparent_34%)]" />
-        <div className="relative grid gap-8 px-6 py-7 sm:px-8 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,30rem)] lg:items-stretch">
-          <div className="flex min-h-0 flex-col space-y-5 lg:min-h-0">
+    <div className="min-w-0 space-y-8">
+      <section className="relative overflow-visible rounded-2xl border border-border bg-card shadow-xl dark:border-white/5 dark:bg-white/[0.02]">
+        <div
+          className="pointer-events-none absolute inset-0 z-0 overflow-hidden rounded-2xl bg-[radial-gradient(circle_at_top_left,rgba(190,149,83,0.18),transparent_42%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.08),transparent_34%)]"
+          aria-hidden
+        />
+        <div className="relative z-10">
+          <div className="grid min-w-0 gap-6 px-4 py-6 sm:gap-8 sm:px-8 sm:py-7 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,30rem)] lg:items-stretch lg:gap-8">
+          <div className="flex min-h-0 min-w-0 flex-col space-y-5 lg:min-h-0">
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="outline" className="rounded-full border-brand/20 bg-brand/10 px-3 py-1 text-xs font-semibold text-brand">
                 Proposta comercial
               </Badge>
             </div>
 
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 text-sm font-medium text-brand">
-                <FileText className="size-7 shrink-0 sm:size-4" aria-hidden />
-                {displayLead.company}
+            <div className="min-w-0 space-y-3">
+              <div className="flex min-w-0 items-start gap-2 text-sm font-medium text-brand sm:items-center">
+                <FileText className="mt-0.5 size-4 shrink-0 sm:mt-0" aria-hidden />
+                <span className="min-w-0 flex-1 break-words leading-snug">{displayLead.company}</span>
               </div>
-              <div>
-                <h1 className="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
+              <div className="min-w-0">
+                <h1 className="break-words text-3xl font-extrabold tracking-tight text-foreground text-balance sm:text-4xl">
                   Proposta Comercial
                 </h1>
-                <p className="mt-3 max-w-3xl text-sm leading-relaxed text-muted-foreground sm:text-base">
+                <p className="mt-3 max-w-3xl break-words text-sm leading-relaxed text-muted-foreground sm:text-base">
                   Uma proposta pensada exclusivamente para você.
                 </p>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <SummaryStat
-                className="col-span-2 sm:col-span-1"
                 label="Validade"
                 value={formatDate(proposal.validUntilDate)}
                 icon={CalendarDays}
-                badge={status}
+                badge={validityStatus}
               />
               <SummaryStat
                 label="Pontual"
@@ -1863,8 +1903,8 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
             ) : null}
 
             {isDashboard && publicHref && publicLinkOrigin ? (
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-                <code className="min-w-0 flex-1 truncate rounded-md bg-muted px-3 py-2 text-left text-sm text-foreground/90">
+              <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center">
+                <code className="min-w-0 flex-1 overflow-x-auto break-all rounded-md bg-muted px-2 py-2 text-left text-xs leading-relaxed text-foreground/90 sm:px-3 sm:py-2 sm:text-sm">
                   {`${publicLinkOrigin}${publicHref}`}
                 </code>
                 <div className="flex shrink-0 flex-wrap gap-2">
@@ -1891,14 +1931,15 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
             ) : null}
           </div>
 
-          <div className="flex min-h-0 flex-col items-center justify-center lg:h-full lg:min-h-0 lg:items-center">
-            <div className="flex items-center -space-x-11 py-4 sm:-space-x-[3.25rem] sm:py-5 lg:-space-x-[3.6rem] lg:py-2">
-              <div className="relative z-10">
+          <div className="flex min-h-0 w-full min-w-0 flex-col items-center justify-center lg:h-full lg:min-h-0 lg:items-center">
+            <div className="flex w-full max-w-full items-center justify-center gap-0 py-4 max-sm:-space-x-10 sm:-space-x-[3.25rem] sm:py-5 lg:-space-x-[3.6rem] lg:py-2">
+              <div className="relative z-10 shrink-0">
                 <IdentityThumb
                   title={displayLead.company}
                   imageUrl={leadImageUrl}
                   fallback={displayLead.company}
                   tone="muted"
+                  shrinkOnNarrow
                   busy={uploadingSlot === "lead"}
                   replaceButtonSide="left"
                   onPickFile={
@@ -1906,12 +1947,13 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
                   }
                 />
               </div>
-              <div className="relative z-20">
+              <div className="relative z-20 shrink-0">
                 <IdentityThumb
                   title={displayAgencyName}
                   imageUrl={displayAgencyImage}
                   fallback={displayAgencyName}
                   tone="brand"
+                  shrinkOnNarrow
                   busy={uploadingSlot === "agency"}
                   replaceButtonSide="right"
                   onPickFile={
@@ -1922,13 +1964,14 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
             </div>
           </div>
         </div>
+        </div>
       </section>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
-        <Card className="overflow-hidden border-border bg-card shadow-xl dark:border-white/5 dark:bg-white/[0.02]">
+      <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+        <Card className="min-w-0 overflow-hidden border-border bg-card shadow-xl dark:border-white/5 dark:bg-white/[0.02]">
           <CardHeader className="border-b border-border pb-5 dark:border-white/5">
-            <div className="flex items-start justify-between gap-4">
-              <div>
+            <div className="flex min-w-0 items-start justify-between gap-4">
+              <div className="min-w-0 flex-1">
                 <CardTitle className="text-xl font-bold text-foreground">Perfil da empresa</CardTitle>
                 <CardDescription className="mt-2 text-sm leading-relaxed text-muted-foreground">
                   Um resumo para contextualizar esta proposta.
@@ -1953,21 +1996,15 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                 Proposta para:
               </p>
-              <div className="mt-4 space-y-3 text-sm text-muted-foreground">
-                <div className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-4">
-                  <span>Cliente</span>
-                  <span className="min-w-0 font-medium leading-5 text-foreground">{displayLead.name}</span>
-                </div>
-                <div className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-4">
-                  <span>Empresa</span>
-                  <span className="min-w-0 font-medium leading-5 text-foreground">{displayLead.company}</span>
-                </div>
-                <div className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-4">
-                  <span>Validade</span>
-                  <span className="min-w-0 font-medium leading-5 text-foreground">
-                    {remainingValidityLabel(proposal.validUntilDate)}
-                  </span>
-                </div>
+              <div className="mt-4 grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-2.5 text-sm text-muted-foreground sm:gap-x-3">
+                <span className="shrink-0">Cliente</span>
+                <span className="min-w-0 font-medium leading-5 text-foreground">{displayLead.name}</span>
+                <span className="shrink-0">Empresa</span>
+                <span className="min-w-0 font-medium leading-5 text-foreground">{displayLead.company}</span>
+                <span className="shrink-0">Validade</span>
+                <span className="min-w-0 font-medium leading-5 text-foreground">
+                  {remainingValidityLabel(proposal.validUntilDate)}
+                </span>
               </div>
             </div>
 
@@ -2019,7 +2056,7 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
 
         <Card
           className={cn(
-            "overflow-hidden border-border bg-card shadow-xl dark:border-white/5 dark:bg-white/[0.02]",
+            "min-w-0 overflow-hidden border-border bg-card shadow-xl dark:border-white/5 dark:bg-white/[0.02]",
             displayAgencyCoverUrl ? "gap-0 pt-0" : null,
           )}
         >
@@ -2096,30 +2133,32 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
             {agencyContactRows.length ? (
               <div
                 className={cn(
-                  "border border-border bg-muted/25 p-5 dark:border-white/10 dark:bg-white/[0.03]",
+                  "min-w-0 overflow-hidden border border-border bg-muted/25 p-5 dark:border-white/10 dark:bg-white/[0.03]",
                   RR.panel,
                 )}
               >
-                <ul className="m-0 list-none space-y-4 p-0">
+                <ul className="m-0 min-w-0 list-none space-y-4 p-0">
                   {agencyContactRows.map((row) => {
                     const Icon = row.icon;
                     const body =
                       row.topicLines && row.topicLines.length > 0 ? (
-                        <ul className="m-0 list-none space-y-2.5 p-0" aria-label={row.label}>
+                        <ul className="m-0 min-w-0 list-none space-y-2.5 p-0" aria-label={row.label}>
                           {row.topicLines.map((line, idx) => (
-                            <li key={`${row.key}-${idx}`} className="flex gap-2.5">
+                            <li key={`${row.key}-${idx}`} className="flex min-w-0 gap-2.5">
                               <span
                                 className="mt-2 size-1.5 shrink-0 rounded-full bg-brand ring-1 ring-brand/35"
                                 aria-hidden
                               />
-                              <span className="text-sm font-medium leading-snug text-foreground">{line}</span>
+                              <span className="min-w-0 break-words text-sm font-medium leading-snug text-foreground">
+                                {line}
+                              </span>
                             </li>
                           ))}
                         </ul>
                       ) : row.href ? (
                         <a
                           href={row.href}
-                          className="text-sm font-medium text-foreground underline decoration-brand/35 underline-offset-2 transition-colors hover:text-brand"
+                          className="block min-w-0 max-w-full break-all text-sm font-medium text-foreground underline decoration-brand/35 underline-offset-2 transition-colors hover:text-brand sm:break-words"
                           {...(row.external ? { target: "_blank", rel: "noreferrer" } : {})}
                         >
                           {row.value}
@@ -2127,20 +2166,20 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
                       ) : (
                         <span
                           className={cn(
-                            "text-sm font-medium text-foreground/90",
-                            row.multiline ? "block whitespace-pre-line" : "",
+                            "block min-w-0 max-w-full text-sm font-medium text-foreground/90 [overflow-wrap:anywhere]",
+                            row.multiline ? "whitespace-pre-line" : "",
                           )}
                         >
                           {row.value}
                         </span>
                       );
                     return (
-                      <li key={row.key} className="space-y-1">
-                        <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      <li key={row.key} className="min-w-0 space-y-1">
+                        <div className="flex min-w-0 items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                           <Icon className="size-3.5 shrink-0 text-brand" aria-hidden />
-                          {row.label}
+                          <span className="min-w-0">{row.label}</span>
                         </div>
-                        <div className="pl-5">{body}</div>
+                        <div className="min-w-0 max-w-full pl-5">{body}</div>
                       </li>
                     );
                   })}

@@ -19,7 +19,10 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { LinkButton } from "@/components/ui/link-button";
 import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
+import {
+  type ProposalExpiryFloatingTone,
+  proposalExpiryFloatingBadgeClassName,
+} from "@/lib/proposal-floating-badges";
 
 const PAGE_SIZE = 10;
 const STATUS_FILTERS = ["todos", "validas", "expiradas"] as const;
@@ -54,9 +57,7 @@ function calendarDaysUntilValid(validUntilMs: number): number {
   return Math.ceil((end.getTime() - today.getTime()) / 86_400_000);
 }
 
-type ExpiryTagTone = "green" | "yellow" | "red" | "expired" | "indefinite";
-
-function proposalExpiryCountdownTag(proposal: Proposal): { label: string; tone: ExpiryTagTone } {
+function proposalExpiryCountdownTag(proposal: Proposal): { label: string; tone: ProposalExpiryFloatingTone } {
   if (!proposal.validUntilDate) {
     return { label: "Prazo indefinido", tone: "indefinite" };
   }
@@ -72,35 +73,6 @@ function proposalExpiryCountdownTag(proposal: Proposal): { label: string; tone: 
   if (d > 3) return { label, tone: "green" };
   if (d === 3) return { label, tone: "yellow" };
   return { label, tone: "red" };
-}
-
-/** Aba “fora” do cartão, canto superior direito — mesmo padrão visual do selo de prioridade nos cards de canal do relatório. */
-function expiryCountdownFloatingBadgeClassName(tone: ExpiryTagTone): string {
-  const layout =
-    "pointer-events-none absolute right-3 top-0 z-0 inline-flex !h-auto min-h-[26px] max-sm:min-h-[24px] -translate-y-[calc(100%-8px)] shrink-0 items-center justify-center gap-1 rounded-t-md rounded-b-none !rounded-t-md !rounded-b-none border-x border-t border-b-0 px-2 pb-1.5 pt-1 text-[10px] font-semibold leading-snug whitespace-nowrap tabular-nums sm:right-5 sm:min-h-7 sm:px-2.5 sm:pb-2 sm:pt-1.5 sm:text-[11px] sm:font-medium shadow-sm dark:shadow-none";
-  switch (tone) {
-    case "green":
-      return cn(
-        layout,
-        "border-emerald-500/50 bg-[oklch(0.97_0.02_155)] text-emerald-900 dark:border-transparent dark:bg-[oklch(0.22_0.05_155)] dark:text-emerald-100",
-      );
-    case "yellow":
-      return cn(
-        layout,
-        "border-amber-500/50 bg-[oklch(0.97_0.028_85)] text-amber-950 dark:border-transparent dark:bg-[oklch(0.24_0.04_80)] dark:text-amber-50",
-      );
-    case "red":
-    case "expired":
-      return cn(
-        layout,
-        "border-red-500/50 bg-[oklch(0.97_0.02_25)] text-red-900 dark:border-transparent dark:bg-[oklch(0.24_0.06_25)] dark:text-red-100",
-      );
-    default:
-      return cn(
-        layout,
-        "border-border bg-muted text-muted-foreground dark:border-transparent dark:bg-zinc-800 dark:text-zinc-300",
-      );
-  }
 }
 
 export default function PropostasPage() {
@@ -273,7 +245,7 @@ export default function PropostasPage() {
                   const expiryTag = proposalExpiryCountdownTag(proposal);
                   return (
                   <div key={proposal.id} className="relative pt-1">
-                    <Badge variant="outline" className={expiryCountdownFloatingBadgeClassName(expiryTag.tone)}>
+                    <Badge variant="outline" className={proposalExpiryFloatingBadgeClassName(expiryTag.tone)}>
                       {expiryTag.label}
                     </Badge>
                     <Card className="relative z-10 overflow-hidden border-border bg-card shadow-lg transition-colors hover:border-brand/25 dark:border-white/5 dark:bg-[color-mix(in_oklch,white_2%,var(--background))]">
