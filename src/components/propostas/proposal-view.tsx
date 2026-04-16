@@ -879,14 +879,14 @@ function ProposalPlanCard({
           RR.panel,
           isSpot
             ? "bg-card hover:border-brand/25 dark:bg-card dark:border-white/10 dark:hover:border-brand/20"
-            : "bg-emerald-50/95 hover:border-emerald-600/40 dark:bg-emerald-950/50 dark:border-emerald-500/25 dark:hover:border-emerald-400/45",
+            : "bg-emerald-500/[0.045] hover:border-emerald-500/22 dark:bg-emerald-500/[0.07] dark:border-emerald-500/14 dark:hover:border-emerald-400/28",
           "border-border/80 hover:shadow-md",
         )}
       >
       <div
         className={cn(
           "pointer-events-none absolute left-0 top-0 h-full w-1 bg-gradient-to-b",
-          isSpot ? "from-brand/70 to-brand/20" : "from-emerald-600/55 to-emerald-500/15 dark:from-emerald-400/50 dark:to-emerald-500/10",
+          isSpot ? "from-brand/70 to-brand/20" : "from-emerald-600/28 to-emerald-500/10 dark:from-emerald-400/28 dark:to-emerald-500/6",
         )}
         aria-hidden
       />
@@ -1363,19 +1363,39 @@ function ProposalPlansSection({
   );
 }
 
+function summaryStatNumberAccentClass(accent: "spot" | "recurring"): string {
+  return accent === "spot"
+    ? "text-amber-600 dark:text-amber-400"
+    : "text-emerald-600 dark:text-emerald-400";
+}
+
 function SummaryStat({
   label,
   value,
   icon: Icon,
   badge,
   className,
+  valueNumberAccent,
 }: {
   label: string;
   value: string;
   icon: typeof CalendarDays;
   badge?: { label: string; className: string };
   className?: string;
+  /** Destaca só o número inicial (ex.: «3 planos») — pontual âmbar, recorrente verde. */
+  valueNumberAccent?: "spot" | "recurring";
 }) {
+  const valueMatch = valueNumberAccent ? value.match(/^(\d+)(.*)$/) : null;
+  const valueBlock =
+    valueMatch && valueNumberAccent ? (
+      <p className="mt-2 break-words text-sm font-semibold">
+        <span className={cn("tabular-nums", summaryStatNumberAccentClass(valueNumberAccent))}>{valueMatch[1]}</span>
+        <span className="text-foreground">{valueMatch[2]}</span>
+      </p>
+    ) : (
+      <p className="mt-2 break-words text-sm font-semibold text-foreground">{value}</p>
+    );
+
   return (
     <div
       className={cn(
@@ -1401,7 +1421,7 @@ function SummaryStat({
           </Badge>
         ) : null}
       </div>
-      <p className="mt-2 break-words text-sm font-semibold text-foreground">{value}</p>
+      {valueBlock}
     </div>
   );
 }
@@ -1858,9 +1878,8 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
             </div>
 
             <div className="min-w-0 space-y-3">
-              <div className="flex min-w-0 items-start gap-2 text-sm font-medium text-brand sm:items-center">
-                <FileText className="mt-0.5 size-4 shrink-0 sm:mt-0" aria-hidden />
-                <span className="min-w-0 flex-1 break-words leading-snug">{displayLead.company}</span>
+              <div className="min-w-0 text-sm font-medium text-brand">
+                <span className="block min-w-0 break-words leading-snug">{displayLead.company}</span>
               </div>
               <div className="min-w-0">
                 <h1 className="break-words text-3xl font-extrabold tracking-tight text-foreground text-balance sm:text-4xl">
@@ -1883,11 +1902,13 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
                 label="Pontual"
                 value={`${spotCount} plano${spotCount === 1 ? "" : "s"}`}
                 icon={FileText}
+                valueNumberAccent="spot"
               />
               <SummaryStat
                 label="Recorrente"
                 value={`${recurringCount} plano${recurringCount === 1 ? "" : "s"}`}
                 icon={Building2}
+                valueNumberAccent="recurring"
               />
             </div>
 
@@ -1996,7 +2017,7 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                 Proposta para:
               </p>
-              <div className="mt-4 grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-2.5 text-sm text-muted-foreground sm:gap-x-3">
+              <div className="mt-4 grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-3.5 text-sm text-muted-foreground sm:gap-x-5 sm:gap-y-4">
                 <span className="shrink-0">Cliente</span>
                 <span className="min-w-0 font-medium leading-5 text-foreground">{displayLead.name}</span>
                 <span className="shrink-0">Empresa</span>
