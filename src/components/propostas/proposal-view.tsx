@@ -721,9 +721,35 @@ function resolvePlanDisplayPrices(plan: ProposalPlan): {
   return { displayPriceText: listTrim };
 }
 
+/** 1 → I, 2 → II, … (numeração por coluna: só pontuais ou só recorrentes). */
+function planOrdinalRoman(ordinal: number): string {
+  if (!Number.isFinite(ordinal) || ordinal < 1) return "I";
+  let n = Math.floor(ordinal);
+  const parts: readonly (readonly [number, string])[] = [
+    [100, "C"],
+    [90, "XC"],
+    [50, "L"],
+    [40, "XL"],
+    [10, "X"],
+    [9, "IX"],
+    [5, "V"],
+    [4, "IV"],
+    [1, "I"],
+  ];
+  let out = "";
+  for (const [v, sym] of parts) {
+    while (n >= v) {
+      out += sym;
+      n -= v;
+    }
+  }
+  return out || "I";
+}
+
 function ProposalPlanCard({
   plan,
   kind,
+  planOrdinal,
   readOnly,
   onSave,
   onAbandonEmptyPlan,
@@ -731,6 +757,8 @@ function ProposalPlanCard({
 }: {
   plan: ProposalPlan;
   kind: "spot" | "recurring";
+  /** Posição entre planos do mesmo tipo (1 = primeiro pontual ou primeiro recorrente). */
+  planOrdinal: number;
   readOnly: boolean;
   onSave?: (next: ProposalPlan) => void | Promise<void>;
   /** Se o plano ainda está vazio (nunca guardado com conteúdo), cancelar remove-o da proposta. */
@@ -1050,7 +1078,7 @@ function ProposalPlanCard({
                       isSpot ? "text-brand/80 dark:text-brand/75" : "text-emerald-700/85 dark:text-emerald-400/80",
                     )}
                   >
-                    Plano
+                    {`Plano ${planOrdinalRoman(planOrdinal)}`}
                   </span>
                   <h3 className="min-w-0 w-full text-lg font-bold leading-snug tracking-tight text-foreground sm:text-xl">
                     {plan.title}
@@ -1280,6 +1308,7 @@ function ProposalPlansSection({
                     <ProposalPlanCard
                       plan={plan}
                       kind="spot"
+                      planOrdinal={index + 1}
                       readOnly={readOnly}
                       onSave={readOnly ? undefined : (next) => onSavePlan?.("spot", next)}
                       onAbandonEmptyPlan={
@@ -1337,6 +1366,7 @@ function ProposalPlansSection({
                     <ProposalPlanCard
                       plan={plan}
                       kind="recurring"
+                      planOrdinal={index + 1}
                       readOnly={readOnly}
                       onSave={readOnly ? undefined : (next) => onSavePlan?.("recurring", next)}
                       onAbandonEmptyPlan={
@@ -1914,13 +1944,13 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
                 badge={validityStatus}
               />
               <SummaryStat
-                label="Pontual"
+                label="Proposta pontual"
                 value={`${spotCount} plano${spotCount === 1 ? "" : "s"}`}
                 icon={FileText}
                 valueNumberAccent="spot"
               />
               <SummaryStat
-                label="Recorrente"
+                label="Proposta recorrente"
                 value={`${recurringCount} plano${recurringCount === 1 ? "" : "s"}`}
                 icon={Building2}
                 valueNumberAccent="recurring"
@@ -2004,10 +2034,10 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
       </section>
 
       <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
-        <Card className="min-w-0 overflow-hidden border-border bg-card shadow-xl dark:border-white/5 dark:bg-white/[0.02]">
+        <Card className="min-w-0 overflow-hidden border-border bg-card pt-0 shadow-xl dark:border-white/5 dark:bg-white/[0.02]">
           <CardHeader
             className={cn(
-              "rounded-t-md border-b border-border pb-5 pt-5 dark:border-white/10 sm:pb-6 sm:pt-6",
+              "rounded-t-md border-b border-border pb-5 pt-4 dark:border-white/10 sm:pb-6 sm:pt-5",
               "bg-gradient-to-b from-brand/[0.14] via-brand/[0.06] to-brand/[0.02] dark:from-brand/20 dark:via-brand/12 dark:to-brand/[0.06]",
             )}
           >
@@ -2111,7 +2141,7 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
                 sizes="(max-width: 1280px) 100vw, 520px"
               />
               <div
-                className="pointer-events-none absolute inset-0 bg-gradient-to-t from-card/90 via-card/20 to-transparent"
+                className="pointer-events-none absolute inset-0 bg-gradient-to-t from-card/40 to-transparent"
                 aria-hidden
               />
             </div>
