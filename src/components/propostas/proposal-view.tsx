@@ -1897,7 +1897,7 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
                 <span className="block min-w-0 break-words leading-snug">{displayLead.company}</span>
               </div>
               <div className="min-w-0">
-                <h1 className="break-words text-3xl font-extrabold tracking-tight text-foreground text-balance sm:text-4xl">
+                <h1 className="break-words text-2xl font-extrabold leading-tight tracking-tight text-foreground text-balance sm:text-3xl sm:leading-snug lg:text-4xl">
                   Proposta Personalizada
                 </h1>
                 <p className="mt-3 max-w-3xl break-words text-sm leading-relaxed text-muted-foreground sm:text-base">
