@@ -73,6 +73,8 @@ import { getUserCompanyAboutSettings, getUserReportCtaSettings } from "@/lib/use
 import { maskPhoneDisplayLoose, resolveReportCtas, type ResolvedReportCta } from "@/lib/report-cta";
 import type { UserCompanyAboutSettings } from "@/types/user-settings";
 import { WhatsAppIcon } from "@/components/icons/whatsapp-icon";
+import { PublicThemeToggle } from "@/components/public-theme-toggle";
+import { PublicThemeToggleHint } from "@/components/public-theme-toggle-hint";
 
 type ProposalViewProps = {
   proposal: Proposal;
@@ -1869,7 +1871,16 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
           aria-hidden
         />
         <div className="relative z-10">
-          <div className="grid min-w-0 gap-6 px-4 py-6 sm:gap-8 sm:px-8 sm:py-7 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,30rem)] lg:items-stretch lg:gap-8">
+          <div className="no-print absolute right-3 top-3 z-20 flex flex-col items-end gap-2 sm:right-7 sm:top-5 sm:flex-row sm:items-center sm:justify-end sm:gap-5">
+            {variant === "public" ? <PublicThemeToggleHint /> : null}
+            <PublicThemeToggle className="shrink-0" />
+          </div>
+          <div
+            className={cn(
+              "grid min-w-0 gap-6 px-4 py-6 sm:gap-8 sm:px-8 sm:py-7 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,30rem)] lg:items-stretch lg:gap-8",
+              "pt-14 sm:pt-16",
+            )}
+          >
           <div className="flex min-h-0 min-w-0 flex-col space-y-5 lg:min-h-0">
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="outline" className="rounded-full border-brand/20 bg-brand/10 px-3 py-1 text-xs font-semibold text-brand">

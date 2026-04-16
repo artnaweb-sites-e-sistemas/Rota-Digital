@@ -16,7 +16,9 @@ import { useAuth } from "@/lib/auth-context";
 import { Lead, LEAD_STATUSES, normalizeLeadStatus, type LeadStatus } from "@/types/lead";
 import { getLeads, createLead, updateLead } from "@/lib/leads";
 import { deleteReportsByLead, getReportsByUser } from "@/lib/reports";
+import { getProposalsByUser } from "@/lib/proposals";
 import type { RotaDigitalReport } from "@/types/report";
+import type { Proposal } from "@/types/proposal";
 import { buildWhatsAppHref, maskWhatsappBRDisplay, onlyDigitsPhone } from "@/lib/report-cta";
 import { useLeadTableColumnWidths } from "@/lib/leads-table-column-widths";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -87,6 +89,18 @@ const LEADS_CAPTURE_FORM_STORAGE_KEY = "leads_capture_form_v1";
 const DEFAULT_PHONE_COUNTRY_CODE = "55";
 
 const ALL_STATUSES: LeadStatus[] = [...LEAD_STATUSES];
+
+/** Com `reportId` no lead: mostrar atalho “ir” para rota pública ou relatório no painel. */
+const LEAD_STATUS_WITH_OPEN_ROUTE_LINK: readonly LeadStatus[] = [
+  "Em Contato",
+  "Rota Gerada",
+  "Proposta",
+  "Convertido",
+];
+
+function leadStatusShowsOpenRouteLink(status: LeadStatus): boolean {
+  return LEAD_STATUS_WITH_OPEN_ROUTE_LINK.includes(status);
+}
 
 /** Valor interno em português (evita exibir “all” no gatilho do select). */
 const STATUS_FILTER_TODOS = "todos" as const;
@@ -508,6 +522,13 @@ function sharedReportHref(slug: string): string {
   return `${origin}/r/${safeSlug}`;
 }
 
+function sharedProposalHref(slug: string): string {
+  const origin = publicAppOrigin();
+  const safeSlug = encodeURIComponent(slug.trim());
+  if (!origin) return `/p/${safeSlug}`;
+  return `${origin}/p/${safeSlug}`;
+}
+
 /** Chip verde do WhatsApp na tabela (link externo compacto). */
 const TABLE_EXTERNAL_LINK_CHIP_CLASS =
   "inline-flex size-[22px] shrink-0 items-center justify-center rounded-md border border-[#25D366]/20 bg-[#25D366]/5 text-[#25D366]/80 transition-colors hover:border-[#25D366]/35 hover:bg-[#25D366]/10 hover:text-[#25D366] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#25D366]/30 focus-visible:ring-offset-1 focus-visible:ring-offset-background dark:border-[#25D366]/15 dark:bg-[#25D366]/10 dark:hover:border-[#25D366]/28 dark:hover:bg-[#25D366]/12";
@@ -516,13 +537,23 @@ const TABLE_EXTERNAL_LINK_CHIP_CLASS =
 const TABLE_PUBLIC_ROUTE_CHIP_CLASS =
   "inline-flex size-[22px] shrink-0 items-center justify-center rounded-md border border-brand/30 bg-brand/10 text-brand transition-colors hover:border-brand/50 hover:bg-brand/18 hover:text-brand focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand/40 focus-visible:ring-offset-1 focus-visible:ring-offset-background dark:border-brand/40 dark:bg-brand/15 dark:text-brand dark:hover:border-brand/50 dark:hover:bg-brand/22";
 
-/** Chip “gerar rota” — tom âmbar, distinto do link externo (ícone bússola). */
-const TABLE_CREATE_ROUTE_CHIP_CLASS =
-  "inline-flex size-[22px] shrink-0 items-center justify-center rounded-md border border-amber-500/35 bg-amber-500/10 text-amber-800 transition-colors hover:border-amber-500/55 hover:bg-amber-500/18 hover:text-amber-950 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500/40 focus-visible:ring-offset-1 focus-visible:ring-offset-background dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200 dark:hover:border-amber-300/45 dark:hover:bg-amber-400/16 dark:hover:text-amber-50";
+/** “Gerar rota” ainda sem rota — apagado, mas clicável (mesmo destino). */
+const TABLE_CREATE_ROUTE_CHIP_DIMMED_CLASS = cn(
+  "inline-flex size-[22px] shrink-0 items-center justify-center rounded-md border border-border/60 bg-muted/45 text-muted-foreground/75 shadow-none transition-[opacity,background-color,border-color,color]",
+  "opacity-[0.72] hover:opacity-100 hover:border-amber-500/28 hover:bg-amber-500/[0.08] hover:text-amber-900/80 dark:border-white/[0.1] dark:bg-white/[0.04] dark:text-zinc-500 dark:hover:border-amber-400/22 dark:hover:bg-amber-500/[0.1] dark:hover:text-amber-100/85",
+  "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500/30 focus-visible:ring-offset-1 focus-visible:ring-offset-background",
+);
 
 /** Atalho “gerar proposta” — violeta, alinhado ao status Proposta. */
 const TABLE_PROPOSAL_CHIP_CLASS =
   "inline-flex size-[22px] shrink-0 items-center justify-center rounded-md border border-violet-500/35 bg-violet-500/10 text-violet-700 transition-colors hover:border-violet-500/55 hover:bg-violet-500/16 hover:text-violet-900 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-violet-500/40 focus-visible:ring-offset-1 focus-visible:ring-offset-background dark:border-violet-400/35 dark:bg-violet-500/15 dark:text-violet-200 dark:hover:border-violet-400/50 dark:hover:bg-violet-500/22 dark:hover:text-violet-50";
+
+/** “Gerar proposta” sem proposta ainda — apagado, mas clicável (mesmo destino). */
+const TABLE_PROPOSAL_CHIP_DIMMED_CLASS = cn(
+  "inline-flex size-[22px] shrink-0 items-center justify-center rounded-md border border-border/60 bg-muted/45 text-muted-foreground/75 shadow-none transition-[opacity,background-color,border-color,color]",
+  "opacity-[0.72] hover:opacity-100 hover:border-violet-500/25 hover:bg-violet-500/[0.08] hover:text-violet-800/75 dark:border-white/[0.1] dark:bg-white/[0.04] dark:text-zinc-500 dark:hover:border-violet-400/22 dark:hover:bg-violet-500/[0.1] dark:hover:text-violet-100/85",
+  "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-violet-500/30 focus-visible:ring-offset-1 focus-visible:ring-offset-background",
+);
 
 const FOLLOWUP_NEUTRAL_BADGE_CLASS =
   "inline-flex h-8 min-w-8 items-center justify-center rounded-md border border-border/80 bg-muted/60 px-1.5 text-[10px] font-bold uppercase tabular-nums tracking-wide text-muted-foreground dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-400";
@@ -564,9 +595,9 @@ function LeadTableSharedRouteLink({
     return (
       <Link
         href={href}
-        className={TABLE_CREATE_ROUTE_CHIP_CLASS}
+        className={TABLE_CREATE_ROUTE_CHIP_DIMMED_CLASS}
         aria-label={`Gerar rota digital para ${lead.name}`}
-        title="Gerar rota para este lead (abre o formulário com o lead já selecionado)"
+        title="Ainda sem rota — abrir formulário para criar (lead já selecionado)"
         onClick={(e) => e.stopPropagation()}
       >
         <Compass className="size-3 shrink-0" aria-hidden />
@@ -574,7 +605,7 @@ function LeadTableSharedRouteLink({
     );
   }
 
-  if (!rowHasRoute || lead.status !== "Rota Gerada" || !lead.reportId) {
+  if (!rowHasRoute || !lead.reportId?.trim() || !leadStatusShowsOpenRouteLink(lead.status)) {
     return null;
   }
   const slug = publicSlugByReportId.get(lead.reportId);
@@ -590,7 +621,7 @@ function LeadTableSharedRouteLink({
       rel={opensPublic ? "noopener noreferrer" : undefined}
       className={TABLE_PUBLIC_ROUTE_CHIP_CLASS}
       aria-label={label}
-      title={opensPublic ? "Abrir página pública da rota" : "Abrir relatório no painel"}
+      title={opensPublic ? "Abrir página pública da rota (nova aba)" : "Abrir relatório no painel"}
       onClick={(e) => e.stopPropagation()}
     >
       <ExternalLink className="size-3 shrink-0" aria-hidden />
@@ -598,21 +629,84 @@ function LeadTableSharedRouteLink({
   );
 }
 
-function LeadTableProposalLink({ lead, rowHasRoute }: { lead: Lead; rowHasRoute: boolean }) {
-  if (!rowHasRoute || lead.status !== "Rota Gerada" || !lead.reportId) {
+function LeadTableProposalLink({
+  lead,
+  rowHasRoute,
+  latestProposal,
+}: {
+  lead: Lead;
+  rowHasRoute: boolean;
+  latestProposal: { id: string; publicSlug?: string } | null;
+}) {
+  if (latestProposal) {
+    const slug = latestProposal.publicSlug?.trim();
+    if (slug) {
+      return (
+        <a
+          href={sharedProposalHref(slug)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={TABLE_PROPOSAL_CHIP_CLASS}
+          aria-label={`Abrir proposta pública de ${lead.name}`}
+          title="Abrir página pública da proposta (nova aba)"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <ExternalLink className="size-3 shrink-0" aria-hidden />
+        </a>
+      );
+    }
+    return (
+      <Link
+        href={`/dashboard/propostas/${latestProposal.id}`}
+        className={TABLE_PROPOSAL_CHIP_CLASS}
+        aria-label={`Abrir proposta de ${lead.name} no painel`}
+        title="Abrir proposta no painel"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <FileText className="size-3 shrink-0" aria-hidden />
+      </Link>
+    );
+  }
+  const canShowProposalGenerate =
+    !latestProposal &&
+    (lead.status === "Em Contato" ||
+      lead.status === "Proposta" ||
+      (lead.status === "Rota Gerada" && rowHasRoute && Boolean(lead.reportId?.trim())));
+
+  if (!canShowProposalGenerate) {
     return null;
   }
   const href = `/dashboard/propostas/new?leadId=${encodeURIComponent(lead.id)}`;
   return (
     <Link
       href={href}
-      className={TABLE_PROPOSAL_CHIP_CLASS}
+      className={TABLE_PROPOSAL_CHIP_DIMMED_CLASS}
       aria-label={`Gerar proposta para ${lead.name}`}
-      title="Gerar proposta com este lead (abre o formulário já com o lead selecionado)"
+      title="Ainda sem proposta — abrir formulário para criar (lead já selecionado)"
       onClick={(e) => e.stopPropagation()}
     >
       <FileText className="size-3 shrink-0" aria-hidden />
     </Link>
+  );
+}
+
+/** Rota digital + proposta, ao lado do WhatsApp na coluna telefone. */
+function LeadTableRouteAndProposalChips({
+  lead,
+  rowHasRoute,
+  publicSlugByReportId,
+  latestProposal,
+}: {
+  lead: Lead;
+  rowHasRoute: boolean;
+  publicSlugByReportId: Map<string, string>;
+  latestProposal: { id: string; publicSlug?: string } | null;
+}) {
+  return (
+    <>
+      <LeadTableSharedRouteLink lead={lead} rowHasRoute={rowHasRoute} publicSlugByReportId={publicSlugByReportId} />
+      <LeadTableProposalLink lead={lead} rowHasRoute={rowHasRoute} latestProposal={latestProposal} />
+    </>
   );
 }
 
@@ -651,19 +745,25 @@ function LeadTableColumnResizeHandle({
 }
 
 function LeadTablePhoneCell({
-  leadId,
+  lead,
   phone,
   lastCopiedLeadId,
   onPhoneCopied,
+  rowHasRoute,
+  publicSlugByReportId,
+  latestProposal,
 }: {
-  leadId: string;
+  lead: Lead;
   phone: string | undefined;
   lastCopiedLeadId: string | null;
   onPhoneCopied: () => void;
+  rowHasRoute: boolean;
+  publicSlugByReportId: Map<string, string>;
+  latestProposal: { id: string; publicSlug?: string } | null;
 }) {
   const [copied, setCopied] = useState(false);
   const trimmed = phone?.trim() ?? "";
-  const isLastCopiedRow = lastCopiedLeadId === leadId;
+  const isLastCopiedRow = lastCopiedLeadId === lead.id;
   if (!trimmed) {
     return (
       <div className="flex w-full min-w-0 items-center gap-2">
@@ -675,13 +775,21 @@ function LeadTablePhoneCell({
           <Copy className="size-3" aria-hidden />
         </span>
         <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">Sem telefone</span>
-        <span
-          className="inline-flex size-[22px] shrink-0 items-center justify-center rounded-md border border-border/50 bg-muted/35 text-muted-foreground/45"
-          aria-hidden
-          title="WhatsApp indisponível"
-        >
-          <WhatsAppIcon className="size-3" aria-hidden />
-        </span>
+        <div className="flex shrink-0 items-center gap-1">
+          <span
+            className="inline-flex size-[22px] shrink-0 items-center justify-center rounded-md border border-border/50 bg-muted/35 text-muted-foreground/45"
+            aria-hidden
+            title="WhatsApp indisponível"
+          >
+            <WhatsAppIcon className="size-3" aria-hidden />
+          </span>
+          <LeadTableRouteAndProposalChips
+            lead={lead}
+            rowHasRoute={rowHasRoute}
+            publicSlugByReportId={publicSlugByReportId}
+            latestProposal={latestProposal}
+          />
+        </div>
       </div>
     );
   }
@@ -739,27 +847,35 @@ function LeadTablePhoneCell({
       <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground" title={displayPlus55}>
         {displayPlus55 || trimmed}
       </span>
-      {waHref ? (
-        <a
-          href={waHref}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={TABLE_EXTERNAL_LINK_CHIP_CLASS}
-          aria-label={`Abrir WhatsApp ${displayPlus55}`}
-          title="Abrir no WhatsApp"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <WhatsAppIcon className="size-3" aria-hidden />
-        </a>
-      ) : (
-        <span
-          className="inline-flex size-[22px] shrink-0 items-center justify-center rounded-md border border-border/50 bg-muted/35 text-muted-foreground/45"
-          aria-hidden
-          title="WhatsApp indisponível"
-        >
-          <WhatsAppIcon className="size-3" aria-hidden />
-        </span>
-      )}
+      <div className="flex shrink-0 items-center gap-1">
+        {waHref ? (
+          <a
+            href={waHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={TABLE_EXTERNAL_LINK_CHIP_CLASS}
+            aria-label={`Abrir WhatsApp ${displayPlus55}`}
+            title="Abrir no WhatsApp"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <WhatsAppIcon className="size-3" aria-hidden />
+          </a>
+        ) : (
+          <span
+            className="inline-flex size-[22px] shrink-0 items-center justify-center rounded-md border border-border/50 bg-muted/35 text-muted-foreground/45"
+            aria-hidden
+            title="WhatsApp indisponível"
+          >
+            <WhatsAppIcon className="size-3" aria-hidden />
+          </span>
+        )}
+        <LeadTableRouteAndProposalChips
+          lead={lead}
+          rowHasRoute={rowHasRoute}
+          publicSlugByReportId={publicSlugByReportId}
+          latestProposal={latestProposal}
+        />
+      </div>
     </div>
   );
 }
@@ -769,6 +885,7 @@ function LeadsPageContent() {
   const { user } = useAuth();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [reports, setReports] = useState<RotaDigitalReport[]>([]);
+  const [proposals, setProposals] = useState<Proposal[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(STATUS_FILTER_TODOS);
   const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
@@ -815,12 +932,14 @@ function LeadsPageContent() {
     if (!user) return;
     try {
       setLoading(true);
-      const [data, userReports] = await Promise.all([
+      const [data, userReports, userProposals] = await Promise.all([
         getLeads(user.uid),
         getReportsByUser(user.uid),
+        getProposalsByUser(user.uid),
       ]);
       setLeads(data);
       setReports(userReports);
+      setProposals(userProposals);
     } catch (error) {
       console.error(error);
     } finally {
@@ -835,6 +954,17 @@ function LeadsPageContent() {
     }
     return m;
   }, [reports]);
+
+  /** Uma proposta por lead (a mais recente). */
+  const latestProposalByLeadId = useMemo(() => {
+    const m = new Map<string, { id: string; publicSlug?: string }>();
+    for (const p of proposals) {
+      const leadId = p.leadId?.trim();
+      if (!leadId || m.has(leadId)) continue;
+      m.set(leadId, { id: p.id, publicSlug: p.publicSlug });
+    }
+    return m;
+  }, [proposals]);
 
   const captureOverlayHint = useMemo(() => {
     const n = captureNiches[0];
@@ -2014,10 +2144,13 @@ function LeadsPageContent() {
                     </TableCell>
                     <TableCell className="min-w-0 px-3 py-4 align-middle">
                       <LeadTablePhoneCell
-                        leadId={lead.id}
+                        lead={lead}
                         phone={lead.phone}
                         lastCopiedLeadId={lastPhoneCopyLeadId}
                         onPhoneCopied={() => setLastPhoneCopyLeadId(lead.id)}
+                        rowHasRoute={rowHasRoute}
+                        publicSlugByReportId={publicSlugByReportId}
+                        latestProposal={latestProposalByLeadId.get(lead.id) ?? null}
                       />
                     </TableCell>
                     <TableCell className="px-3 py-4 align-middle">
@@ -2070,12 +2203,6 @@ function LeadsPageContent() {
                             ))}
                           </DropdownMenuContent>
                         </DropdownMenu>
-                        <LeadTableSharedRouteLink
-                          lead={lead}
-                          rowHasRoute={rowHasRoute}
-                          publicSlugByReportId={publicSlugByReportId}
-                        />
-                        <LeadTableProposalLink lead={lead} rowHasRoute={rowHasRoute} />
                       </div>
                     </TableCell>
                     <TableCell className="py-4 pl-3 pr-6 text-right align-middle">
