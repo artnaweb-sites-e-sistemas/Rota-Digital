@@ -886,7 +886,7 @@ export default function NewRotaPage() {
                               >
                                 <input
                                   type="checkbox"
-                                  className="size-3.5 rounded border-border"
+                                  className="size-3.5"
                                   checked={aiChannelIds.includes(opt.id)}
                                   disabled={aiChannelPolicy !== "restricted"}
                                   onChange={() => toggleAiChannel(opt.id)}
@@ -938,7 +938,7 @@ export default function NewRotaPage() {
                               >
                                 <input
                                   type="checkbox"
-                                  className="size-3.5 rounded border-border"
+                                  className="size-3.5"
                                   checked={aiServiceIds.includes(opt.id)}
                                   disabled={aiServicesPolicy !== "restricted"}
                                   onChange={() => toggleAiService(opt.id)}
@@ -956,7 +956,7 @@ export default function NewRotaPage() {
                         >
                           <input
                             type="checkbox"
-                            className="size-3.5 rounded border-border"
+                            className="size-3.5"
                             checked={aiCustomServicesOpen}
                             disabled={aiServicesPolicy !== "restricted"}
                             onChange={(e) => setAiCustomServicesOpen(e.target.checked)}

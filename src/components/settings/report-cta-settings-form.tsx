@@ -236,27 +236,25 @@ export function ReportCtaSettingsForm() {
             {error ? (
               <p className="rounded-md border border-red-500/35 bg-red-500/10 px-3 py-2 text-sm text-red-800 dark:text-red-300">{error}</p>
             ) : null}
-            <div
-              className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-muted-foreground"
-              role="status"
-              aria-live="polite"
-            >
-              {saving ? (
-                <span className="inline-flex items-center gap-1.5">
-                  <Loader2 className="size-3.5 animate-spin shrink-0 text-brand" aria-hidden />
-                  A guardar…
-                </span>
-              ) : savedAt && !error ? (
-                <span className="inline-flex max-w-full items-center gap-1.5 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
-                  <Check className="size-3.5 shrink-0 text-emerald-700 dark:text-emerald-500/80" aria-hidden />
-                  Guardado automaticamente.
-                </span>
-              ) : (
-                <span className="text-muted-foreground/80">
-                  Guarda automática quando o WhatsApp ou a URL estiver válidos.
-                </span>
-              )}
-            </div>
+            {saving || (savedAt && !error) ? (
+              <div
+                className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-muted-foreground"
+                role="status"
+                aria-live="polite"
+              >
+                {saving ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <Loader2 className="size-3.5 animate-spin shrink-0 text-brand" aria-hidden />
+                    A guardar…
+                  </span>
+                ) : (
+                  <span className="inline-flex max-w-full items-center gap-1.5 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
+                    <Check className="size-3.5 shrink-0 text-emerald-700 dark:text-emerald-500/80" aria-hidden />
+                    Guardado automaticamente.
+                  </span>
+                )}
+              </div>
+            ) : null}
           </>
         )}
       </CardContent>

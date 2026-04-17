@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight, ExternalLink, FileText, Loader2, ScrollText, Search, Trash2 } from "lucide-react";
 
@@ -46,6 +47,14 @@ function formatDate(value: number): string {
     month: "short",
     year: "numeric",
   });
+}
+
+/** Iniciais para o avatar do lead na listagem (empresa, ou nome se a empresa estiver vazia). */
+function leadListThumbInitials(company: string, name: string): string {
+  const src = company.trim() || name.trim();
+  const parts = src.split(/\s+/).filter(Boolean).slice(0, 2);
+  if (!parts.length) return "?";
+  return parts.map((part) => part.charAt(0).toUpperCase()).join("");
 }
 
 /** Dias corridos até a data de validade (meia-noite local), alinhado ao restante da app. */
@@ -250,9 +259,29 @@ export default function PropostasPage() {
                     </Badge>
                     <Card className="relative z-10 overflow-hidden border-border bg-card shadow-lg transition-colors hover:border-brand/25 dark:border-white/5 dark:bg-[color-mix(in_oklch,white_2%,var(--background))]">
                     <CardContent className="space-y-5 p-5">
-                      <div className="min-w-0">
-                        <p className="truncate text-lg font-bold text-foreground">{proposal.lead.company}</p>
-                        <p className="truncate text-sm text-muted-foreground">{proposal.lead.name}</p>
+                      <div className="flex min-w-0 gap-3">
+                        <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-md border border-border bg-muted/50 dark:border-white/10 dark:bg-white/[0.04]">
+                          {proposal.evidences?.leadImageUrl?.trim() ? (
+                            <Image
+                              src={proposal.evidences.leadImageUrl.trim()}
+                              alt={`Foto do lead — ${proposal.lead.company}`}
+                              fill
+                              className="object-cover"
+                              sizes="48px"
+                            />
+                          ) : (
+                            <div
+                              className="flex h-full w-full items-center justify-center bg-gradient-to-br from-brand/18 to-transparent text-[11px] font-bold tracking-wide text-brand dark:from-brand/28 dark:text-brand/90"
+                              aria-hidden
+                            >
+                              {leadListThumbInitials(proposal.lead.company, proposal.lead.name)}
+                            </div>
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-lg font-bold text-foreground">{proposal.lead.company}</p>
+                          <p className="truncate text-sm text-muted-foreground">{proposal.lead.name}</p>
+                        </div>
                       </div>
 
                       <div className="rounded-md border border-border px-3 py-3 dark:border-white/10">

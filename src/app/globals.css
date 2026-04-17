@@ -228,6 +228,47 @@
   a[href]:not([aria-disabled="true"]) {
     cursor: pointer;
   }
+
+  /**
+   * Checkboxes nativos — alinhados à marca (ouro/oliva), cantos e foco como o resto da UI.
+   * Classes utilitárias (ex.: size-3.5) continuam a poder afinar tamanho por contexto.
+   */
+  input[type="checkbox"] {
+    height: 1rem;
+    width: 1rem;
+    flex-shrink: 0;
+    cursor: pointer;
+    vertical-align: middle;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--input);
+    background-color: var(--background);
+    color: var(--brand);
+    accent-color: var(--brand);
+    transition-property: color, background-color, border-color, box-shadow;
+    transition-duration: 150ms;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  input[type="checkbox"]:hover:not(:disabled) {
+    border-color: color-mix(in oklch, var(--brand) 42%, var(--input));
+  }
+
+  input[type="checkbox"]:checked {
+    border-color: color-mix(in oklch, var(--brand) 55%, var(--input));
+  }
+
+  input[type="checkbox"]:focus-visible {
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+    box-shadow:
+      0 0 0 2px var(--background),
+      0 0 0 4px color-mix(in oklch, var(--ring) 75%, transparent);
+  }
+
+  input[type="checkbox"]:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
 }
 
 @keyframes gradient-move {

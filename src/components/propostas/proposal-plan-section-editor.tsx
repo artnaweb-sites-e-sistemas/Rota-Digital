@@ -17,6 +17,9 @@ import { formatCurrencyInput } from "@/lib/currency-brl-input";
 import { PROPOSAL_PLAN_MAX_INSTALLMENTS, normalizeInstallmentCount } from "@/lib/proposal-plan-installments";
 import type { ProposalPaymentMethodId, ProposalPlan } from "@/types/proposal";
 
+/** Pontual = ouro da marca; recorrente = verde (como na vista da proposta). */
+export type ProposalPlanSectionAccent = "spot" | "emerald";
+
 export function ProposalPlanSectionEditor({
   title,
   description,
@@ -28,6 +31,7 @@ export function ProposalPlanSectionEditor({
   onAdd,
   onRemove,
   hideInstallments = false,
+  accent,
 }: {
   title: string;
   description: string;
@@ -40,6 +44,7 @@ export function ProposalPlanSectionEditor({
   onRemove: (planId: string) => void;
   /** Planos recorrentes: sem parcelas / à vista (valor mensal). */
   hideInstallments?: boolean;
+  accent?: ProposalPlanSectionAccent;
 }) {
   const [collapsedByPlanId, setCollapsedByPlanId] = useState<Record<string, boolean>>({});
 
@@ -62,13 +67,70 @@ export function ProposalPlanSectionEditor({
     });
   }, [plans]);
 
+  const accentCard =
+    accent === "spot"
+      ? "border-l-[3px] border-l-brand/70 bg-gradient-to-b from-brand/[0.09] via-transparent to-transparent dark:border-l-brand/55 dark:from-brand/[0.12]"
+      : accent === "emerald"
+        ? "border-l-[3px] border-l-emerald-700/45 bg-gradient-to-b from-emerald-600/[0.04] via-transparent to-transparent dark:border-l-emerald-500/35 dark:from-emerald-500/[0.06]"
+        : "";
+
+  const accentHeaderBorder =
+    accent === "spot"
+      ? "border-brand/20 dark:border-brand/25"
+      : accent === "emerald"
+        ? "border-emerald-800/12 dark:border-emerald-500/12"
+        : "border-border dark:border-white/5";
+
+  const accentIconWrap =
+    accent === "spot"
+      ? "bg-brand/12 ring-brand/30 dark:bg-brand/15 dark:ring-brand/35"
+      : accent === "emerald"
+        ? "bg-emerald-600/[0.07] ring-emerald-700/18 dark:bg-emerald-500/[0.08] dark:ring-emerald-400/15"
+        : "bg-brand/10 ring-brand/20";
+
+  const accentIconClass =
+    accent === "spot"
+      ? "text-brand dark:text-brand"
+      : accent === "emerald"
+        ? "text-emerald-800 dark:text-emerald-600/90"
+        : "text-brand";
+
+  const accentPlanShell =
+    accent === "spot"
+      ? "border-brand/25 bg-brand/[0.04] dark:border-brand/30 dark:bg-brand/[0.07]"
+      : accent === "emerald"
+        ? "border-emerald-800/14 bg-emerald-700/[0.025] dark:border-emerald-500/15 dark:bg-emerald-500/[0.04]"
+        : "border-border bg-background/70 dark:border-white/10 dark:bg-white/[0.03]";
+
+  const accentPlanLabel =
+    accent === "spot"
+      ? "text-brand/90 dark:text-brand/80"
+      : accent === "emerald"
+        ? "text-emerald-900/80 dark:text-zinc-400"
+        : "text-muted-foreground";
+
+  const accentFocusRing =
+    accent === "emerald"
+      ? "focus-visible:ring-emerald-700/30 dark:focus-visible:ring-emerald-500/28"
+      : "focus-visible:ring-brand/45";
+
   return (
-    <Card className="overflow-hidden border-border bg-card shadow-xl dark:border-white/5 dark:bg-white/[0.02]">
-      <CardHeader className="border-b border-border pb-5 dark:border-white/5">
+    <Card
+      className={cn(
+        "overflow-hidden border-border bg-card shadow-xl dark:border-white/5 dark:bg-white/[0.02]",
+        accentCard,
+      )}
+    >
+      <CardHeader className={cn("border-b pb-5", accentHeaderBorder)}>
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-start gap-3">
-            <div className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center self-start rounded-md bg-brand/10 ring-1 ring-brand/20">
-              <Icon className="size-4 text-brand" aria-hidden />
+            <div
+              className={cn(
+                "mt-1 flex h-10 w-10 shrink-0 items-center justify-center self-start rounded-md ring-1",
+                accentIconWrap,
+              )}
+            >
+              <Icon className={cn("size-4", accentIconClass)} aria-hidden />
             </div>
             <div>
               <CardTitle className="text-xl font-bold leading-tight text-foreground">{title}</CardTitle>
@@ -86,22 +148,23 @@ export function ProposalPlanSectionEditor({
 
       <CardContent className="space-y-4 pt-6">
         {plans.map((plan, index) => {
-          const isCollapsed = collapsedByPlanId[plan.id] === true;
+          /** Por omissão colapsado (entrada ausente); só expande com `false` explícito. */
+          const isCollapsed = collapsedByPlanId[plan.id] !== false;
           const summaryTitle = plan.title.trim() || "Sem título";
 
           return (
-          <div
-            key={plan.id}
-            className="rounded-2xl border border-border bg-background/70 p-5 dark:border-white/10 dark:bg-white/[0.03]"
-          >
+          <div key={plan.id} className={cn("rounded-md border p-5", accentPlanShell)}>
             <div className="flex items-center justify-between gap-3">
               <button
                 type="button"
                 onClick={() => setPlanCollapsed(plan.id, !isCollapsed)}
                 aria-expanded={!isCollapsed}
-                className="min-w-0 flex-1 rounded-md text-left outline-none ring-brand/40 focus-visible:ring-2"
+                className={cn(
+                  "min-w-0 flex-1 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                  accentFocusRing,
+                )}
               >
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                <p className={cn("text-xs font-semibold uppercase tracking-[0.2em]", accentPlanLabel)}>
                   Plano {index + 1}
                 </p>
                 {isCollapsed ? (
@@ -117,7 +180,7 @@ export function ProposalPlanSectionEditor({
                   <Button
                     type="button"
                     variant="ghost"
-                    className="gap-2 text-red-600 hover:text-red-700 dark:text-red-300"
+                    className="gap-2 font-medium text-red-700 hover:bg-red-500/12 hover:text-red-900 dark:text-red-400 dark:hover:bg-red-500/18 dark:hover:text-red-200"
                     onClick={() => onRemove(plan.id)}
                   >
                     <Trash2 className="size-4" aria-hidden />
@@ -132,9 +195,10 @@ export function ProposalPlanSectionEditor({
                   className={cn(
                     "inline-flex size-9 shrink-0 items-center justify-center rounded-lg",
                     "border border-border/70 bg-muted/45 text-muted-foreground",
-                    "ring-brand/40 transition-transform duration-200",
+                    "transition-transform duration-200",
                     "hover:bg-muted/65 dark:border-white/12 dark:bg-white/[0.07] dark:hover:bg-white/[0.11]",
-                    "focus-visible:outline-none focus-visible:ring-2",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                    accentFocusRing,
                   )}
                 >
                   <ChevronDown

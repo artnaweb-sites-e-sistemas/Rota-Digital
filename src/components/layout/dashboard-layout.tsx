@@ -211,7 +211,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                   <img
                     src={agencyLogoUrl}
                     alt=""
-                    className="size-full object-cover"
+                    className="size-full object-contain object-center p-1"
                     referrerPolicy="no-referrer"
                   />
                 ) : (
@@ -220,8 +220,8 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               </div>
             </div>
           ) : (
-            <div className="mb-3 rounded-xl border border-sidebar-border bg-sidebar-accent/40 p-3 shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:shadow-none">
-              <div className="flex items-start gap-3">
+            <div className="mb-3 rounded-md border border-sidebar-border bg-sidebar-accent/40 p-3 shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:shadow-none">
+              <div className="flex items-center gap-3">
                 <div
                   className={cn(
                     "relative flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-full border border-sidebar-border bg-muted/60 shadow-sm",
@@ -232,7 +232,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                     <img
                       src={agencyLogoUrl}
                       alt=""
-                      className="size-full object-cover"
+                      className="size-full object-contain object-center p-1.5"
                       referrerPolicy="no-referrer"
                     />
                   ) : (

@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   ArrowRight,
   Building2,
@@ -368,7 +368,8 @@ function formatDate(value: number): string {
   });
 }
 
-function remainingValidityLabel(validUntilDate: number): string {
+/** Texto da validade restante; o número usa algarismos tabulares quando aplicável. */
+function remainingValidityDisplay(validUntilDate: number): ReactNode {
   if (!validUntilDate) return "Não definido";
 
   const now = new Date();
@@ -380,8 +381,20 @@ function remainingValidityLabel(validUntilDate: number): string {
   const diffDays = Math.ceil((end.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
   if (diffDays < 0) return "Expirada";
   if (diffDays === 0) return "Vence hoje";
-  if (diffDays === 1) return "1 dia";
-  return `${diffDays} dias`;
+  if (diffDays === 1) {
+    return (
+      <>
+        <span className="tabular-nums">1</span>
+        <span className="text-muted-foreground"> dia</span>
+      </>
+    );
+  }
+  return (
+    <>
+      <span className="tabular-nums">{diffDays}</span>
+      <span className="text-muted-foreground"> dias</span>
+    </>
+  );
 }
 
 function splitReadableParagraphs(value: string): string[] {
@@ -2074,7 +2087,7 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
                 <span className="min-w-0 font-medium leading-5 text-foreground">{displayLead.company}</span>
                 <span className="shrink-0">Validade</span>
                 <span className="min-w-0 font-medium leading-5 text-foreground">
-                  {remainingValidityLabel(proposal.validUntilDate)}
+                  {remainingValidityDisplay(proposal.validUntilDate)}
                 </span>
               </div>
             </div>

@@ -17,6 +17,14 @@ const nextConfig: NextConfig = {
         pathname: "/**",
       },
     ],
+    /**
+     * Next 16 exige padrão explícito para `src` local com query (ex.: proxy de imagens).
+     * Sem `search`: aceita qualquer query string nestes pathnames.
+     */
+    localPatterns: [
+      { pathname: "/api/image-proxy" },
+      { pathname: "/api/instagram-profile-snapshot" },
+    ],
   },
 };
 

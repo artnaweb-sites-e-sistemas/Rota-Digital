@@ -635,7 +635,7 @@ export default function NewProposalPage() {
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
-            <div className="rounded-2xl border border-border bg-background/70 p-5 dark:border-white/10 dark:bg-white/[0.03]">
+            <div className="rounded-md border border-border bg-background/70 p-5 dark:border-white/10 dark:bg-white/[0.03]">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                 Perfil da empresa
               </p>
@@ -661,7 +661,7 @@ export default function NewProposalPage() {
               )}
             </div>
 
-            <div className="rounded-2xl border border-border bg-background/70 p-5 dark:border-white/10 dark:bg-white/[0.03]">
+            <div className="rounded-md border border-border bg-background/70 p-5 dark:border-white/10 dark:bg-white/[0.03]">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                 Sobre a empresa
               </p>
@@ -694,6 +694,7 @@ export default function NewProposalPage() {
       </Card>
 
       <ProposalPlanSectionEditor
+        accent="spot"
         title="Execução pontual"
         description="Planos fechados por escopo, com entregáveis e investimento definidos."
         icon={FileText}
@@ -706,6 +707,7 @@ export default function NewProposalPage() {
       />
 
       <ProposalPlanSectionEditor
+        accent="emerald"
         title="Execução recorrente"
         description="Planos de acompanhamento contínuo com frequência e valor recorrente."
         icon={Repeat2}

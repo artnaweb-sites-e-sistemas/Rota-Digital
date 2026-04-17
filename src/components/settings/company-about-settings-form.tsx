@@ -533,6 +533,7 @@ export function CompanyAboutSettingsForm() {
 
             <div className="space-y-4">
               <ProposalPlanSectionEditor
+                accent="spot"
                 title="Execução pontual"
                 description="Modelos de planos por escopo único; copiados ao criar uma proposta nova."
                 icon={FileText}
@@ -545,6 +546,7 @@ export function CompanyAboutSettingsForm() {
               />
 
               <ProposalPlanSectionEditor
+                accent="emerald"
                 title="Execução recorrente"
                 description="Modelos de planos contínuos ou mensais; copiados ao criar uma proposta nova."
                 icon={Repeat2}
@@ -570,24 +572,21 @@ export function CompanyAboutSettingsForm() {
               </p>
             ) : null}
 
-            <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground" role="status" aria-live="polite">
-              {saving ? (
-                <span className="inline-flex items-center gap-1.5">
-                  <Loader2 className="size-3.5 animate-spin text-brand" aria-hidden />
-                  A guardar…
-                </span>
-              ) : savedAt && !error ? (
-                <span className="inline-flex items-center gap-1.5">
-                  <Check className="size-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden />
-                  Guardado automaticamente.
-                </span>
-              ) : (
-                <span className="text-muted-foreground/80">
-                  As alterações guardam-se sozinhas. Nome vazio usa “{DEFAULT_COMPANY_ABOUT_NAME}”; resumo vazio usa
-                  um texto de apoio padrão na proposta.
-                </span>
-              )}
-            </div>
+            {saving || (savedAt && !error) ? (
+              <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground" role="status" aria-live="polite">
+                {saving ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <Loader2 className="size-3.5 animate-spin text-brand" aria-hidden />
+                    A guardar…
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5">
+                    <Check className="size-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden />
+                    Guardado automaticamente.
+                  </span>
+                )}
+              </div>
+            ) : null}
           </>
         )}
       </CardContent>

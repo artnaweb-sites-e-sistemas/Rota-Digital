@@ -271,10 +271,10 @@ export function AiPromptSettingsForm() {
             <div className="flex h-9 w-9 items-center justify-center rounded-md bg-brand/10 ring-1 ring-brand/20">
               <Scale className="size-4 text-brand dark:text-brand" aria-hidden />
             </div>
-            <div>
+            <div className="min-w-0 flex-1">
               <CardTitle className="text-lg font-bold text-foreground dark:text-white">Exigência nas notas</CardTitle>
-              <CardDescription className="text-sm text-muted-foreground leading-relaxed">
-                Define como a IA calibra as pontuações do diagnóstico e da maturidade digital no relatório.
+              <CardDescription className="truncate text-xs leading-snug text-muted-foreground">
+                Calibra pontuações de diagnóstico e de maturidade digital no relatório.
               </CardDescription>
             </div>
           </div>
@@ -312,11 +312,10 @@ export function AiPromptSettingsForm() {
             <div className="flex h-9 w-9 items-center justify-center rounded-md bg-brand/10 ring-1 ring-brand/20">
               <Bot className="size-4 text-brand dark:text-brand" aria-hidden />
             </div>
-            <div>
+            <div className="min-w-0 flex-1">
               <CardTitle className="text-lg font-bold text-foreground dark:text-white">Diretrizes da IA</CardTitle>
-              <CardDescription className="text-sm text-muted-foreground leading-relaxed">
-                Texto extra no prompt em toda geração. As regras de canais e de serviços abaixo também
-                entram automaticamente.
+              <CardDescription className="truncate text-xs leading-snug text-muted-foreground">
+                Texto extra fixo; regras de canais e de serviços abaixo entram no prompt automaticamente.
               </CardDescription>
             </div>
           </div>
@@ -349,11 +348,10 @@ export function AiPromptSettingsForm() {
             <div className="flex h-9 w-9 items-center justify-center rounded-md bg-brand/10 ring-1 ring-brand/20">
               <ListTree className="size-4 text-brand dark:text-brand" aria-hidden />
             </div>
-            <div>
+            <div className="min-w-0 flex-1">
               <CardTitle className="text-lg font-bold text-foreground dark:text-white">Canais digitais recomendados</CardTitle>
-              <CardDescription className="text-sm text-muted-foreground leading-relaxed">
-                Apenas canais de mídia e distribuição (onde o cliente investe presença). Lista fixa, sem
-                campo livre neste bloco.
+              <CardDescription className="truncate text-xs leading-snug text-muted-foreground">
+                Só mídia e distribuição; lista fixa, sem campo livre neste bloco.
               </CardDescription>
             </div>
           </div>
@@ -455,7 +453,7 @@ export function AiPromptSettingsForm() {
                 >
                   <input
                     type="checkbox"
-                    className="mt-1 size-4 shrink-0 rounded border-input bg-background text-brand focus:ring-brand/30 dark:border-white/20 dark:bg-zinc-900 dark:text-brand"
+                    className="mt-1"
                     checked={channelIds.includes(opt.id)}
                     disabled={channelPolicy !== "restricted"}
                     onChange={() => toggleChannel(opt.id)}
@@ -474,12 +472,10 @@ export function AiPromptSettingsForm() {
             <div className="flex h-9 w-9 items-center justify-center rounded-md bg-brand/10 ring-1 ring-brand/20">
               <Briefcase className="size-4 text-brand dark:text-brand" aria-hidden />
             </div>
-            <div>
+            <div className="min-w-0 flex-1">
               <CardTitle className="text-lg font-bold text-foreground dark:text-white">Serviços da agência (foco)</CardTitle>
-              <CardDescription className="text-sm text-muted-foreground leading-relaxed">
-                O que a agência entrega como serviço (tráfego, vídeo, identidade, etc.). A análise do site
-                e do Instagram segue completa; o foco aqui é alinhar oportunidades e planos de ação ao que
-                vocês vendem.
+              <CardDescription className="truncate text-xs leading-snug text-muted-foreground">
+                Só filtra oportunidades e planos pelos serviços; site e Instagram completos.
               </CardDescription>
             </div>
           </div>
@@ -552,7 +548,7 @@ export function AiPromptSettingsForm() {
                 >
                   <input
                     type="checkbox"
-                    className="mt-1 size-4 shrink-0 rounded border-input bg-background text-brand focus:ring-brand/30 dark:border-white/20 dark:bg-zinc-900 dark:text-brand"
+                    className="mt-1"
                     checked={serviceIds.includes(opt.id)}
                     disabled={servicesPolicy !== "restricted"}
                     onChange={() => toggleService(opt.id)}
@@ -574,7 +570,7 @@ export function AiPromptSettingsForm() {
               >
                 <input
                   type="checkbox"
-                  className="mt-1 size-4 shrink-0 rounded border-input bg-background text-brand focus:ring-brand/30 dark:border-white/20 dark:bg-zinc-900 dark:text-brand"
+                  className="mt-1"
                   checked={servicesOthersEnabled}
                   disabled={servicesPolicy !== "restricted"}
                   onChange={(e) => {
@@ -618,27 +614,25 @@ export function AiPromptSettingsForm() {
           {error}
         </p>
       ) : null}
-      <div
-        className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-muted-foreground"
-        role="status"
-        aria-live="polite"
-      >
-        {saving ? (
-          <span className="inline-flex items-center gap-1.5">
-            <Loader2 className="size-3.5 animate-spin shrink-0 text-brand" aria-hidden />
-            A guardar…
-          </span>
-        ) : savedAt && !error ? (
-          <span className="inline-flex max-w-full items-center gap-1.5 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
-            <Check className="size-3.5 shrink-0 text-emerald-700 dark:text-emerald-500/80" aria-hidden />
-            Guardado automaticamente.
-          </span>
-        ) : (
-          <span className="text-muted-foreground/80">
-            Guarda automática: combinações inválidas (ex.: restrito sem itens) não são enviadas até ficarem válidas.
-          </span>
-        )}
-      </div>
+      {saving || (savedAt && !error) ? (
+        <div
+          className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-muted-foreground"
+          role="status"
+          aria-live="polite"
+        >
+          {saving ? (
+            <span className="inline-flex items-center gap-1.5">
+              <Loader2 className="size-3.5 animate-spin shrink-0 text-brand" aria-hidden />
+              A guardar…
+            </span>
+          ) : (
+            <span className="inline-flex max-w-full items-center gap-1.5 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
+              <Check className="size-3.5 shrink-0 text-emerald-700 dark:text-emerald-500/80" aria-hidden />
+              Guardado automaticamente.
+            </span>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }
