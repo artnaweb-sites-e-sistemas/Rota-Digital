@@ -9,9 +9,11 @@ import { cn } from "@/lib/utils";
 
 type PublicThemeToggleProps = {
   className?: string;
+  /** Padrão: id do relatório público (hints/animação). Use outro id se houver mais de um toggle na mesma página. */
+  id?: string;
 };
 
-export function PublicThemeToggle({ className }: PublicThemeToggleProps) {
+export function PublicThemeToggle({ className, id = PUBLIC_REPORT_THEME_TOGGLE_ID }: PublicThemeToggleProps) {
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
@@ -43,7 +45,7 @@ export function PublicThemeToggle({ className }: PublicThemeToggleProps) {
 
   return (
     <button
-      id={PUBLIC_REPORT_THEME_TOGGLE_ID}
+      id={id}
       type="button"
       className={cn(
         "inline-flex h-11 min-h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-md border border-border/80 bg-background shadow-sm outline-none transition-[border-color,box-shadow,background-color] hover:border-border hover:bg-muted/80 focus-visible:ring-2 focus-visible:ring-brand/45 focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:border-white/12 dark:bg-zinc-950 dark:shadow-[0_1px_0_rgba(255,255,255,0.04)_inset] dark:hover:border-white/18 dark:hover:bg-zinc-900 sm:h-11 sm:min-h-11 sm:w-11",
