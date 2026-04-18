@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { Eye, EyeOff, Heart, Loader2, Shield } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Heart, Loader2, LogIn, Shield } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -146,17 +146,33 @@ export function LoginPage({ passwordResetSuccess = false }: { passwordResetSucce
 
         {/* Área do login — mesmo fundo da página (transparente até o shell externo) */}
         <main className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-transparent px-5 pt-10 pb-0 sm:px-8 lg:px-12 xl:px-16">
+          <div className="absolute top-4 left-4 z-20 sm:top-5 sm:left-5">
+            <Link
+              href="/"
+              className={cn(
+                "inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground",
+                "transition-colors duration-150",
+                "hover:bg-muted/70 hover:text-foreground",
+                "focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none",
+              )}
+              aria-label="Voltar para o início"
+            >
+              <ArrowLeft className="size-[1.125rem]" strokeWidth={2} aria-hidden />
+            </Link>
+          </div>
           <div className="absolute top-4 right-4 z-20 sm:top-5 sm:right-5">
             <PublicThemeToggle
               id="login-theme-toggle"
               className={cn(
-                "h-11 min-h-11 w-11 rounded-full border border-zinc-700/85 bg-zinc-900 shadow-none",
-                "[&_svg]:!text-zinc-50",
+                "h-11 min-h-11 w-11 rounded-full shadow-none",
+                "bg-background",
+                "[&_svg]:!text-brand",
                 "transition-[background-color,border-color,box-shadow,color] duration-150",
-                "hover:border-zinc-600 hover:bg-zinc-800 hover:shadow-sm",
+                "hover:bg-muted/80",
                 "focus-visible:ring-2 focus-visible:ring-ring/45 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                "dark:border-zinc-300/90 dark:bg-zinc-100 dark:shadow-none dark:[&_svg]:!text-zinc-900",
-                "dark:hover:border-zinc-400 dark:hover:bg-zinc-200 dark:hover:shadow-sm"
+                "dark:bg-zinc-950 dark:shadow-[0_1px_0_rgba(255,255,255,0.04)_inset]",
+                "dark:[&_svg]:!text-zinc-100",
+                "dark:hover:border-white/18 dark:hover:bg-zinc-900",
               )}
             />
           </div>
@@ -209,7 +225,7 @@ export function LoginPage({ passwordResetSuccess = false }: { passwordResetSucce
                   required
                   autoComplete="email"
                   disabled={isSubmitting}
-                  className="h-12 rounded-xl border-border bg-card px-4 text-base text-foreground shadow-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/40 md:text-sm"
+                  className="h-12 rounded-xl border-border bg-card px-4 text-base text-foreground shadow-none placeholder:text-muted-foreground focus:border-ring focus:ring-ring/40 md:text-sm"
                 />
               </div>
 
@@ -227,7 +243,7 @@ export function LoginPage({ passwordResetSuccess = false }: { passwordResetSucce
                     required
                     autoComplete="current-password"
                     disabled={isSubmitting}
-                    className="h-12 rounded-xl border-border bg-card py-1 pr-12 pl-4 text-base text-foreground shadow-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/40 md:text-sm"
+                    className="h-12 rounded-xl border-border bg-card py-1 pr-12 pl-4 text-base text-foreground shadow-none placeholder:text-muted-foreground focus:border-ring focus:ring-ring/40 md:text-sm"
                   />
                   <button
                     type="button"
@@ -266,7 +282,7 @@ export function LoginPage({ passwordResetSuccess = false }: { passwordResetSucce
                 type="submit"
                 size="lg"
                 disabled={isSubmitting}
-                className="mt-1 h-12 w-full cursor-pointer rounded-xl bg-foreground text-[0.9375rem] font-semibold text-background shadow-sm hover:bg-foreground/90 disabled:opacity-70"
+                className="mt-1 h-12 w-full cursor-pointer gap-2 rounded-xl bg-foreground text-[0.9375rem] font-semibold text-background shadow-sm hover:bg-foreground/90 disabled:opacity-70"
               >
                 {isSubmitting ? (
                   <>
@@ -274,7 +290,10 @@ export function LoginPage({ passwordResetSuccess = false }: { passwordResetSucce
                     Entrando…
                   </>
                 ) : (
-                  "Entrar"
+                  <>
+                    <LogIn className="size-4 shrink-0 opacity-90" aria-hidden />
+                    Entrar
+                  </>
                 )}
               </Button>
             </form>

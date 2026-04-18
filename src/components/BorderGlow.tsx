@@ -30,6 +30,20 @@ export interface BorderGlowProps {
   glowIntensity?: number;
   coneSpread?: number;
   animated?: boolean;
+  /**
+   * Se true, o brilho não segue o rato (ângulo/proximidade só vêm da animação programada).
+   * Útil para cards em que se quer só o “sweep” de entrada.
+   */
+  disablePointerTracking?: boolean;
+  /**
+   * Com `animated` + `disablePointerTracking`: repete o sweep de entrada em ciclo contínuo.
+   */
+  loopEntranceAnimation?: boolean;
+  /**
+   * Multiplica todas as durações/atrasos do sweep programado (entrada em loop).
+   * `1` = padrão; `2` ≈ metade da velocidade (mais lento).
+   */
+  entranceSweepDurationScale?: number;
   colors?: string[];
   fillOpacity?: number;
   /**
@@ -149,14 +163,19 @@ const BorderGlow: FC<BorderGlowProps> = ({
   contentInset = 2,
   contentScrollable = false,
   edgeSensitivity = 30,
-  glowColor = "40 80 80",
+  /** HSL sem `hsl()` — ouro da identidade (~`--brand` / #8e7d4d). */
+  glowColor = "43 38 48",
   backgroundColor = "#060010",
   borderRadius = 28,
   glowRadius = 40,
   glowIntensity = 1.0,
   coneSpread = 25,
   animated = false,
-  colors = ["#c084fc", "#f472b6", "#38bdf8"],
+  disablePointerTracking = false,
+  loopEntranceAnimation = false,
+  entranceSweepDurationScale = 1,
+  /** Malha do brilho na borda — tons ouro / areia alinhados ao tema Rota Digital. */
+  colors = ["#c4b27a", "#8e7d4d", "#e8dcc4"],
   fillOpacity = 0.5,
   disableMobileStarBorder = false,
   disableBorderGlowOnMobile = false,
@@ -176,6 +195,7 @@ const BorderGlow: FC<BorderGlowProps> = ({
   const useMobileStarShimmer =
     !disableMobileStarBorder && !suppressGlowOnMobile && isMobileChassis;
   const finePointer = !useMobileStarShimmer && !suppressGlowOnMobile;
+  const pointerGlowEnabled = finePointer && !disablePointerTracking;
   const [isHovered, setIsHovered] = useState(false);
   const [cursorAngle, setCursorAngle] = useState(45);
   const [edgeProximity, setEdgeProximity] = useState(0);
@@ -283,43 +303,64 @@ const BorderGlow: FC<BorderGlowProps> = ({
 
   useEffect(() => {
     if (!animated || !finePointer) return;
-    const angleStart = 110;
-    const angleEnd = 465;
-    setSweepActive(true);
-    setCursorAngle(angleStart);
 
-    animateValue({ duration: 500, onUpdate: (v) => setEdgeProximity(v / 100) });
-    animateValue({
-      ease: easeInCubic,
-      duration: 1500,
-      end: 50,
-      onUpdate: (v) => {
-        setCursorAngle((angleEnd - angleStart) * (v / 100) + angleStart);
-      },
-    });
-    animateValue({
-      ease: easeOutCubic,
-      delay: 1500,
-      duration: 2250,
-      start: 50,
-      end: 100,
-      onUpdate: (v) => {
-        setCursorAngle((angleEnd - angleStart) * (v / 100) + angleStart);
-      },
-    });
-    animateValue({
-      ease: easeInCubic,
-      delay: 2500,
-      duration: 1500,
-      start: 100,
-      end: 0,
-      onUpdate: (v) => setEdgeProximity(v / 100),
-      onEnd: () => setSweepActive(false),
-    });
-  }, [animated, finePointer]);
+    let cancelled = false;
+
+    const s = Math.max(0.25, entranceSweepDurationScale);
+
+    const runEntranceSweep = () => {
+      if (cancelled) return;
+      const angleStart = 110;
+      const angleEnd = 465;
+      setSweepActive(true);
+      setCursorAngle(angleStart);
+      setEdgeProximity(0);
+
+      animateValue({ duration: 500 * s, onUpdate: (v) => setEdgeProximity(v / 100) });
+      animateValue({
+        ease: easeInCubic,
+        duration: 1500 * s,
+        end: 50,
+        onUpdate: (v) => {
+          setCursorAngle((angleEnd - angleStart) * (v / 100) + angleStart);
+        },
+      });
+      animateValue({
+        ease: easeOutCubic,
+        delay: 1500 * s,
+        duration: 2250 * s,
+        start: 50,
+        end: 100,
+        onUpdate: (v) => {
+          setCursorAngle((angleEnd - angleStart) * (v / 100) + angleStart);
+        },
+      });
+      animateValue({
+        ease: easeInCubic,
+        delay: 2500 * s,
+        duration: 1500 * s,
+        start: 100,
+        end: 0,
+        onUpdate: (v) => setEdgeProximity(v / 100),
+        onEnd: () => {
+          if (cancelled) return;
+          if (disablePointerTracking && loopEntranceAnimation) {
+            queueMicrotask(() => runEntranceSweep());
+          } else {
+            setSweepActive(false);
+          }
+        },
+      });
+    };
+
+    runEntranceSweep();
+    return () => {
+      cancelled = true;
+    };
+  }, [animated, finePointer, disablePointerTracking, loopEntranceAnimation, entranceSweepDurationScale]);
 
   const colorSensitivity = edgeSensitivity + 20;
-  const isVisible = isHovered || sweepActive;
+  const isVisible = (pointerGlowEnabled && isHovered) || sweepActive;
   const borderOpacity = isVisible
     ? Math.max(0, (edgeProximity * 100 - colorSensitivity) / (100 - colorSensitivity))
     : 0;
@@ -380,16 +421,16 @@ const BorderGlow: FC<BorderGlowProps> = ({
   return (
     <div
       ref={cardRef}
-      onPointerMove={finePointer ? handlePointerMove : undefined}
+      onPointerMove={pointerGlowEnabled ? handlePointerMove : undefined}
       onPointerEnter={(e) => {
-        if (!finePointer) return;
+        if (!pointerGlowEnabled) return;
         setIsHovered(true);
         const card = cardRef.current;
         if (card) applyPointerClient(card, e.clientX, e.clientY);
       }}
       onPointerLeave={() => {
         cancelPointerFrame();
-        if (finePointer) setIsHovered(false);
+        if (pointerGlowEnabled) setIsHovered(false);
       }}
       className={cn(
         "relative isolate flex min-h-0 touch-auto flex-col overflow-visible border border-solid",

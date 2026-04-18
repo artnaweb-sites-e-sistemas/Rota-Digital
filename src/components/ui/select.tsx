@@ -41,12 +41,12 @@ function SelectTrigger({
       data-slot="select-trigger"
       data-size={size}
       className={cn(
-        "flex w-fit min-w-0 items-center justify-between gap-2 rounded-md border border-input bg-background text-sm text-foreground shadow-none outline-none select-none",
-        "transition-[border-color,box-shadow,background-color,color] duration-200",
-        "hover:border-brand/35 hover:bg-brand/[0.04] dark:hover:border-brand/30 dark:hover:bg-brand/[0.08]",
-        "focus-visible:border-brand/50 focus-visible:ring-2 focus-visible:ring-brand/25 focus-visible:ring-offset-0",
-        "disabled:pointer-events-none disabled:opacity-50",
-        "aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive/25 dark:aria-invalid:border-destructive/60",
+        "flex w-fit min-w-0 items-center justify-between gap-2 rounded-md border border-input bg-background text-sm text-foreground shadow-sm outline-none select-none",
+        "transition-[transform,box-shadow,border-color,background-color,color] duration-200 ease-out",
+        "hover:-translate-y-1 hover:border-brand/35 hover:bg-brand/[0.04] hover:shadow-md dark:hover:border-brand/30 dark:hover:bg-brand/[0.08] dark:hover:shadow-lg",
+        "focus:-translate-y-1 focus:border-border focus:shadow-md focus:ring-0 dark:focus:shadow-lg",
+        "disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none disabled:translate-y-0",
+        "aria-invalid:border-destructive/55 aria-invalid:ring-0 aria-invalid:shadow-md dark:aria-invalid:border-destructive/55 dark:aria-invalid:shadow-lg",
         "data-placeholder:text-muted-foreground",
         "dark:border-white/10 dark:bg-white/[0.05] dark:text-zinc-100 dark:data-placeholder:text-zinc-500",
         "data-[size=default]:h-10 data-[size=default]:px-3.5",
