@@ -15,6 +15,7 @@
     "@react-three/fiber": "^9.5.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "d3-shape": "^3.2.0",
     "firebase": "^12.11.0",
     "firebase-admin": "^13.8.0",
     "jsonrepair": "^3.13.3",
@@ -25,6 +26,7 @@
     "playwright": "^1.59.1",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "recharts": "^3.8.0",
     "shadcn": "^4.2.0",
     "sharp": "^0.34.5",
     "tailwind-merge": "^3.5.0",
@@ -33,6 +35,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/d3-shape": "^3.1.8",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

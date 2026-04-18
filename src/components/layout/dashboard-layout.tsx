@@ -10,12 +10,14 @@ import {
   FileText,
   LayoutDashboard,
   Users,
+  UserCog,
   Settings,
   LogOut,
   SlidersHorizontal,
   Building2,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { isGeneralAdminEmail } from "@/lib/general-admin";
 import { getUserCompanyAboutSettings } from "@/lib/user-settings";
 import { useRouter, usePathname } from "next/navigation";
 import { signOut } from "firebase/auth";
@@ -43,6 +45,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const settingsSection = pathname.startsWith("/dashboard/settings");
+  const usuariosSection = pathname.startsWith("/dashboard/usuarios");
   const [mainCollapsed, setMainCollapsed] = useState(false);
   const [companyAbout, setCompanyAbout] = useState<UserCompanyAboutSettings | null>(null);
 
@@ -94,6 +97,9 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   if (loading || !user) {
     return null;
   }
+
+  /** Mesma regra que `/api/admin-users` e `/dashboard/usuarios`: só este e-mail vê o divisor e o link. */
+  const canAccessUsuariosAdmin = isGeneralAdminEmail(user.email);
 
   const agencyName = companyAbout?.companyName?.trim() || "Rota Digital";
   const agencyLogoUrl = companyAbout?.primaryImageUrl?.trim() || "";
@@ -190,6 +196,36 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               />
               {!mainCollapsed ? <span className="font-medium text-[14px]">Configurações</span> : null}
             </Link>
+
+            {canAccessUsuariosAdmin ? (
+              <>
+                <div
+                  role="separator"
+                  aria-orientation="horizontal"
+                  className={cn(
+                    "my-2 shrink-0 border-t border-sidebar-border/90 dark:border-white/[0.08]",
+                    mainCollapsed ? "mx-0.5" : undefined,
+                  )}
+                />
+                <Link
+                  href="/dashboard/usuarios"
+                  title={mainCollapsed ? "Usuários" : undefined}
+                  aria-label={mainCollapsed ? "Usuários" : undefined}
+                  className={navLinkClass(usuariosSection, mainCollapsed)}
+                >
+                  <UserCog
+                    className={cn(
+                      "size-5 shrink-0 transition-colors",
+                      usuariosSection
+                        ? "text-sidebar-primary dark:text-sidebar-primary"
+                        : "group-hover:text-foreground dark:group-hover:text-zinc-300",
+                    )}
+                    aria-hidden
+                  />
+                  {!mainCollapsed ? <span className="font-medium text-[14px]">Usuários</span> : null}
+                </Link>
+              </>
+            ) : null}
           </nav>
         </div>
 

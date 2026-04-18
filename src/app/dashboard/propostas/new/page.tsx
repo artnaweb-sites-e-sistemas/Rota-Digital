@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { CalendarDays, FileText, Loader2, Repeat2, Search, Sparkles, UserPlus } from "lucide-react";
+import { CalendarDays, FilePlus, FileText, Loader2, Repeat2, Search, Sparkles, UserPlus } from "lucide-react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -725,7 +725,7 @@ export default function NewProposalPage() {
           Cancelar
         </Button>
         <Button type="button" variant="cta" size="lg" className="gap-2" onClick={() => void handleSave()} disabled={saving || !selectedLead}>
-          {saving ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Sparkles className="size-4" aria-hidden />}
+          {saving ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <FilePlus className="size-4" aria-hidden />}
           {saving ? "Gerando proposta…" : "Gerar proposta"}
         </Button>
       </div>
