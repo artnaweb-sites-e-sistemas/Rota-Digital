@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import {
+  getPublicOriginFromRequest,
+  rewriteFirebaseAuthActionUrlToAppPath,
+} from "@/lib/firebase-auth-action-app-url";
 import { requireGeneralAdminApi } from "@/lib/require-general-admin-api";
 
 export const runtime = "nodejs";
@@ -29,7 +33,12 @@ export async function POST(_request: NextRequest, context: RouteContext) {
   }
 
   try {
-    const link = await gate.ctx.auth.generatePasswordResetLink(email);
+    const firebaseLink = await gate.ctx.auth.generatePasswordResetLink(email);
+    const origin = getPublicOriginFromRequest(_request);
+    const link =
+      origin != null
+        ? rewriteFirebaseAuthActionUrlToAppPath(firebaseLink, origin, "/redefinir-senha")
+        : firebaseLink;
     return NextResponse.json({ link, email });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Não foi possível gerar o link.";

@@ -51,7 +51,7 @@ function BrandMark({ className }: { className?: string }) {
   );
 }
 
-export function LoginPage() {
+export function LoginPage({ passwordResetSuccess = false }: { passwordResetSuccess?: boolean } = {}) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -179,6 +179,14 @@ export function LoginPage() {
             </header>
 
             <form onSubmit={handleLogin} className="space-y-5">
+              {passwordResetSuccess ? (
+                <div
+                  className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-3 text-sm text-emerald-900 dark:border-emerald-500/35 dark:bg-emerald-500/15 dark:text-emerald-100"
+                  role="status"
+                >
+                  Palavra-passe atualizada. Já pode entrar com a nova senha.
+                </div>
+              ) : null}
               {error && (
                 <div
                   className="rounded-xl border border-destructive/25 bg-destructive/10 px-3.5 py-3 text-sm text-destructive"

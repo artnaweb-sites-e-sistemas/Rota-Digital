@@ -2,7 +2,17 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowDown, ArrowUp, Check, ChevronsUpDown, Copy, Loader2, Search, X } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  Check,
+  ChevronsUpDown,
+  Copy,
+  Loader2,
+  Search,
+  UserPlus,
+  X,
+} from "lucide-react";
 
 import { AdminGrowthCharts } from "@/components/admin/admin-growth-charts";
 import { PlatformVolumeCharts } from "@/components/admin/platform-volume-charts";
@@ -16,6 +26,15 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Table,
@@ -209,6 +228,13 @@ export default function UsuariosAdminPage() {
   const [sort, setSort] = useState<UsersSortState>({ key: null, dir: "asc" });
   const [copyFeedbackUid, setCopyFeedbackUid] = useState<string | null>(null);
   const copyFeedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [createUserOpen, setCreateUserOpen] = useState(false);
+  const [createEmail, setCreateEmail] = useState("");
+  const [createPassword, setCreatePassword] = useState("");
+  const [createDisplayName, setCreateDisplayName] = useState("");
+  const [createBusy, setCreateBusy] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   const usersTableRef = useRef<HTMLTableElement | null>(null);
   const [colWidthsPct, { onResizerMouseDown: onColResizeMouseDown }] = useAdminUsersTableColumnWidths(usersTableRef);
@@ -412,6 +438,76 @@ export default function UsuariosAdminPage() {
     setSort({ key: null, dir: "asc" });
   }, []);
 
+  const resetCreateUserForm = useCallback(() => {
+    setCreateEmail("");
+    setCreatePassword("");
+    setCreateDisplayName("");
+    setCreateError(null);
+  }, []);
+
+  const onCreateUserOpenChange = useCallback(
+    (open: boolean) => {
+      setCreateUserOpen(open);
+      if (!open) resetCreateUserForm();
+    },
+    [resetCreateUserForm],
+  );
+
+  const submitCreateUser = useCallback(async () => {
+    if (!user) return;
+    setCreateError(null);
+    const email = createEmail.trim();
+    if (!email) {
+      setCreateError("Indique o e-mail.");
+      return;
+    }
+    if (createPassword.length < 6) {
+      setCreateError("A palavra-passe deve ter pelo menos 6 caracteres.");
+      return;
+    }
+    setCreateBusy(true);
+    try {
+      const idToken = await user.getIdToken();
+      const res = await fetch("/api/admin-users", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${idToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email,
+          password: createPassword,
+          displayName: createDisplayName.trim() || undefined,
+        }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setCreateError(typeof body.error === "string" ? body.error : "Não foi possível criar o utilizador.");
+        return;
+      }
+      setCreateUserOpen(false);
+      resetCreateUserForm();
+      pageTokensRef.current = [null];
+      const previousPage = pageIndex;
+      setPageIndex(0);
+      if (previousPage === 0) {
+        await loadPage(0);
+      }
+    } catch {
+      setCreateError("Erro de rede. Tente novamente.");
+    } finally {
+      setCreateBusy(false);
+    }
+  }, [
+    user,
+    createEmail,
+    createPassword,
+    createDisplayName,
+    pageIndex,
+    loadPage,
+    resetCreateUserForm,
+  ]);
+
   if (authLoading || !user) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center gap-2 text-muted-foreground">
@@ -511,6 +607,17 @@ export default function UsuariosAdminPage() {
                     <SelectItem value={PLAN_FILTER_PRO}>Pro</SelectItem>
                   </SelectContent>
                 </Select>
+                {isGeneralAdmin ? (
+                  <Button
+                    type="button"
+                    variant="default"
+                    className="h-10 w-full shrink-0 gap-2 sm:w-auto"
+                    onClick={() => setCreateUserOpen(true)}
+                  >
+                    <UserPlus className="size-4 shrink-0" aria-hidden />
+                    Criar utilizador
+                  </Button>
+                ) : null}
                 {hasActiveFilters || sort.key != null ? (
                   <Button
                     type="button"
@@ -526,23 +633,20 @@ export default function UsuariosAdminPage() {
             </div>
 
             {pageUsers.length > 0 ? (
-              <p className="text-[11px] leading-snug text-muted-foreground sm:text-xs">
+              <p className="text-[10px] leading-tight text-muted-foreground/80 sm:text-[11px]">
                 {hasActiveFilters ? (
                   <>
-                    <span className="text-foreground/80">
+                    <span className="font-medium text-foreground/75">
                       {filteredUsers.length} de {pageUsers.length}
                     </span>{" "}
                     {pageUsers.length === 1 ? "utilizador nesta página" : "utilizadores nesta página"}
                   </>
                 ) : (
                   <>
-                    <span className="text-foreground/80">{pageUsers.length}</span>{" "}
+                    <span className="font-medium text-foreground/75">{pageUsers.length}</span>{" "}
                     {pageUsers.length === 1 ? "utilizador nesta página" : "utilizadores nesta página"}
                   </>
-                )}{" "}
-                <span className="text-muted-foreground/90">
-                  Leads, rotas e propostas: totais no Firestore (todos os períodos).
-                </span>
+                )}
               </p>
             ) : null}
           </div>
@@ -872,6 +976,87 @@ export default function UsuariosAdminPage() {
           </Button>
         </div>
       </Card>
+
+      <Dialog open={createUserOpen} onOpenChange={onCreateUserOpenChange}>
+        <DialogContent showCloseButton={!createBusy} className="sm:max-w-md">
+          <DialogHeader className="text-left">
+            <DialogTitle>Criar utilizador</DialogTitle>
+            <DialogDescription>
+              Conta nova no Firebase Auth. A palavra-passe deve ter pelo menos 6 caracteres. O utilizador poderá
+              alterá-la após o primeiro acesso.
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            className="grid gap-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void submitCreateUser();
+            }}
+          >
+            {createError ? (
+              <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {createError}
+              </p>
+            ) : null}
+            <div className="grid gap-2">
+              <Label htmlFor="admin-create-user-email">E-mail</Label>
+              <Input
+                id="admin-create-user-email"
+                name="admin_create_user_email"
+                type="email"
+                autoComplete="off"
+                value={createEmail}
+                onChange={(e) => setCreateEmail(e.target.value)}
+                placeholder="nome@empresa.com"
+                disabled={createBusy}
+                className="h-10"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="admin-create-user-name">Nome (opcional)</Label>
+              <Input
+                id="admin-create-user-name"
+                name="admin_create_user_name"
+                type="text"
+                autoComplete="off"
+                value={createDisplayName}
+                onChange={(e) => setCreateDisplayName(e.target.value)}
+                placeholder="Nome para exibição"
+                disabled={createBusy}
+                className="h-10"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="admin-create-user-password">Palavra-passe</Label>
+              <Input
+                id="admin-create-user-password"
+                name="admin_create_user_password"
+                type="password"
+                autoComplete="new-password"
+                value={createPassword}
+                onChange={(e) => setCreatePassword(e.target.value)}
+                placeholder="Mínimo 6 caracteres"
+                disabled={createBusy}
+                className="h-10"
+              />
+            </div>
+            <DialogFooter className="gap-2 sm:justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={createBusy}
+                onClick={() => onCreateUserOpenChange(false)}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={createBusy} className="gap-2">
+                {createBusy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
+                Criar
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Check, Copy, Link2, Loader2, RefreshCw } from "lucide-react";
 
 import { PlatformVolumeCharts } from "@/components/admin/platform-volume-charts";
 import {
@@ -26,7 +26,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   PLATFORM_CHART_COLOR_LEADS,
   PLATFORM_CHART_COLOR_PROPOSALS,
@@ -351,7 +352,7 @@ export default function UsuarioAdminDetailPage() {
               <div className="flex flex-wrap gap-2 border-t border-border pt-4 dark:border-white/10">
                 <Button
                   type="button"
-                  variant="outline"
+                  variant={detail.disabled ? "outline" : "destructive"}
                   size="sm"
                   className="gap-2"
                   disabled={toggleBusy}
@@ -482,45 +483,110 @@ export default function UsuarioAdminDetailPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={resetOpen} onOpenChange={setResetOpen}>
-        <DialogContent className="sm:max-w-md" showCloseButton>
-          <DialogHeader>
-            <DialogTitle>Redefinir senha</DialogTitle>
-            <DialogDescription>
-              Gera um link seguro do Firebase. Copie e envie ao utilizador por um canal confiável até existir envio automático
-              por e-mail.
-            </DialogDescription>
-          </DialogHeader>
-          {resetError ? <p className="text-sm text-destructive">{resetError}</p> : null}
-          {resetLink ? (
-            <div className="space-y-2">
-              <Input readOnly value={resetLink} className="font-mono text-xs" />
-              <Button type="button" variant="outline" size="sm" className="w-full" onClick={() => void onCopyLink()}>
-                {copyDone ? "Copiado" : "Copiar link"}
-              </Button>
-            </div>
-          ) : (
-            <Button
-              type="button"
-              className="w-full gap-2"
-              disabled={resetBusy}
-              onClick={() => void onGenerateReset()}
-            >
-              {resetBusy ? (
-                <>
-                  <Loader2 className="size-4 animate-spin" aria-hidden />
-                  A gerar…
-                </>
-              ) : (
-                "Gerar link de redefinição"
-              )}
-            </Button>
-          )}
-          <DialogFooter className="border-0 bg-transparent p-0 sm:justify-start">
-            <Button type="button" variant="ghost" size="sm" onClick={() => setResetOpen(false)}>
-              Fechar
-            </Button>
-          </DialogFooter>
+      <Dialog
+        open={resetOpen}
+        onOpenChange={(open) => {
+          setResetOpen(open);
+          if (!open) {
+            setResetLink(null);
+            setResetError(null);
+            setCopyDone(false);
+          }
+        }}
+      >
+        <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-lg" showCloseButton={!resetBusy}>
+          <div className="border-b border-border px-4 pb-4 pt-4 dark:border-white/10 sm:px-5 sm:pt-5">
+            <DialogHeader className="space-y-2 text-left">
+              <DialogTitle className="text-base leading-snug sm:text-lg">Redefinir palavra-passe</DialogTitle>
+              <DialogDescription className="text-[11px] leading-snug text-muted-foreground sm:text-xs">
+                Redefinição no site Rota Digital (não na página genérica do Firebase). Envie o link por um canal seguro.
+              </DialogDescription>
+              {detail?.email ? (
+                <p className="rounded-lg border border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]">
+                  <span className="font-medium text-foreground/90">Conta</span>{" "}
+                  <span className="break-all text-foreground/80">{detail.email}</span>
+                </p>
+              ) : null}
+            </DialogHeader>
+          </div>
+
+          <div className="grid gap-4 px-4 py-4 sm:px-5 sm:py-5">
+            {resetError ? (
+              <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {resetError}
+              </p>
+            ) : null}
+
+            {resetLink ? (
+              <div className="grid gap-3">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="admin-reset-link-field" className="text-xs font-medium">
+                    Link de redefinição
+                  </Label>
+                  <Textarea
+                    id="admin-reset-link-field"
+                    readOnly
+                    value={resetLink}
+                    rows={4}
+                    className="min-h-[5.5rem] resize-none font-mono text-[11px] leading-snug break-all md:text-xs"
+                    onFocus={(e) => e.currentTarget.select()}
+                  />
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Button type="button" className="gap-2 sm:min-w-0 sm:flex-1" disabled={resetBusy} onClick={() => void onCopyLink()}>
+                    {copyDone ? (
+                      <>
+                        <Check className="size-4 shrink-0" aria-hidden />
+                        Copiado
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="size-4 shrink-0" aria-hidden />
+                        Copiar link
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="gap-2 sm:shrink-0"
+                    disabled={resetBusy}
+                    onClick={() => void onGenerateReset()}
+                  >
+                    {resetBusy ? (
+                      <Loader2 className="size-4 animate-spin" aria-hidden />
+                    ) : (
+                      <RefreshCw className="size-4 shrink-0" aria-hidden />
+                    )}
+                    Gerar novo link
+                  </Button>
+                </div>
+                <p className="text-[11px] leading-snug text-muted-foreground">
+                  O link expira conforme as regras do projeto Firebase e deixa de ser válido após ser usado. Não publique em
+                  canais abertos.
+                </p>
+              </div>
+            ) : (
+              <div className="grid gap-3">
+                <Button type="button" className="h-11 w-full gap-2" disabled={resetBusy} onClick={() => void onGenerateReset()}>
+                  {resetBusy ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" aria-hidden />
+                      A gerar link…
+                    </>
+                  ) : (
+                    <>
+                      <Link2 className="size-4 shrink-0" aria-hidden />
+                      Gerar link de redefinição
+                    </>
+                  )}
+                </Button>
+                <p className="text-center text-[11px] leading-snug text-muted-foreground">
+                  O link só é mostrado nesta janela. Copie ou guarde antes de fechar.
+                </p>
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>
