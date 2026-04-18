@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useMemo, type MouseEvent, type ReactNode } from "react";
+import { useMemo, useState, type MouseEvent, type ReactNode } from "react";
 import { motion } from "motion/react";
 import {
   ArrowRight,
@@ -207,6 +207,7 @@ function BrowserMockup({ className }: { className?: string }) {
 }
 
 export function LandingPage() {
+  const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
   const { resolvedTheme } = useTheme();
   const heroHyperspeedOptions = useMemo(
     () => getRotaHeroHyperspeedOptions(resolvedTheme),
@@ -340,7 +341,7 @@ export function LandingPage() {
               </div>
               <h1 className="font-heading text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl md:text-6xl md:leading-[1.1] lg:text-[4rem]">
                 Transforme<br />
-                <span className="bg-gradient-to-br from-primary to-primary/60 bg-clip-text text-transparent">Espectadores</span> em Clientes.
+                <span className="bg-gradient-to-br from-primary to-primary/60 bg-clip-text text-transparent">Leads</span> em Clientes.
               </h1>
               <p className="mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground sm:text-xl">
                 A plataforma definitiva para agências modernas. Organize leads, gere diagnósticos em segundos com IA e entregue propostas que fecham vendas.
@@ -382,19 +383,19 @@ export function LandingPage() {
         </section>
 
         {/* --- Social Proof --- */}
-        <section className="relative z-10 border-y py-16 bg-zinc-50 dark:border-white/5 dark:bg-white/[0.01]">
+        <section className="relative z-10 border-y border-brand/25 bg-brand/16 py-16 dark:border-brand/30 dark:bg-brand/14">
           <div className="mx-auto max-w-7xl px-4 sm:px-6">
             <div className="flex flex-col items-center justify-center gap-10">
-              <p className="text-center text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground">
+              <p className="text-center text-xs font-bold uppercase tracking-[0.2em] text-foreground/75 dark:text-foreground/80">
                 Poderosa infraestrutura de inteligência e design
               </p>
-              <div className="flex flex-wrap items-center justify-center gap-x-16 gap-y-10 opacity-70 transition-all duration-700 hover:opacity-100">
+              <div className="flex flex-wrap items-center justify-center gap-x-16 gap-y-10 opacity-80 transition-all duration-700 hover:opacity-100">
                 {["Google Gemini 1.5 Pro", "Next.js 15 App Router", "Tailwind Engine v4", "Firebase Realtime"].map((tech) => (
                   <div key={tech} className="group relative flex items-center gap-2">
                     <span className="text-sm font-bold tracking-tight text-foreground sm:text-base lg:text-xl">
                       {tech}
                     </span>
-                    <div className="absolute -bottom-1 left-0 h-[2px] w-0 bg-primary/50 transition-all group-hover:w-full" />
+                    <div className="absolute -bottom-1 left-0 h-[2px] w-0 bg-brand/55 transition-all group-hover:w-full dark:bg-brand/50" />
                   </div>
                 ))}
               </div>
@@ -472,7 +473,6 @@ export function LandingPage() {
                   icon: FileText,
                   title: "Propostas Mágicas",
                   desc: "Gere documentos comerciais matadores a partir do diagnóstico.",
-                  badge: "/p/...",
                   items: ["Geração do escopo em um clique", "Visão limpa e objetiva", "Efeito 'uau' no cliente"],
                 },
                 {
@@ -501,14 +501,9 @@ export function LandingPage() {
                   >
                     <div className="p-8">
                       <div className="flex items-start justify-between">
-                        <div className="flex size-14 items-center justify-center rounded-xl bg-zinc-100 border dark:bg-background dark:border-border/50">
-                          <item.icon className="size-7 text-primary" aria-hidden />
+                        <div className="flex size-14 items-center justify-center rounded-xl border border-brand/25 bg-brand/10 dark:border-brand/35 dark:bg-brand/15">
+                          <item.icon className="size-7 text-brand" aria-hidden />
                         </div>
-                        {item.badge && (
-                          <span className="rounded-md bg-primary/10 px-3 py-1 font-mono text-xs font-semibold text-primary">
-                            {item.badge}
-                          </span>
-                        )}
                       </div>
                       <h3 className="mt-6 font-heading text-2xl font-bold tracking-tight">{item.title}</h3>
                       <p className="mt-3 text-base text-muted-foreground">{item.desc}</p>
@@ -516,7 +511,7 @@ export function LandingPage() {
                       <ul className="mt-8 space-y-3">
                         {item.items.map((line) => (
                           <li key={line} className="flex items-center gap-3 text-sm font-medium text-foreground/80">
-                            <CheckCircle2 className="size-4 text-emerald-600 dark:text-emerald-500" />
+                            <CheckCircle2 className="size-4 shrink-0 text-brand" />
                             <span>{line}</span>
                           </li>
                         ))}
@@ -682,12 +677,96 @@ export function LandingPage() {
               description="Escolha o plano que melhor se adapta ao momento do seu negócio."
             />
 
-            <div className="mt-20 grid gap-8 md:grid-cols-3">
+            <div className="mt-12 flex justify-center px-2">
+              <div
+                className={cn(
+                  "relative inline-flex h-[3.25rem] items-stretch rounded-full border-2 p-1 text-sm",
+                  /* Trilho sólido: no escuro usa cinza médio (nunca igual ao fundo zinc-950). */
+                  "border-zinc-300 bg-zinc-200/95 shadow-inner shadow-black/10",
+                  "dark:border-zinc-500 dark:bg-zinc-600 dark:shadow-[inset_0_2px_10px_rgba(0,0,0,0.35)]",
+                )}
+                role="tablist"
+                aria-label="Ciclo de cobrança dos planos"
+              >
+                <div className="relative flex w-full items-center gap-0.5">
+                  <motion.button
+                    type="button"
+                    role="tab"
+                    whileTap={{ scale: 0.98 }}
+                    aria-selected={billingCycle === "monthly"}
+                    onClick={() => setBillingCycle("monthly")}
+                    className={cn(
+                      "relative isolate min-w-[7.75rem] rounded-full px-5 py-2.5 text-[13px] font-bold tracking-normal transition-colors duration-200",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                      billingCycle === "monthly"
+                        ? "text-brand-foreground"
+                        : "text-zinc-700 hover:text-zinc-950 dark:text-white dark:hover:text-white",
+                    )}
+                  >
+                    {billingCycle === "monthly" && (
+                      <motion.div
+                        layoutId="active-billing"
+                        aria-hidden
+                        className={cn(
+                          "pointer-events-none absolute inset-0 z-0 rounded-full [background-image:none]",
+                          /* Fundo sólido — token --brand (ouro ID visual), contraste via --brand-foreground. */
+                          "shadow-[0_4px_18px_rgba(0,0,0,0.22)] ring-2 ring-black/20 dark:shadow-[0_6px_24px_rgba(0,0,0,0.5)] dark:ring-white/25",
+                        )}
+                        style={{ backgroundColor: "var(--brand)" }}
+                        transition={{ type: "spring", bounce: 0.22, stiffness: 400, damping: 30 }}
+                      />
+                    )}
+                    <span className="relative z-10">Mensal</span>
+                  </motion.button>
+
+                  <motion.button
+                    type="button"
+                    role="tab"
+                    whileTap={{ scale: 0.98 }}
+                    aria-selected={billingCycle === "yearly"}
+                    onClick={() => setBillingCycle("yearly")}
+                    className={cn(
+                      "relative isolate flex min-w-[8rem] items-center justify-center gap-2 rounded-full px-4 py-2.5 text-[13px] font-bold tracking-normal transition-colors duration-200",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                      billingCycle === "yearly"
+                        ? "text-brand-foreground"
+                        : "text-zinc-700 hover:text-zinc-950 dark:text-white dark:hover:text-white",
+                    )}
+                  >
+                    {billingCycle === "yearly" && (
+                      <motion.div
+                        layoutId="active-billing"
+                        aria-hidden
+                        className={cn(
+                          "pointer-events-none absolute inset-0 z-0 rounded-full [background-image:none]",
+                          "shadow-[0_4px_18px_rgba(0,0,0,0.22)] ring-2 ring-black/20 dark:shadow-[0_6px_24px_rgba(0,0,0,0.5)] dark:ring-white/25",
+                        )}
+                        style={{ backgroundColor: "var(--brand)" }}
+                        transition={{ type: "spring", bounce: 0.22, stiffness: 400, damping: 30 }}
+                      />
+                    )}
+                    <span className="relative z-10">Anual</span>
+                    <span
+                      className={cn(
+                        "relative z-10 rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.06em]",
+                        billingCycle === "yearly"
+                          ? "bg-white text-zinc-950 shadow-sm ring-1 ring-black/10"
+                          : "bg-zinc-900 text-[#f5edd8] ring-1 ring-[#c4b27a]/80 dark:bg-zinc-950 dark:text-[#f8f0d4] dark:ring-[#e8dcc4]/90",
+                      )}
+                    >
+                      -20%
+                    </span>
+                  </motion.button>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-12 grid gap-8 md:grid-cols-3">
               {[
                 {
                   name: "Starter",
                   price: "0",
-                  description: "Ideal para freelancers e agências que estão começando.",
+                  description: "Grátis, com quotas mensais para validar o funil.",
                   features: [
                     "1 diagnóstico (Rota Digital) com IA.",
                     "10 prospecções de leads.",
@@ -699,9 +778,9 @@ export function LandingPage() {
                 },
                 {
                   name: "Pro",
-                  price: "97",
-                  originalPrice: "197",
-                  description: "Melhor custo-benefício para quem prospeceta diariamente.",
+                  price: billingCycle === "monthly" ? "147" : "97",
+                  originalPrice: billingCycle === "monthly" ? "197" : "147",
+                  description: "Mais capacidade mensal para prospectação diária.",
                   features: [
                     "10 diagnósticos (Rota Digital) com IA.",
                     "300 prospecções de leads.",
@@ -713,8 +792,8 @@ export function LandingPage() {
                 },
                 {
                   name: "Agency",
-                  price: "497",
-                  description: "White-label e escala total para grandes operações.",
+                  price: billingCycle === "monthly" ? "497" : "397",
+                  description: "Volume mensal máximo para alta demanda.",
                   features: [
                     "30 diagnósticos (Rota Digital) com IA.",
                     "1.000 prospecções de leads.",
@@ -759,10 +838,15 @@ export function LandingPage() {
                           )}
                           <div className="flex items-baseline gap-1">
                             <span className="text-4xl font-black text-foreground">R$ {plan.price}</span>
-                            <span className="text-sm font-medium text-muted-foreground">/mês</span>
+                            <span className="text-sm font-medium text-muted-foreground">/{billingCycle === "monthly" ? "mês" : "mês*"}</span>
                           </div>
+                          {billingCycle === "yearly" && plan.price !== "0" && (
+                            <span className="mt-1 text-[10px] font-bold text-brand uppercase tracking-tight">
+                              Cerca de R$ {parseInt(plan.price) * 12},00 por ano
+                            </span>
+                          )}
                         </div>
-                        <p className="mt-4 text-sm text-muted-foreground">{plan.description}</p>
+                        <p className="mt-4 text-pretty text-sm leading-snug text-muted-foreground">{plan.description}</p>
                         <div className="my-8 h-px bg-border" />
                         <ul className="flex-1 space-y-2.5">
                           {plan.features.map((f, idx) => (
@@ -793,10 +877,20 @@ export function LandingPage() {
                           )}
                           <div className="flex items-baseline gap-1">
                             <span className="text-4xl font-black text-foreground">R$ {plan.price}</span>
-                            <span className="text-sm font-medium text-muted-foreground">/mês</span>
+                            <span className="text-sm font-medium text-muted-foreground">/{billingCycle === "monthly" ? "mês" : "mês*"}</span>
                           </div>
+                          {billingCycle === "yearly" && plan.price !== "0" && (
+                            <span className="mt-1 text-[11px] font-medium text-muted-foreground/80">
+                              *cobrado anualmente
+                            </span>
+                          )}
+                          {billingCycle === "yearly" && plan.price === "0" && (
+                            <span className="mt-1 text-[11px] font-medium text-muted-foreground/80">
+                              *Gratuito para testar
+                            </span>
+                          )}
                         </div>
-                        <p className="mt-4 text-sm text-muted-foreground">{plan.description}</p>
+                        <p className="mt-4 text-pretty text-sm leading-snug text-muted-foreground">{plan.description}</p>
                         <div className="my-8 h-px bg-border" />
                         <ul className="flex-1 space-y-2.5">
                           {plan.features.map((f, idx) => (
@@ -935,62 +1029,8 @@ export function LandingPage() {
         </section>
       </main>
 
-      <footer className="relative z-10 border-t bg-zinc-50 px-4 py-12 sm:px-6 lg:py-16 dark:border-white/5 dark:bg-background">
-        <div className="mx-auto flex max-w-7xl flex-col gap-10 md:flex-row md:items-start md:justify-between">
-          <div className="max-w-[280px]">
-            <Link href="/" className="flex items-center gap-2 font-bold tracking-tight text-foreground">
-              <Compass className="size-5 text-primary" aria-hidden />
-              <span className="text-lg">Rota Digital</span>
-            </Link>
-            <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-              O sistema operacional para agências digitais que buscam maestria na gestão de leads e conversão de propostas.
-            </p>
-          </div>
-          <div className="grid gap-10 sm:grid-cols-2 md:grid-cols-3 lg:gap-16">
-            <div>
-              <p className="text-sm font-bold uppercase tracking-wider text-foreground">Produto</p>
-              <ul className="mt-5 space-y-3 text-sm">
-                {NAV_LINKS.map((l) => (
-                  <li key={l.href}>
-                    <a
-                      href={l.href}
-                      onClick={(e) => handleInPageNavClick(e, l.href)}
-                      className="text-muted-foreground transition-colors hover:text-primary"
-                    >
-                      {l.label}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <p className="text-sm font-bold uppercase tracking-wider text-foreground">Plataforma</p>
-              <ul className="mt-5 space-y-3 text-sm">
-                <li>
-                  <Link href="/login" className="text-muted-foreground transition-colors hover:text-primary">
-                    Login / Cadastro
-                  </Link>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <p className="text-sm font-bold uppercase tracking-wider text-foreground">Legal</p>
-              <ul className="mt-5 space-y-3 text-sm">
-                <li>
-                  <Link href="#" className="text-muted-foreground transition-colors hover:text-primary">
-                    Termos de Uso
-                  </Link>
-                </li>
-                <li>
-                  <Link href="#" className="text-muted-foreground transition-colors hover:text-primary">
-                    Privacidade
-                  </Link>
-                </li>
-              </ul>
-            </div>
-          </div>
-        </div>
-        <div className="mx-auto mt-16 max-w-7xl space-y-4 border-t pt-8 text-center sm:flex sm:items-center sm:justify-between sm:space-y-0 text-sm text-muted-foreground dark:border-white/5">
+      <footer className="relative z-10 border-t bg-zinc-50 px-4 py-8 sm:px-6 dark:border-white/5 dark:bg-background">
+        <div className="mx-auto max-w-7xl space-y-4 text-center sm:flex sm:items-center sm:justify-between sm:space-y-0 text-sm text-muted-foreground">
           <p>© {new Date().getFullYear()} Rota Digital SaaS. Todos os direitos reservados.</p>
           <p className="flex justify-center gap-1">Feito com ⚡️ no Brasil</p>
         </div>

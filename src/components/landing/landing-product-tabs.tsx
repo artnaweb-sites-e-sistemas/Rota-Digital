@@ -105,7 +105,7 @@ export function LandingProductTabs() {
               {isOn && (
                 <motion.div
                   layoutId="active-pill"
-                  className="absolute -left-1 hidden h-8 w-1 rounded-sm bg-primary lg:block"
+                  className="absolute -left-1 hidden h-8 w-1 rounded-sm bg-brand lg:block"
                 />
               )}
             </button>
@@ -136,7 +136,7 @@ export function LandingProductTabs() {
           >
             <div className="grid h-full gap-8 p-6 sm:p-10 lg:grid-cols-[1fr_1.1fr]">
               <div className="flex flex-col justify-center">
-                <div className="mb-4 flex items-center gap-2 text-sm font-bold uppercase tracking-[0.15em] text-primary">
+                <div className="mb-4 flex items-center gap-2 text-sm font-bold uppercase tracking-[0.15em] text-brand">
                   <Building2 className="size-4" aria-hidden />
                   <span>Módulo {panel.label}</span>
                 </div>
@@ -150,7 +150,7 @@ export function LandingProductTabs() {
                 <ul className="mt-8 space-y-4">
                   {panel.bullets.map((line) => (
                     <li key={line} className="flex items-start gap-3">
-                      <div className="mt-1 flex size-5 items-center justify-center rounded-md bg-primary/10 text-primary">
+                      <div className="mt-1 flex size-5 items-center justify-center rounded-md bg-brand/10 text-brand">
                         <CheckCircle2 className="size-3.5" />
                       </div>
                       <span className="text-sm font-medium text-foreground/80">{line}</span>
@@ -160,14 +160,14 @@ export function LandingProductTabs() {
               </div>
 
               <div className="relative flex aspect-video items-center justify-center overflow-hidden rounded-xl border bg-zinc-50 shadow-inner dark:border-white/5 dark:bg-white/[0.02]">
-                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-br from-brand/5 via-transparent to-transparent" />
                 <div className="relative z-10 p-4 text-center">
                   <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-xl bg-white border shadow-sm dark:bg-background dark:border-border/50">
-                    <panel.icon className="size-6 text-primary" />
+                    <panel.icon className="size-6 text-brand" />
                   </div>
                   <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground/60">Interface Preview</p>
                   <div className="mt-6 flex flex-col gap-2 w-full max-w-[240px] mx-auto">
-                    <div className="h-2 w-3/4 rounded bg-primary/20" />
+                    <div className="h-2 w-3/4 rounded bg-brand/20" />
                     <div className="h-2 w-full rounded bg-zinc-200 dark:bg-muted" />
                     <div className="h-2 w-1/2 rounded bg-zinc-200 dark:bg-muted" />
                   </div>
@@ -176,7 +176,7 @@ export function LandingProductTabs() {
                   </div>
                 </div>
                 {/* Decorative Elements */}
-                <div className="absolute -bottom-10 -right-10 size-40 rounded-full bg-primary/10 blur-3xl opacity-50 dark:bg-primary/20" />
+                <div className="absolute -bottom-10 -right-10 size-40 rounded-full bg-brand/10 blur-3xl opacity-50 dark:bg-brand/20" />
                 <div className="absolute -top-10 -left-10 size-40 rounded-full bg-amber-500/5 blur-3xl opacity-30 dark:bg-purple-500/10" />
               </div>
             </div>
