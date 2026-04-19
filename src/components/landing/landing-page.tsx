@@ -243,7 +243,7 @@ export function LandingPage() {
             redOffset={0}
             greenOffset={8}
             blueOffset={18}
-            mixBlendMode="soft-light"
+            mixBlendMode="normal"
             edge="subtle"
             innerClassName="!flex !h-auto !min-h-16 !w-full !min-w-0 !max-w-full !items-stretch !justify-center !p-0"
             className="box-border w-full min-w-0 max-w-full rounded-xl"
@@ -965,33 +965,10 @@ export function LandingPage() {
         <section className="relative z-10 px-4 py-24 sm:px-6 lg:py-32">
           <div className="relative mx-auto max-w-5xl overflow-hidden rounded-2xl border-0 bg-[#121217] px-6 py-20 text-center shadow-2xl sm:px-16 dark:border dark:border-white/10">
             <div className="absolute inset-0 z-0 overflow-hidden rounded-2xl">
-              <Grainient
-                color1="#e8dcc4"
-                color2="#8e7d4d"
-                color3="#3d3528"
-                timeSpeed={0.25}
-                colorBalance={0}
-                warpStrength={1}
-                warpFrequency={5}
-                warpSpeed={2}
-                warpAmplitude={50}
-                blendAngle={0}
-                blendSoftness={0.05}
-                rotationAmount={500}
-                noiseScale={2}
-                grainAmount={0.1}
-                grainScale={2}
-                grainAnimated={false}
-                contrast={1.5}
-                gamma={1}
-                saturation={1}
-                centerX={0}
-                centerY={0}
-                zoom={0.9}
-                className="h-full min-h-full w-full"
-              />
+              <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,#2a2416_0%,transparent_70%)]" />
+              <div className="absolute -bottom-[20%] -left-[20%] h-[60%] w-[60%] rounded-full bg-brand/10 blur-[100px] opacity-50" />
+              <div className="absolute top-[10%] right-[10%] h-[40%] w-[40%] rounded-full bg-amber-500/5 blur-[80px]" />
             </div>
-            <div className="pointer-events-none absolute inset-0 z-[1] rounded-2xl bg-gradient-to-b from-[#121217]/58 via-[#121217]/16 to-[#121217]/48" />
 
             <div className="relative z-10 mx-auto max-w-2xl">
               <h2 className="font-heading text-3xl font-extrabold tracking-tight text-white sm:text-5xl">
