@@ -217,7 +217,7 @@ export function LandingPage() {
           grainAmount={0.04}
           grainScale={1.5}
           grainAnimated={true}
-          className="h-full w-full opacity-0 dark:opacity-40 mix-blend-screen"
+          className="hidden md:block h-full w-full opacity-0 dark:opacity-40 mix-blend-screen"
         />
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/50 to-background" />
       </div>
@@ -469,6 +469,7 @@ export function LandingPage() {
                   transition={{ delay: idx * 0.1 }}
                 >
                   <BorderGlow
+                    disableBorderGlowOnMobile
                     className="h-full rounded-xl bg-white dark:bg-zinc-900/40"
                     backgroundColor="var(--background)"
                     borderRadius={12}
@@ -590,20 +591,34 @@ export function LandingPage() {
                       </div>
                     </motion.div>
 
-                    {/* Connector arrow between cards — hidden on mobile & after last card */}
+                    {/* Connector arrow between cards */}
                     {i < arr.length - 1 && (
-                      <div className="hidden items-center justify-center px-2 md:flex" aria-hidden>
-                        <motion.div
-                          initial={{ opacity: 0, scaleX: 0 }}
-                          whileInView={{ opacity: 1, scaleX: 1 }}
-                          viewport={{ once: true }}
-                          transition={{ delay: i * 0.12 + 0.3, duration: 0.4 }}
-                          className="flex items-center gap-0"
-                        >
-                          <div className="h-px w-6 bg-gradient-to-r from-border to-border/60 lg:w-8 dark:from-brand/55 dark:to-brand/30" />
-                          <ChevronRight className="size-3.5 -ml-1 shrink-0 text-muted-foreground/55 dark:text-brand/85 dark:drop-shadow-[0_1px_2px_rgba(0,0,0,0.55)]" strokeWidth={2.25} aria-hidden />
-                        </motion.div>
-                      </div>
+                      <>
+                        <div className="hidden items-center justify-center px-2 md:flex" aria-hidden>
+                          <motion.div
+                            initial={{ opacity: 0, scaleX: 0 }}
+                            whileInView={{ opacity: 1, scaleX: 1 }}
+                            viewport={{ once: true }}
+                            transition={{ delay: i * 0.12 + 0.3, duration: 0.4 }}
+                            className="flex origin-left items-center gap-0"
+                          >
+                            <div className="h-px w-6 bg-gradient-to-r from-border to-border/60 lg:w-8 dark:from-brand/55 dark:to-brand/30" />
+                            <ChevronRight className="size-3.5 -ml-1 shrink-0 text-muted-foreground/55 dark:text-brand/85 dark:drop-shadow-[0_1px_2px_rgba(0,0,0,0.55)]" strokeWidth={2.25} aria-hidden />
+                          </motion.div>
+                        </div>
+                        <div className="flex items-center justify-center py-3 md:hidden" aria-hidden>
+                          <motion.div
+                            initial={{ opacity: 0, scaleY: 0 }}
+                            whileInView={{ opacity: 1, scaleY: 1 }}
+                            viewport={{ once: true }}
+                            transition={{ delay: i * 0.12 + 0.3, duration: 0.4 }}
+                            className="flex origin-top flex-col items-center gap-0"
+                          >
+                            <div className="h-6 w-px bg-gradient-to-b from-border to-border/60 dark:from-brand/55 dark:to-brand/30" />
+                            <ChevronRight className="size-3.5 -mt-1 shrink-0 rotate-90 text-muted-foreground/55 dark:text-brand/85 dark:drop-shadow-[0_1px_2px_rgba(0,0,0,0.55)]" strokeWidth={2.25} aria-hidden />
+                          </motion.div>
+                        </div>
+                      </>
                     )}
                   </>
                 ))}
@@ -618,6 +633,7 @@ export function LandingPage() {
                 className="mx-auto mt-14 max-w-fit"
               >
                 <BorderGlow
+                  disableBorderGlowOnMobile
                   className="rounded-lg border-[0.5px] bg-white dark:bg-zinc-950/20"
                   backgroundColor="var(--background)"
                   borderRadius={8}
@@ -793,6 +809,7 @@ export function LandingPage() {
                 >
                   {plan.isFeatured ? (
                     <BorderGlow
+                      disableBorderGlowOnMobile
                       className="flex h-full w-full flex-col rounded-xl border-none bg-white p-0 dark:bg-zinc-950/40"
                       backgroundColor="var(--background)"
                       borderRadius={12}

@@ -152,6 +152,7 @@ export function LandingProductTabs() {
           className="h-full"
         >
           <BorderGlow
+            disableBorderGlowOnMobile
             className="h-full rounded-xl bg-white dark:bg-zinc-950/20"
             backgroundColor="var(--background)"
             borderRadius={12}
