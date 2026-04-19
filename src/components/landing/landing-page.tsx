@@ -16,7 +16,6 @@ import {
   Link2,
   LogIn,
   Send,
-  Sparkles,
   Users,
   Zap,
 } from "lucide-react";
@@ -167,10 +166,7 @@ function HeroVisual({ className }: { className?: string }) {
       initial={{ opacity: 0, rotateX: 10, y: 40 }}
       animate={{ opacity: 1, rotateX: 0, y: 0 }}
       transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-      className={cn(
-        "relative overflow-hidden rounded-xl border border-border bg-muted shadow-[0_32px_80px_-16px_rgba(0,0,0,0.12)] dark:border-white/10 dark:shadow-[0_32px_80px_-16px_rgba(0,0,0,0.4)]",
-        className,
-      )}
+      className={cn("relative overflow-hidden rounded-xl", className)}
     >
       <Image
         src="/videos/landing/hero.png"
@@ -299,12 +295,12 @@ export function LandingPage() {
         <section className="relative z-10 overflow-hidden px-4 pt-20 pb-20 sm:px-6 md:pt-32 md:pb-32">
           <div className="pointer-events-none absolute inset-0 z-0 min-h-[520px] md:min-h-[640px] hidden md:block">
             <HeroHyperspeed
-              className="min-h-full opacity-[0.34] saturate-[0.72] contrast-[0.92]"
+              className="min-h-full opacity-[0.48] saturate-[0.72] contrast-[0.92] dark:opacity-[0.38]"
               effectOptions={heroHyperspeedOptions}
             />
           </div>
           <div
-            className="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-b from-background/94 via-background/84 to-background/76 dark:from-background/[0.93] dark:via-background/82 dark:to-background/74"
+            className="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-b from-background/56 via-background/36 to-background/28 dark:from-background/76 dark:via-background/58 dark:to-background/50"
             aria-hidden
           />
           <div className="relative z-[2] mx-auto grid max-w-7xl gap-12 lg:grid-cols-2 lg:gap-12 xl:gap-16 lg:items-center">
@@ -314,13 +310,13 @@ export function LandingPage() {
               transition={{ duration: 0.7, ease: "easeOut" }}
               className="max-w-2xl"
             >
-              <div className="mb-6 inline-flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/8 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-primary shadow-sm" >
-                <Sparkles className="size-3.5" aria-hidden />
+              <div className="mb-6 inline-flex items-center gap-2 rounded-lg border border-brand/25 bg-brand/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-brand shadow-sm">
+                <Compass className="size-3.5 shrink-0" aria-hidden />
                 <span>O Futuro da Gestão de Leads</span>
               </div>
               <h1 className="font-heading text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl md:text-6xl md:leading-[1.1] lg:text-[4rem]">
                 Transforme<br />
-                <span className="bg-gradient-to-br from-primary to-primary/60 bg-clip-text text-transparent">Leads</span> em Clientes.
+                <span className="bg-gradient-to-br from-brand to-brand/55 bg-clip-text text-transparent">Leads</span> em Clientes.
               </h1>
               <p className="mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground sm:text-xl">
                 A plataforma definitiva para agências modernas. Organize leads, gere diagnósticos em segundos com IA e entregue propostas que fecham vendas.
@@ -593,8 +589,9 @@ export function LandingPage() {
 
                     {/* Connector arrow between cards */}
                     {i < arr.length - 1 && (
-                      <>
-                        <div className="hidden items-center justify-center px-2 md:flex" aria-hidden>
+                      <div className="flex items-center justify-center px-2 py-3 md:py-0" aria-hidden>
+                        {/* Desktop connector (horizontal) */}
+                        <div className="hidden md:block">
                           <motion.div
                             initial={{ opacity: 0, scaleX: 0 }}
                             whileInView={{ opacity: 1, scaleX: 1 }}
@@ -606,7 +603,8 @@ export function LandingPage() {
                             <ChevronRight className="size-3.5 -ml-1 shrink-0 text-muted-foreground/55 dark:text-brand/85 dark:drop-shadow-[0_1px_2px_rgba(0,0,0,0.55)]" strokeWidth={2.25} aria-hidden />
                           </motion.div>
                         </div>
-                        <div className="flex items-center justify-center py-3 md:hidden" aria-hidden>
+
+                        <div className="rd-landing-flow-v-connector">
                           <motion.div
                             initial={{ opacity: 0, scaleY: 0 }}
                             whileInView={{ opacity: 1, scaleY: 1 }}
@@ -618,7 +616,7 @@ export function LandingPage() {
                             <ChevronRight className="size-3.5 -mt-1 shrink-0 rotate-90 text-muted-foreground/55 dark:text-brand/85 dark:drop-shadow-[0_1px_2px_rgba(0,0,0,0.55)]" strokeWidth={2.25} aria-hidden />
                           </motion.div>
                         </div>
-                      </>
+                      </div>
                     )}
                   </>
                 ))}
@@ -675,10 +673,10 @@ export function LandingPage() {
             <div className="mt-12 flex justify-center px-2">
               <div
                 className={cn(
-                  "relative inline-flex h-[3.25rem] items-stretch rounded-full border-2 p-1 text-sm",
-                  /* Trilho sólido: no escuro usa cinza médio (nunca igual ao fundo zinc-950). */
-                  "border-zinc-300 bg-zinc-200/95 shadow-inner shadow-black/10",
-                  "dark:border-zinc-500 dark:bg-zinc-600 dark:shadow-[inset_0_2px_10px_rgba(0,0,0,0.35)]",
+                  "relative inline-flex h-[3.25rem] items-stretch rounded-full border p-1 text-sm",
+                  /* Modo claro: trilho alinhado a --muted/--border; menos “bloco” cinza que border-2 + zinc-200. */
+                  "border-border/90 bg-muted/80 shadow-[0_1px_3px_rgba(15,23,42,0.06),inset_0_1px_0_rgba(255,255,255,0.92),inset_0_-1px_0_rgba(15,23,42,0.04)]",
+                  "dark:border-border dark:bg-background dark:shadow-[inset_0_2px_14px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.035)]",
                 )}
                 role="tablist"
                 aria-label="Ciclo de cobrança dos planos"
@@ -695,7 +693,7 @@ export function LandingPage() {
                       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                       billingCycle === "monthly"
                         ? "text-brand-foreground"
-                        : "text-zinc-700 hover:text-zinc-950 dark:text-white dark:hover:text-white",
+                        : "text-muted-foreground hover:text-foreground dark:text-white dark:hover:text-white",
                     )}
                   >
                     {billingCycle === "monthly" && (
@@ -704,8 +702,8 @@ export function LandingPage() {
                         aria-hidden
                         className={cn(
                           "pointer-events-none absolute inset-0 z-0 rounded-full [background-image:none]",
-                          /* Fundo sólido — token --brand (ouro ID visual), contraste via --brand-foreground. */
-                          "shadow-[0_4px_18px_rgba(0,0,0,0.22)] ring-2 ring-black/20 dark:shadow-[0_6px_24px_rgba(0,0,0,0.5)] dark:ring-white/25",
+                          /* Fundo --brand: sombra suave em claro; mais contraste em dark. */
+                          "shadow-[0_3px_14px_-3px_rgba(60,50,30,0.35),0_0_0_1px_rgba(0,0,0,0.06)] dark:shadow-[0_6px_24px_rgba(0,0,0,0.5)] dark:ring-2 dark:ring-white/25",
                         )}
                         style={{ backgroundColor: "var(--brand)" }}
                         transition={{ type: "spring", bounce: 0.22, stiffness: 400, damping: 30 }}
@@ -725,7 +723,7 @@ export function LandingPage() {
                       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                       billingCycle === "yearly"
                         ? "text-brand-foreground"
-                        : "text-zinc-700 hover:text-zinc-950 dark:text-white dark:hover:text-white",
+                        : "text-muted-foreground hover:text-foreground dark:text-white dark:hover:text-white",
                     )}
                   >
                     {billingCycle === "yearly" && (
@@ -734,7 +732,7 @@ export function LandingPage() {
                         aria-hidden
                         className={cn(
                           "pointer-events-none absolute inset-0 z-0 rounded-full [background-image:none]",
-                          "shadow-[0_4px_18px_rgba(0,0,0,0.22)] ring-2 ring-black/20 dark:shadow-[0_6px_24px_rgba(0,0,0,0.5)] dark:ring-white/25",
+                          "shadow-[0_3px_14px_-3px_rgba(60,50,30,0.35),0_0_0_1px_rgba(0,0,0,0.06)] dark:shadow-[0_6px_24px_rgba(0,0,0,0.5)] dark:ring-2 dark:ring-white/25",
                         )}
                         style={{ backgroundColor: "var(--brand)" }}
                         transition={{ type: "spring", bounce: 0.22, stiffness: 400, damping: 30 }}
@@ -745,8 +743,8 @@ export function LandingPage() {
                       className={cn(
                         "relative z-10 rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.06em]",
                         billingCycle === "yearly"
-                          ? "bg-white text-zinc-950 shadow-sm ring-1 ring-black/10"
-                          : "bg-[#f5f0e6] text-[#3d3528] shadow-sm ring-1 ring-[#c4b27a]/55 dark:bg-zinc-950 dark:text-[#f8f0d4] dark:shadow-none dark:ring-[#e8dcc4]/90",
+                          ? "bg-white text-foreground shadow-sm ring-1 ring-black/[0.08] dark:bg-white dark:text-zinc-950 dark:ring-black/10"
+                          : "bg-brand/12 text-brand shadow-none ring-1 ring-brand/30 dark:bg-zinc-950 dark:text-[#f8f0d4] dark:shadow-none dark:ring-[#e8dcc4]/90",
                       )}
                     >
                       -20%

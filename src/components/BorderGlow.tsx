@@ -106,7 +106,6 @@ function easeOutCubic(x: number) {
 function easeInCubic(x: number) {
   return x * x * x;
 }
-
 interface AnimateOpts {
   start?: number;
   end?: number;
@@ -134,7 +133,9 @@ function animateValue({
     if (t < 1) requestAnimationFrame(tick);
     else if (onEnd) onEnd();
   }
-  setTimeout(() => requestAnimationFrame(tick), delay);
+  /* setTimeout(0) atrasa ~1 frame; sem delay usamos rAF direto para encadear loops sem “buraco”. */
+  if (delay <= 0) requestAnimationFrame(tick);
+  else setTimeout(() => requestAnimationFrame(tick), delay);
 }
 
 const GRADIENT_POSITIONS = [
@@ -185,6 +186,8 @@ const BorderGlow: FC<BorderGlowProps> = ({
   restingBorderColor,
 }) => {
   const cardRef = useRef<HTMLDivElement>(null);
+  /** Desloca o arco do sweep em cada repetição (loop) para o ângulo não saltar de 465° → 110°. */
+  const sweepRotationAccumRef = useRef(0);
   const pointerRafRef = useRef<number | null>(null);
   const pointerPendingRef = useRef<{ el: HTMLElement; x: number; y: number } | null>(null);
   const [coarseTouch, setCoarseTouch] = useState(false);
@@ -319,53 +322,95 @@ const BorderGlow: FC<BorderGlowProps> = ({
     let cancelled = false;
 
     const s = Math.max(0.25, entranceSweepDurationScale);
+    const angleStartBase = 110;
+    const angleEndBase = 465;
+    const angleSpan = angleEndBase - angleStartBase;
 
-    const runEntranceSweep = () => {
+    sweepRotationAccumRef.current = 0;
+
+    const loopContinuo = disablePointerTracking && loopEntranceAnimation;
+    const durAngleTotal = (1500 + 2250) * s;
+
+    const runEntranceSweep = (seamlessRepeat: boolean) => {
       if (cancelled) return;
-      const angleStart = 110;
-      const angleEnd = 465;
-      setSweepActive(true);
-      setCursorAngle(angleStart);
-      setEdgeProximity(0);
+      const base = sweepRotationAccumRef.current;
+      const aStart = angleStartBase + base;
+      const aEnd = angleEndBase + base;
 
-      animateValue({ duration: 500 * s, onUpdate: (v) => setEdgeProximity(v / 100) });
-      animateValue({
-        ease: easeInCubic,
-        duration: 1500 * s,
-        end: 50,
-        onUpdate: (v) => {
-          setCursorAngle((angleEnd - angleStart) * (v / 100) + angleStart);
-        },
-      });
-      animateValue({
-        ease: easeOutCubic,
-        delay: 1500 * s,
-        duration: 2250 * s,
-        start: 50,
-        end: 100,
-        onUpdate: (v) => {
-          setCursorAngle((angleEnd - angleStart) * (v / 100) + angleStart);
-        },
-      });
-      animateValue({
-        ease: easeInCubic,
-        delay: 2500 * s,
-        duration: 1500 * s,
-        start: 100,
-        end: 0,
-        onUpdate: (v) => setEdgeProximity(v / 100),
-        onEnd: () => {
-          if (cancelled) return;
-          if (disablePointerTracking && loopEntranceAnimation) {
-            queueMicrotask(() => runEntranceSweep());
-          } else {
+      setSweepActive(true);
+      setCursorAngle(aStart);
+
+      if (seamlessRepeat) {
+        /* Entrada já luminosa: sem rampa 0→1 nem fade-out no fim — evita “apagar” entre ciclos. */
+        setEdgeProximity(1);
+      } else {
+        setEdgeProximity(0);
+        animateValue({ duration: 500 * s, onUpdate: (v) => setEdgeProximity(v / 100) });
+      }
+
+      /**
+       * Repetições seamless: um único segmento com easing linear — velocidade constante no cruzamento
+       * entre ciclos (ease in/out encerra com velocidade 0 e “segura” o movimento nessa junção).
+       */
+      if (seamlessRepeat && loopContinuo) {
+        animateValue({
+          ease: (t) => t,
+          duration: durAngleTotal,
+          onUpdate: (v) => {
+            setCursorAngle((aEnd - aStart) * (v / 100) + aStart);
+          },
+          onEnd: () => {
+            if (cancelled) return;
+            sweepRotationAccumRef.current += angleSpan;
+            runEntranceSweep(true);
+          },
+        });
+      } else {
+        animateValue({
+          ease: easeInCubic,
+          duration: 1500 * s,
+          end: 50,
+          onUpdate: (v) => {
+            setCursorAngle((aEnd - aStart) * (v / 100) + aStart);
+          },
+        });
+        animateValue({
+          ease: easeOutCubic,
+          delay: 1500 * s,
+          duration: 2250 * s,
+          start: 50,
+          end: 100,
+          onUpdate: (v) => {
+            setCursorAngle((aEnd - aStart) * (v / 100) + aStart);
+          },
+          onEnd: () => {
+            if (cancelled) return;
+            if (loopContinuo) {
+              sweepRotationAccumRef.current += angleSpan;
+              runEntranceSweep(true);
+            }
+          },
+        });
+      }
+
+      const fadeOutAfterSweep = !loopContinuo;
+      if (fadeOutAfterSweep) {
+        animateValue({
+          ease: easeInCubic,
+          delay: 2500 * s,
+          duration: 1500 * s,
+          start: 100,
+          end: 0,
+          onUpdate: (v) => setEdgeProximity(v / 100),
+          onEnd: () => {
+            if (cancelled) return;
             setSweepActive(false);
-          }
-        },
-      });
+          },
+        });
+      }
     };
 
-    runEntranceSweep();
+    runEntranceSweep(false);
     return () => {
       cancelled = true;
     };

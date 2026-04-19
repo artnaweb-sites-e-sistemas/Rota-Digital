@@ -347,6 +347,20 @@ html {
   animation: rd-progress-shine 2.2s ease-in-out infinite;
 }
 
+/* Landing #como-funciona: seta vertical entre cards — só em viewport estreita (max 767px).
+   Evita colisão de cascata entre utilitários Tailwind (flex vs hidden em md). */
+.rd-landing-flow-v-connector {
+  display: none !important;
+}
+@media (max-width: 767px) {
+  .rd-landing-flow-v-connector {
+    display: flex !important;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
 /* Badge / gatilho “Rota Gerada” — ouro mais vivo + brilho pulsante (respeita redução de movimento). */
 @keyframes lead-rota-status-badge-glow {
   0%,
