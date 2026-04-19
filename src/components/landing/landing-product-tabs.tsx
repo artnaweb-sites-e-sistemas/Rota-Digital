@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Building2, Compass, FileText, Users, ChevronRight, CheckCircle2 } from "lucide-react";
 
@@ -52,8 +52,33 @@ const AUTO_TAB_INTERVAL_MS = 3800;
 export function LandingProductTabs() {
   const [active, setActive] = useState<(typeof TABS)[number]["id"]>("leads");
   const [pauseAuto, setPauseAuto] = useState(false);
+  const tabsStripRef = useRef<HTMLDivElement>(null);
 
   const panel = TABS.find((t) => t.id === active)!;
+
+  /**
+   * No strip horizontal (mobile), mantém o botão ativo visível.
+   * Não usar scrollIntoView — nalguns browsers também faz scroll do documento e a página “salta” para cima.
+   */
+  useEffect(() => {
+    const strip = tabsStripRef.current;
+    if (!strip) return;
+    if (strip.scrollWidth <= strip.clientWidth + 1) return;
+    const btn = strip.querySelector<HTMLElement>(`[data-landing-tab="${active}"]`);
+    if (!btn) return;
+
+    const align = () => {
+      const sr = strip.getBoundingClientRect();
+      const br = btn.getBoundingClientRect();
+      const pad = 12;
+      let delta = 0;
+      if (br.left < sr.left + pad) delta = br.left - sr.left - pad;
+      else if (br.right > sr.right - pad) delta = br.right - sr.right + pad;
+      if (delta !== 0) strip.scrollBy({ left: delta, behavior: "smooth" });
+    };
+
+    requestAnimationFrame(align);
+  }, [active]);
 
   useEffect(() => {
     if (TABS.length < 2 || pauseAuto) return;
@@ -73,7 +98,10 @@ export function LandingProductTabs() {
       onMouseEnter={() => setPauseAuto(true)}
       onMouseLeave={() => setPauseAuto(false)}
     >
-      <div className="flex flex-row gap-3 overflow-x-auto pb-4 lg:flex-col lg:overflow-visible lg:pb-0">
+      <div
+        ref={tabsStripRef}
+        className="flex flex-row gap-3 overflow-x-auto pb-4 [scroll-padding-inline:12px] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden lg:flex-col lg:overflow-visible lg:pb-0"
+      >
         {TABS.map((tab) => {
           const Icon = tab.icon;
           const isOn = tab.id === active;
@@ -81,6 +109,7 @@ export function LandingProductTabs() {
             <button
               key={tab.id}
               type="button"
+              data-landing-tab={tab.id}
               onClick={() => setActive(tab.id)}
               className={cn(
                 "group relative flex shrink-0 items-center justify-between gap-4 rounded-xl border p-4 text-left transition-all duration-300",

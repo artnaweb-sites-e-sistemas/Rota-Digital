@@ -5,6 +5,7 @@ import {
   useCallback,
   useState,
   useEffect,
+  useLayoutEffect,
   type CSSProperties,
   type FC,
   type ReactNode,
@@ -189,19 +190,29 @@ const BorderGlow: FC<BorderGlowProps> = ({
   const [coarseTouch, setCoarseTouch] = useState(false);
   /** `md` do Tailwind — emulação Chrome costuma manter `pointer: fine`; largura garante o efeito. */
   const [narrowViewport, setNarrowViewport] = useState(false);
+  /**
+   * Até o cliente medir os media queries, não ativamos malha desktop nem sweep —
+   * no primeiro frame `narrow/coarse` vinham false e o mobile entrava no caminho pesado
+   * (loop + máscaras), travando o scroll na LP com vários cards.
+   */
+  const [glowLayoutReady, setGlowLayoutReady] = useState(false);
   const isMobileChassis = coarseTouch || narrowViewport;
   const suppressGlowOnMobile = Boolean(disableBorderGlowOnMobile && isMobileChassis);
   /** Brilho “estrela” na borda (substitui camadas pesadas do hover). */
   const useMobileStarShimmer =
-    !disableMobileStarBorder && !suppressGlowOnMobile && isMobileChassis;
-  const finePointer = !useMobileStarShimmer && !suppressGlowOnMobile;
+    glowLayoutReady &&
+    !disableMobileStarBorder &&
+    !suppressGlowOnMobile &&
+    isMobileChassis;
+  const finePointer =
+    glowLayoutReady && !useMobileStarShimmer && !suppressGlowOnMobile;
   const pointerGlowEnabled = finePointer && !disablePointerTracking;
   const [isHovered, setIsHovered] = useState(false);
   const [cursorAngle, setCursorAngle] = useState(45);
   const [edgeProximity, setEdgeProximity] = useState(0);
   const [sweepActive, setSweepActive] = useState(false);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (typeof window === "undefined") return;
     const mqTouch = window.matchMedia("(hover: none) and (pointer: coarse)");
     const mqNarrow = window.matchMedia("(max-width: 767px)");
@@ -210,6 +221,7 @@ const BorderGlow: FC<BorderGlowProps> = ({
       setNarrowViewport(mqNarrow.matches);
     };
     sync();
+    setGlowLayoutReady(true);
     mqTouch.addEventListener("change", sync);
     mqNarrow.addEventListener("change", sync);
     return () => {
@@ -472,7 +484,7 @@ const BorderGlow: FC<BorderGlowProps> = ({
             }}
           />
         </div>
-      ) : (
+      ) : finePointer ? (
         <>
           <div
             className="pointer-events-none absolute inset-0 z-[1] rounded-[inherit]"
@@ -502,7 +514,7 @@ const BorderGlow: FC<BorderGlowProps> = ({
             />
           </span>
         </>
-      )}
+      ) : null}
 
       <div
         className="relative z-[3] flex min-h-0 flex-1 flex-col"
@@ -513,7 +525,11 @@ const BorderGlow: FC<BorderGlowProps> = ({
             "flex min-h-0 min-w-0 flex-1 flex-col",
             contentScrollable ? "overflow-auto" : "overflow-visible",
           )}
-          style={{ borderRadius: `${innerRadius}px` }}
+          style={{
+            borderRadius: `${innerRadius}px`,
+            /* Cobre o brilho “estrela” (z-2): sem isto o miolo fica transparente e as elipses aparecem no centro. */
+            backgroundColor,
+          }}
         >
           {children}
         </div>
