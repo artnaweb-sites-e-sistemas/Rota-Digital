@@ -24,6 +24,7 @@ const nextConfig: NextConfig = {
     localPatterns: [
       { pathname: "/api/image-proxy" },
       { pathname: "/api/instagram-profile-snapshot" },
+      { pathname: "/videos/landing/**" },
     ],
   },
 };

@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import Image from "next/image";
 import Link from "next/link";
 import { useMemo, useState, type MouseEvent, type ReactNode } from "react";
 import { motion } from "motion/react";
@@ -159,49 +160,27 @@ function SectionTitle({
   );
 }
 
-function BrowserMockup({ className }: { className?: string }) {
+/** Imagem da hero (`public/videos/landing/hero.png`). */
+function HeroVisual({ className }: { className?: string }) {
   return (
     <motion.div
       initial={{ opacity: 0, rotateX: 10, y: 40 }}
       animate={{ opacity: 1, rotateX: 0, y: 0 }}
       transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
       className={cn(
-        "relative overflow-hidden rounded-xl border bg-white shadow-[0_32px_80px_-16px_rgba(0,0,0,0.12)] dark:border-white/10 dark:bg-zinc-950/40 dark:shadow-[0_32px_80px_-16px_rgba(0,0,0,0.4)]",
+        "relative overflow-hidden rounded-xl border border-border bg-muted shadow-[0_32px_80px_-16px_rgba(0,0,0,0.12)] dark:border-white/10 dark:shadow-[0_32px_80px_-16px_rgba(0,0,0,0.4)]",
         className,
       )}
     >
-      <div className="flex items-center gap-2 border-b px-4 py-3 bg-zinc-50 dark:border-white/5 dark:bg-white/[0.02]">
-        <div className="flex gap-1.5">
-          <span className="size-3 rounded-full bg-zinc-300 dark:bg-red-400/90" />
-          <span className="size-3 rounded-full bg-zinc-300 dark:bg-amber-400/90" />
-          <span className="size-3 rounded-full bg-zinc-300 dark:bg-emerald-400/90" />
-        </div>
-        <div className="mx-auto flex h-6 w-full max-w-[200px] items-center justify-center rounded-md bg-zinc-100 text-[10px] font-medium text-muted-foreground dark:bg-white/[0.04]">
-          rota.digital/p/proposta-incrivel
-        </div>
-      </div>
-      <div className="space-y-4 p-5 sm:p-8">
-        <div className="space-y-2">
-          <div className="h-4 w-1/3 rounded bg-primary/25" />
-          <div className="h-8 w-3/4 rounded bg-zinc-200 dark:bg-foreground/10" />
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2 pt-4">
-          <div className="group relative overflow-hidden h-32 rounded-lg border bg-zinc-50 transition-all hover:bg-zinc-100 dark:border-white/5 dark:bg-white/[0.02] dark:hover:bg-white/[0.05]">
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/8 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
-          </div>
-          <div className="group relative overflow-hidden h-32 rounded-lg border bg-zinc-50 transition-all hover:bg-zinc-100 dark:border-white/5 dark:bg-white/[0.02] dark:hover:bg-white/[0.05]">
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/8 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2 pt-2">
-          <span className="rounded-md border px-3 py-1.5 text-[11px] font-medium text-foreground bg-zinc-50 dark:border-white/10 dark:bg-zinc-900/50">
-            Inteligência Artificial
-          </span>
-          <span className="rounded-md border px-3 py-1.5 text-[11px] font-medium text-foreground bg-zinc-50 dark:border-white/10 dark:bg-zinc-900/50">
-            Diagnóstico
-          </span>
-        </div>
-      </div>
+      <Image
+        src="/videos/landing/hero.png"
+        alt="Demonstração da plataforma Rota Digital"
+        width={1920}
+        height={1080}
+        className="block h-auto w-full"
+        sizes="(max-width: 1024px) 100vw, 50vw"
+        priority
+      />
     </motion.div>
   );
 }
@@ -328,7 +307,7 @@ export function LandingPage() {
             className="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-b from-background/94 via-background/84 to-background/76 dark:from-background/[0.93] dark:via-background/82 dark:to-background/74"
             aria-hidden
           />
-          <div className="relative z-[2] mx-auto grid max-w-7xl gap-16 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+          <div className="relative z-[2] mx-auto grid max-w-7xl gap-12 lg:grid-cols-2 lg:gap-12 xl:gap-16 lg:items-center">
             <motion.div
               initial={{ opacity: 0, x: -30 }}
               animate={{ opacity: 1, x: 0 }}
@@ -374,10 +353,10 @@ export function LandingPage() {
               </div>
             </motion.div>
 
-            <div className="relative mx-auto w-full max-w-[540px] lg:max-w-none">
+            <div className="relative mx-auto mt-8 w-full max-w-[600px] lg:mt-0 lg:max-w-none">
               {/* Glow orb: stronger in light, different color balance */}
               <div className="absolute -inset-10 rounded-full bg-gradient-to-r from-primary/15 to-amber-500/10 opacity-60 blur-3xl dark:from-primary/20 dark:to-amber-400/15 dark:opacity-30" />
-              <BrowserMockup />
+              <HeroVisual />
             </div>
           </div>
         </section>
@@ -448,7 +427,7 @@ export function LandingPage() {
         </section>
 
         {/* --- Pilares (Ecossistema) --- */}
-        <section id="pilares" className="relative z-10 scroll-mt-24 border-t px-4 py-24 sm:px-6 lg:py-32 bg-zinc-50/80 dark:border-white/5 dark:bg-zinc-950/20">
+        <section id="pilares" className="relative z-10 scroll-mt-24 border-t px-4 py-14 sm:px-6 lg:py-20 bg-zinc-50/80 dark:border-white/5 dark:bg-zinc-950/20">
           <div className="mx-auto max-w-7xl">
             <SectionTitle
               eyebrow="O Ecossistema Completo"
@@ -751,7 +730,7 @@ export function LandingPage() {
                         "relative z-10 rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.06em]",
                         billingCycle === "yearly"
                           ? "bg-white text-zinc-950 shadow-sm ring-1 ring-black/10"
-                          : "bg-zinc-900 text-[#f5edd8] ring-1 ring-[#c4b27a]/80 dark:bg-zinc-950 dark:text-[#f8f0d4] dark:ring-[#e8dcc4]/90",
+                          : "bg-[#f5f0e6] text-[#3d3528] shadow-sm ring-1 ring-[#c4b27a]/55 dark:bg-zinc-950 dark:text-[#f8f0d4] dark:shadow-none dark:ring-[#e8dcc4]/90",
                       )}
                     >
                       -20%
@@ -967,7 +946,7 @@ export function LandingPage() {
 
         {/* --- CTA final --- */}
         <section className="relative z-10 px-4 py-24 sm:px-6 lg:py-32">
-          <div className="relative mx-auto max-w-5xl overflow-hidden rounded-2xl border border-zinc-800 bg-[#121217] px-6 py-20 text-center shadow-2xl sm:px-16 dark:border-white/10">
+          <div className="relative mx-auto max-w-5xl overflow-hidden rounded-2xl border-0 bg-[#121217] px-6 py-20 text-center shadow-2xl sm:px-16 dark:border dark:border-white/10">
             <div className="absolute inset-0 z-0 overflow-hidden rounded-2xl">
               <Grainient
                 color1="#e8dcc4"
