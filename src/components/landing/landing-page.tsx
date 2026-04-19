@@ -297,7 +297,7 @@ export function LandingPage() {
       <main>
         {/* --- Hero Section --- */}
         <section className="relative z-10 overflow-hidden px-4 pt-20 pb-20 sm:px-6 md:pt-32 md:pb-32">
-          <div className="pointer-events-none absolute inset-0 z-0 min-h-[520px] md:min-h-[640px]">
+          <div className="pointer-events-none absolute inset-0 z-0 min-h-[520px] md:min-h-[640px] hidden md:block">
             <HeroHyperspeed
               className="min-h-full opacity-[0.34] saturate-[0.72] contrast-[0.92]"
               effectOptions={heroHyperspeedOptions}
