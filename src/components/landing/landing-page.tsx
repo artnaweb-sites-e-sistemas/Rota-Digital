@@ -164,7 +164,7 @@ function SectionTitle({
   );
 }
 
-/** Imagem da hero (`public/videos/landing/hero.png`). */
+/** Imagem da hero (`public/videos/landing/hero2.png`). */
 function HeroVisual({ className }: { className?: string }) {
   return (
     <motion.div
@@ -174,7 +174,7 @@ function HeroVisual({ className }: { className?: string }) {
       className={cn("relative overflow-hidden rounded-xl", className)}
     >
       <Image
-        src="/videos/landing/hero.png"
+        src="/videos/landing/hero2.png"
         alt="Demonstração da plataforma Rota Digital"
         width={1920}
         height={1080}
