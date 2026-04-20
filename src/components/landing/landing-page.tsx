@@ -684,7 +684,10 @@ export function LandingPage() {
         </section>
 
         {/* --- Como Funciona --- */}
-        <section id="como-funciona" className="relative z-10 scroll-mt-24 border-t border-amber-500/30 px-4 py-24 sm:px-6 lg:py-32 bg-zinc-50/80 dark:border-amber-400/25 dark:bg-white/[0.01]">
+        <section
+          id="como-funciona"
+          className="relative z-10 scroll-mt-24 border-t border-amber-500/30 bg-zinc-50/80 px-4 pb-2 pt-20 dark:border-amber-400/25 dark:bg-white/[0.01] sm:px-6 sm:pb-3 sm:pt-24 lg:pb-4 lg:pt-28"
+        >
           <div className="mx-auto max-w-7xl">
             <SectionTitle
               eyebrow="Jornada de Sucesso"
@@ -692,7 +695,7 @@ export function LandingPage() {
               description="Uma jornada simples para ganhar velocidade comercial sem perder profundidade."
             />
 
-            <div className="mt-20">
+            <div className="mt-24 lg:mt-28">
               <div className="grid gap-0 md:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr]">
                 {[
                   {
@@ -791,67 +794,68 @@ export function LandingPage() {
                 ))}
               </div>
 
-              {/* Legenda acima do vídeo (BorderGlow) */}
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: 0.5 }}
-                className="mx-auto mt-14 max-w-fit"
-              >
-                <BorderGlow
-                  disableBorderGlowOnMobile
-                  className="rounded-lg border-[0.5px] bg-white dark:bg-zinc-950/20"
-                  backgroundColor="var(--background)"
-                  borderRadius={8}
-                  glowRadius={24}
-                  glowIntensity={0.62}
-                  glowColor="43 38 48"
-                  coneSpread={14}
-                  colors={["#c4b27a", "#8e7d4d", "#e8dcc4"]}
-                  fillOpacity={0.34}
-                  edgeSensitivity={38}
-                  contentInset={1}
-                  animated={true}
-                  disablePointerTracking
-                  loopEntranceAnimation
-                  entranceSweepDurationScale={2.05}
-                  restingBorderColor="color-mix(in oklch, var(--border) 52%, transparent)"
-                  mobileStarSpeed="8s"
-                  mobileStarThickness={1}
+              {/* Legenda + vídeo: gap controla só o espaço entre os dois (sem encolher o BorderGlow) */}
+              <div className="mx-auto mt-16 flex w-full max-w-2xl flex-col items-center gap-0 sm:mt-20 sm:gap-px">
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: 0.5 }}
+                  className="max-w-fit"
                 >
-                  <div className="flex items-center gap-2.5 px-5 py-2.5 text-sm font-medium text-muted-foreground">
-                    <Link2 className="size-4 shrink-0 text-brand" aria-hidden />
-                    Links públicos seguros com experiência responsiva
-                  </div>
-                </BorderGlow>
-              </motion.div>
+                  <BorderGlow
+                    disableBorderGlowOnMobile
+                    className="rounded-lg border-[0.5px] bg-white dark:bg-zinc-950/20"
+                    backgroundColor="var(--background)"
+                    borderRadius={8}
+                    glowRadius={24}
+                    glowIntensity={0.62}
+                    glowColor="43 38 48"
+                    coneSpread={14}
+                    colors={["#c4b27a", "#8e7d4d", "#e8dcc4"]}
+                    fillOpacity={0.34}
+                    edgeSensitivity={38}
+                    contentInset={1}
+                    animated={true}
+                    disablePointerTracking
+                    loopEntranceAnimation
+                    entranceSweepDurationScale={2.05}
+                    restingBorderColor="color-mix(in oklch, var(--border) 52%, transparent)"
+                    mobileStarSpeed="8s"
+                    mobileStarThickness={1}
+                  >
+                    <div className="flex items-center gap-2.5 px-5 py-2.5 text-sm font-medium text-muted-foreground">
+                      <Link2 className="size-4 shrink-0 text-brand" aria-hidden />
+                      Crie propostas de alta conversao para seus leads
+                    </div>
+                  </BorderGlow>
+                </motion.div>
 
-              {/* Vídeo do link partilhável — fora do BorderGlow, sem moldura/fundo */}
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: 0.6 }}
-                className="mx-auto mt-3 w-full max-w-lg sm:mt-4 sm:max-w-2xl"
-              >
-                <video
-                  className="mx-auto block h-auto w-full max-h-[min(52vh,340px)] max-w-full object-contain sm:max-h-[420px] md:max-h-[480px]"
-                  src="/videos/landing/link%20compartilhavel.webm"
-                  muted
-                  loop
-                  playsInline
-                  autoPlay
-                  preload="auto"
-                  aria-label="Demonstração do link público partilhável"
-                />
-              </motion.div>
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: 0.6 }}
+                  className="w-full max-w-lg sm:max-w-2xl"
+                >
+                  <video
+                    className="mx-auto block h-auto w-full max-h-[min(52vh,340px)] max-w-full object-contain sm:max-h-[420px] md:max-h-[480px]"
+                    src="/videos/landing/link%20compartilhavel.webm"
+                    muted
+                    loop
+                    playsInline
+                    autoPlay
+                    preload="auto"
+                    aria-label="Demonstração do link público partilhável"
+                  />
+                </motion.div>
+              </div>
             </div>
           </div>
         </section>
 
         {/* --- Planos --- */}
-        <section id="planos" className="relative z-10 scroll-mt-24 border-t border-amber-500/30 px-4 py-24 sm:px-6 lg:py-32 dark:border-amber-400/25">
+        <section id="planos" className="relative z-10 scroll-mt-24 border-t border-amber-500/30 px-4 py-16 sm:px-6 lg:py-20 dark:border-amber-400/25">
           <div className="mx-auto max-w-7xl">
             <SectionTitle
               eyebrow="Investimento"
