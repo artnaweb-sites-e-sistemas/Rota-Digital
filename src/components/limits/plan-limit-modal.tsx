@@ -239,7 +239,7 @@ export function PlanLimitModal({ state, onClose, getIdToken }: Props) {
             </div>
           ) : null}
 
-          {!showSubscribeCtas && kind !== "logo" ? (
+          {!showSubscribeCtas ? (
             <p className="text-[11px] leading-relaxed text-zinc-500">{QUOTA_RENEWAL_NOTE}</p>
           ) : null}
 

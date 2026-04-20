@@ -28,8 +28,39 @@ type UserQuotaPayload = {
 
 type QuotaKind = "rotas" | "propostas";
 
+type LinkHref = ComponentProps<typeof Link>["href"];
+
+function linkHrefToString(href: LinkHref): string {
+  if (typeof href === "string") return href;
+  if (href == null || typeof href !== "object") return "/";
+  const o = href as {
+    pathname?: string | null;
+    query?: Record<string, string | string[] | undefined>;
+    search?: string | null;
+    hash?: string | null;
+  };
+  const pathname = o.pathname ?? "";
+  if (typeof o.search === "string" && o.search.length > 0) {
+    return `${pathname}${o.search}${o.hash ?? ""}`;
+  }
+  if (o.query && typeof o.query === "object") {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(o.query)) {
+      if (value === undefined) continue;
+      if (Array.isArray(value)) {
+        for (const item of value) params.append(key, String(item));
+      } else {
+        params.append(key, String(value));
+      }
+    }
+    const q = params.toString();
+    return `${pathname}${q ? `?${q}` : ""}${o.hash ?? ""}`;
+  }
+  return `${pathname}${o.hash ?? ""}`;
+}
+
 type QuotaGateContextValue = {
-  openQuotaGate: (href: string, kind: QuotaKind) => Promise<void>;
+  openQuotaGate: (href: LinkHref, kind: QuotaKind) => Promise<void>;
   checking: boolean;
 };
 
@@ -42,7 +73,8 @@ export function QuotaGateProvider({ children }: { children: ReactNode }) {
   const [checking, setChecking] = useState(false);
 
   const openQuotaGate = useCallback(
-    async (href: string, kind: QuotaKind) => {
+    async (hrefInput: LinkHref, kind: QuotaKind) => {
+      const href = linkHrefToString(hrefInput);
       if (!user) return;
       setChecking(true);
       try {
