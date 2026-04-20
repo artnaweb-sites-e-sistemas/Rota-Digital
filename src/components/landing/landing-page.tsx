@@ -803,7 +803,7 @@ export function LandingPage() {
                           : "bg-brand/12 text-brand shadow-none ring-1 ring-brand/30 dark:bg-zinc-950 dark:text-[#f8f0d4] dark:shadow-none dark:ring-[#e8dcc4]/90",
                       )}
                     >
-                      -20%
+                      -24%
                     </span>
                   </motion.button>
                 </div>
@@ -815,11 +815,11 @@ export function LandingPage() {
                 {
                   name: "Starter",
                   price: "0",
-                  description: "Grátis, com quotas mensais para validar o funil.",
+                  description: "Grátis, para conhecer a plataforma e validar o funil.",
                   features: [
-                    "1 diagnóstico (Rota Digital) com IA.",
-                    "10 prospecções de leads.",
-                    "1 geração de propostas",
+                    "2 diagnósticos (Rota Digital) com IA.",
+                    "30 prospecções de leads.",
+                    "2 gerações de propostas",
                     { before: "Link Público", red: "sem a sua marca" },
                   ] satisfies LandingPlanFeature[],
                   buttonText: "Começar Grátis",
@@ -827,13 +827,12 @@ export function LandingPage() {
                 },
                 {
                   name: "Pro",
-                  price: billingCycle === "monthly" ? "147" : "97",
-                  originalPrice: billingCycle === "monthly" ? "197" : "147",
-                  description: "Mais capacidade mensal para prospectação diária.",
+                  price: billingCycle === "monthly" ? "127" : "97",
+                  description: "Diagnósticos diários e prospecção consistente para sua agência crescer.",
                   features: [
-                    "10 diagnósticos (Rota Digital) com IA.",
-                    "300 prospecções de leads.",
-                    "20 gerações de propostas",
+                    "20 diagnósticos (Rota Digital) com IA.",
+                    "30 prospecções de leads.",
+                    "30 gerações de propostas",
                     { before: "Link Público", gold: "com a sua marca" },
                   ] satisfies LandingPlanFeature[],
                   buttonText: "Assinar Pro",
@@ -841,12 +840,12 @@ export function LandingPage() {
                 },
                 {
                   name: "Agency",
-                  price: billingCycle === "monthly" ? "497" : "397",
-                  description: "Volume mensal máximo para alta demanda.",
+                  price: billingCycle === "monthly" ? "347" : "267",
+                  description: "Volume máximo para agências com alta demanda de prospecção.",
                   features: [
-                    "30 diagnósticos (Rota Digital) com IA.",
-                    "1.000 prospecções de leads.",
-                    "100 gerações de propostas",
+                    "50 diagnósticos (Rota Digital) com IA.",
+                    "100 prospecções de leads.",
+                    "Propostas ilimitadas",
                     { before: "Link Público", gold: "com a sua marca" },
                   ] satisfies LandingPlanFeature[],
                   buttonText: "Falar com Consultor",
@@ -878,7 +877,7 @@ export function LandingPage() {
                       <div className="flex h-full flex-col p-8">
                         <div className="flex items-center justify-between">
                           <h4 className="text-xl font-bold">{plan.name}</h4>
-                          <span className="rounded-full bg-brand/10 px-3 py-1 text-xs font-bold text-brand">OFERTA</span>
+                          <span className="rounded-full bg-brand/10 px-3 py-1 text-xs font-bold text-brand">POPULAR</span>
                         </div>
                         <div className="mt-5 flex flex-col">
                           {plan.originalPrice && (
@@ -892,7 +891,7 @@ export function LandingPage() {
                           </div>
                           {billingCycle === "yearly" && plan.price !== "0" && (
                             <span className="mt-1 text-[10px] font-bold text-brand uppercase tracking-tight">
-                              Cerca de R$ {parseInt(plan.price) * 12},00 por ano
+                              ~3 meses grátis · R$ {parseInt(plan.price) * 12},00/ano
                             </span>
                           )}
                         </div>
@@ -963,6 +962,39 @@ export function LandingPage() {
                 </motion.div>
               ))}
             </div>
+
+            {/* --- Pacotes de Leads --- */}
+            <div className="mt-16">
+              <div className="mx-auto max-w-2xl text-center">
+                <p className="text-sm font-bold uppercase tracking-widest text-brand">Add-on</p>
+                <h3 className="mt-2 text-2xl font-extrabold tracking-tight">Precisa de mais prospecções?</h3>
+                <p className="mt-3 text-sm text-muted-foreground">
+                  Disponível para assinantes Pro e Agency. Créditos de leads extras, sem mudar de plano.
+                </p>
+              </div>
+              <div className="mt-8 grid gap-4 sm:grid-cols-3">
+                {[
+                  { leads: "50", price: "37", label: "Básico" },
+                  { leads: "100", price: "67", label: "Pro" },
+                  { leads: "200", price: "127", label: "Max" },
+                ].map((pack) => (
+                  <div
+                    key={pack.leads}
+                    className="flex items-center justify-between rounded-xl border border-border/60 bg-white px-6 py-5 shadow-sm dark:bg-zinc-950/20"
+                  >
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">{pack.label}</p>
+                      <p className="mt-0.5 text-lg font-extrabold">+{pack.leads} leads</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-2xl font-black text-foreground">R$ {pack.price}</p>
+                      <p className="text-xs text-muted-foreground">pagamento único</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
           </div>
         </section>
 
