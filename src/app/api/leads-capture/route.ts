@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuth } from "firebase-admin/auth";
+import { getFirestore } from "firebase-admin/firestore";
 
 import { getFirebaseAdminApp } from "@/lib/firebase-admin-app";
 import {
@@ -9,14 +10,23 @@ import {
 } from "@/lib/leads-admin";
 import { normalizePlaceResourceName, placesGetDetails, placesSearchText } from "@/lib/google-places";
 import { onlyDigitsPhone } from "@/lib/report-cta";
+import {
+  LEAD_CAPTURE_ADD_ON_PACKS,
+  LEAD_CAPTURE_MAX_PER_RUN,
+  LEAD_CAPTURE_MIN_PER_RUN,
+  monthStartUtcMs,
+  normalizedSubscriptionPlanKey,
+  resolveMonthlyLeadLimit,
+} from "@/lib/lead-capture-config";
 
 export const runtime = "nodejs";
 
-const MAX_CAPTURE = 50;
-const MIN_CAPTURE = 1;
+const MAX_CAPTURE = LEAD_CAPTURE_MAX_PER_RUN;
+const MIN_CAPTURE = LEAD_CAPTURE_MIN_PER_RUN;
 const DEFAULT_CAPTURE = 25;
 const MAX_PAGES_PER_QUERY = 3;
 const DETAIL_DELAY_MS = 90;
+const USER_SETTINGS_COLLECTION = "userSettings";
 
 function parseList(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
@@ -131,10 +141,39 @@ export async function POST(req: NextRequest) {
 
     const maxResults = clampInt(body.maxResults, MIN_CAPTURE, MAX_CAPTURE, DEFAULT_CAPTURE);
 
-    const [existing, blocked] = await Promise.all([
+    const db = getFirestore(adminApp);
+    const [existing, blocked, userSettingsSnap] = await Promise.all([
       listLeadsForUserAdmin(uid),
       listLeadCaptureBlocksForUserAdmin(uid),
+      db.collection(USER_SETTINGS_COLLECTION).doc(uid).get(),
     ]);
+    const userSettings = userSettingsSnap.exists ? (userSettingsSnap.data() as Record<string, unknown>) : {};
+    const normalizedPlan = normalizedSubscriptionPlanKey(userSettings.subscriptionPlan ?? userSettings.plan);
+    const isMasterPlan =
+      normalizedPlan === "master" || userSettings.planMasterUnlimited === true;
+    const monthlyLimit = resolveMonthlyLeadLimit(userSettings);
+    const periodStartMs = monthStartUtcMs(Date.now());
+    const usedThisMonth = existing.filter(
+      (lead) => lead.leadSource === "google_places" && lead.createdAt >= periodStartMs,
+    ).length;
+    const remainingThisMonth = isMasterPlan
+      ? MAX_CAPTURE
+      : Math.max(0, monthlyLimit - usedThisMonth);
+    if (!isMasterPlan && remainingThisMonth <= 0) {
+      return NextResponse.json(
+        {
+          error:
+            "Você atingiu o limite mensal de prospecções automáticas do seu plano. Para continuar hoje, adquira um pacote extra de leads.",
+          code: "LEAD_CAPTURE_LIMIT_REACHED",
+          plan: normalizedPlan,
+          monthlyLimit,
+          usedThisMonth,
+          remainingThisMonth,
+          addOnPacks: LEAD_CAPTURE_ADD_ON_PACKS,
+        },
+        { status: 429 },
+      );
+    }
     const seenPlaceIds = new Set<string>();
     const seenPhones = new Set<string>();
     const seenHosts = new Set<string>();
@@ -292,7 +331,8 @@ export async function POST(req: NextRequest) {
       return a.company.localeCompare(b.company, "pt-BR");
     });
 
-    const chosen = pool.slice(0, maxResults);
+    const allowedResults = Math.min(maxResults, remainingThisMonth);
+    const chosen = pool.slice(0, allowedResults);
 
     let created = 0;
     for (const c of chosen) {
@@ -323,6 +363,9 @@ export async function POST(req: NextRequest) {
       ok: true,
       created,
       requested: maxResults,
+      monthlyLimit,
+      usedThisMonth,
+      remainingThisMonth: Math.max(0, remainingThisMonth - created),
       eligibleUnique: pool.length,
       scannedUnique: pool.length,
       shortfall: created < maxResults,

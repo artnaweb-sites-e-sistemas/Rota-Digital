@@ -18,6 +18,8 @@ export type AdminListedUser = {
   planPriceCents?: number | null;
   /** Centavos (BRL), só preenchido no detalhe admin. Firestore: `lifetimePaidCents` ou `totalPaidCents`. */
   lifetimePaidCents?: number | null;
+  /** Centavos de add-ons por mês no formato `YYYY-MM` (quando disponível em userSettings). */
+  addOnPaidByMonthCents?: Record<string, number>;
 };
 
 export type AdminUsersListResponse = {

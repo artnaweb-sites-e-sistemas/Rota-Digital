@@ -7,12 +7,12 @@ import {
   type RefObject,
 } from "react";
 
-export const LEADS_TABLE_COLUMN_COUNT = 7;
+export const LEADS_TABLE_COLUMN_COUNT = 8;
 
-const STORAGE_KEY = "rota-digital.leads-table-column-widths-pct.v1";
+const STORAGE_KEY = "rota-digital.leads-table-column-widths-pct.v2";
 
-/** Percentuais iniciais alinhados à tabela antiga (somatório 100). */
-const DEFAULT_WIDTHS_PCT: readonly number[] = [10, 17, 18, 22, 16, 12, 5];
+/** Percentuais iniciais: coluna 0 = seleção (somatório 100). */
+const DEFAULT_WIDTHS_PCT: readonly number[] = [3, 10, 16, 17, 21, 15, 11, 7];
 
 const MIN_COL_PCT = 3;
 
@@ -20,7 +20,7 @@ function round1(n: number): number {
   return Math.round(n * 10) / 10;
 }
 
-/** Garante 7 valores, mínimos e soma 100. */
+/** Garante 8 valores, mínimos e soma 100. */
 export function normalizeLeadTableWidths(input: unknown): number[] {
   if (!Array.isArray(input) || input.length !== LEADS_TABLE_COLUMN_COUNT) {
     return [...DEFAULT_WIDTHS_PCT];

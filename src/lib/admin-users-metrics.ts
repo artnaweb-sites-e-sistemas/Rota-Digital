@@ -5,6 +5,14 @@ import type { AdminListedUser } from "@/types/admin-user-list";
 
 const USER_SETTINGS_COLLECTION = "userSettings";
 const CHUNK = 8;
+const DEFAULT_PLAN = "Pro";
+
+const NORMALIZED_PLAN_LABEL: Record<string, "Starter" | "Pro" | "Agency" | "Master"> = {
+  starter: "Starter",
+  pro: "Pro",
+  agency: "Agency",
+  master: "Master",
+};
 
 function companyNameFromSettings(data: Record<string, unknown> | undefined): string | null {
   if (!data) return null;
@@ -13,13 +21,65 @@ function companyNameFromSettings(data: Record<string, unknown> | undefined): str
 }
 
 function planFromSettings(data: Record<string, unknown> | undefined): string {
-  if (!data) return "Pro";
+  if (!data) return DEFAULT_PLAN;
   const sub =
     typeof data.subscriptionPlan === "string" ? data.subscriptionPlan.trim() : "";
-  if (sub) return sub;
+  if (sub) return normalizePlanLabel(sub);
   const p = typeof data.plan === "string" ? data.plan.trim() : "";
-  if (p) return p;
+  if (p) return normalizePlanLabel(p);
+  return DEFAULT_PLAN;
+}
+
+function normalizePlanLabel(raw: string): "Starter" | "Pro" | "Agency" | "Master" {
+  const text = raw.trim().toLowerCase();
+  if (!text) return "Pro";
+  if (text.includes("master")) return "Master";
+  if (text.includes("agency") || text.includes("enterprise")) return "Agency";
+  if (text.includes("starter") || text.includes("free") || text.includes("trial")) return "Starter";
   return "Pro";
+}
+
+function asCentsMap(v: unknown): Record<string, number> {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return {};
+  const out: Record<string, number> = {};
+  for (const [k, value] of Object.entries(v as Record<string, unknown>)) {
+    if (!/^\d{4}-\d{2}$/.test(k)) continue;
+    if (typeof value !== "number" || !Number.isFinite(value)) continue;
+    out[k] = Math.max(0, Math.round(value));
+  }
+  return out;
+}
+
+function addOnPaidByMonthFromSettings(data: Record<string, unknown> | undefined): Record<string, number> {
+  if (!data) return {};
+  const fromKnownMaps = [
+    asCentsMap(data.addOnPaidByMonthCents),
+    asCentsMap(data.addonPaidByMonthCents),
+    asCentsMap(data.leadsAddOnPaidByMonthCents),
+    asCentsMap(data.leadsAddonPaidByMonthCents),
+    asCentsMap(data.extraLeadsPaidByMonthCents),
+  ];
+  const merged: Record<string, number> = {};
+  for (const map of fromKnownMaps) {
+    for (const [key, cents] of Object.entries(map)) {
+      merged[key] = (merged[key] ?? 0) + cents;
+    }
+  }
+  return merged;
+}
+
+export function normalizedPlanKey(plan: string): "starter" | "pro" | "agency" | "master" {
+  const text = plan.trim().toLowerCase();
+  if (text.includes("master")) return "master";
+  if (text.includes("agency")) return "agency";
+  if (text.includes("starter") || text.includes("free") || text.includes("trial")) return "starter";
+  return "pro";
+}
+
+export function canonicalPlanLabelFromKey(
+  key: "starter" | "pro" | "agency" | "master",
+): "Starter" | "Pro" | "Agency" | "Master" {
+  return NORMALIZED_PLAN_LABEL[key];
 }
 
 function pickFirstCents(data: Record<string, unknown>, keys: string[]): number | null {
@@ -73,6 +133,7 @@ async function enrichOne(
   if (includeBilling && settingsData) {
     base.planPriceCents = pickFirstCents(settingsData, ["subscriptionPriceCents", "planPriceCents"]);
     base.lifetimePaidCents = pickFirstCents(settingsData, ["lifetimePaidCents", "totalPaidCents"]);
+    base.addOnPaidByMonthCents = addOnPaidByMonthFromSettings(settingsData);
   }
   return base;
 }

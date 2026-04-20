@@ -12,7 +12,20 @@ import {
   type SVGProps,
 } from "react";
 import { useSearchParams } from "next/navigation";
+import { doc, onSnapshot } from "firebase/firestore";
 import { useAuth } from "@/lib/auth-context";
+import { db } from "@/lib/firebase";
+import {
+  allowedMaxResultsPerCapture,
+  LEAD_CAPTURE_ADD_ON_PACKS,
+  LEAD_CAPTURE_FALLBACK_DEFAULT,
+  LEAD_CAPTURE_MAX_PER_RUN,
+  LEAD_CAPTURE_MIN_PER_RUN,
+  monthStartUtcMs,
+  normalizedSubscriptionPlanKey,
+  resolveMonthlyLeadLimit,
+  type LeadCaptureAddOnPack,
+} from "@/lib/lead-capture-config";
 import { Lead, LEAD_STATUSES, normalizeLeadStatus, type LeadStatus } from "@/types/lead";
 import { getLeads, createLead, updateLead } from "@/lib/leads";
 import { deleteReportsByLead, getReportsByUser } from "@/lib/reports";
@@ -20,6 +33,7 @@ import { getProposalsByUser } from "@/lib/proposals";
 import type { RotaDigitalReport } from "@/types/report";
 import type { Proposal } from "@/types/proposal";
 import { buildWhatsAppHref, maskWhatsappBRDisplay, onlyDigitsPhone } from "@/lib/report-cta";
+import { downloadLeadsCsv } from "@/lib/leads-export";
 import { useLeadTableColumnWidths } from "@/lib/leads-table-column-widths";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -66,6 +80,7 @@ import {
   ExternalLink,
   FileText,
   Globe,
+  Crown,
   Loader2,
   Mail,
   MapPin,
@@ -73,7 +88,9 @@ import {
   Phone,
   Plus,
   Compass,
+  Download,
   Search,
+  TriangleAlert,
   X,
   Users,
 } from "lucide-react";
@@ -87,6 +104,7 @@ const PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const;
 const LEADS_PAGE_SIZE_STORAGE_KEY = "leads_page_size";
 const LEADS_CAPTURE_FORM_STORAGE_KEY = "leads_capture_form_v1";
 const DEFAULT_PHONE_COUNTRY_CODE = "55";
+const LEAD_CAPTURE_SALES_EMAIL = "suporte@rotadigital.app";
 
 const ALL_STATUSES: LeadStatus[] = [...LEAD_STATUSES];
 
@@ -106,6 +124,15 @@ function leadStatusShowsOpenRouteLink(status: LeadStatus): boolean {
 const STATUS_FILTER_TODOS = "todos" as const;
 
 type StatusFilter = typeof STATUS_FILTER_TODOS | LeadStatus;
+
+type LeadCaptureLimitModalData = {
+  plan: string;
+  monthlyLimit: number;
+  usedThisMonth: number;
+  remainingThisMonth: number;
+  addOnPacks: LeadCaptureAddOnPack[];
+  reason?: "monthly_exhausted" | "quota_above_drag";
+};
 
 type PhoneCountry = {
   code: string;
@@ -911,12 +938,18 @@ function LeadsPageContent() {
   const [captureNichesDraft, setCaptureNichesDraft] = useState("");
   const [captureCities, setCaptureCities] = useState<string[]>([]);
   const [captureCitiesDraft, setCaptureCitiesDraft] = useState("");
-  const [captureMax, setCaptureMax] = useState(25);
+  const [captureMax, setCaptureMax] = useState(LEAD_CAPTURE_FALLBACK_DEFAULT);
   const [captureBusy, setCaptureBusy] = useState(false);
   const [captureProgress, setCaptureProgress] = useState(0);
   const [captureError, setCaptureError] = useState<string | null>(null);
   const [captureNoticeOpen, setCaptureNoticeOpen] = useState(false);
   const [captureNoticeMessage, setCaptureNoticeMessage] = useState("");
+  const [captureLimitModalOpen, setCaptureLimitModalOpen] = useState(false);
+  const [captureLimitModalData, setCaptureLimitModalData] = useState<LeadCaptureLimitModalData | null>(null);
+  const [userSettingsSnap, setUserSettingsSnap] = useState<Record<string, unknown>>({});
+  const [addOnCheckoutBusyId, setAddOnCheckoutBusyId] = useState<string | null>(null);
+  const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
+  const leadsTableHeaderCheckboxRef = useRef<HTMLInputElement | null>(null);
 
   // Form State
   const [name, setName] = useState("");
@@ -974,6 +1007,58 @@ function LeadsPageContent() {
     return undefined;
   }, [captureNiches, captureCities]);
 
+  const monthStartMs = useMemo(() => monthStartUtcMs(Date.now()), []);
+
+  const isMasterPlan = useMemo(() => {
+    const k = normalizedSubscriptionPlanKey(userSettingsSnap.subscriptionPlan ?? userSettingsSnap.plan);
+    return k === "master" || userSettingsSnap.planMasterUnlimited === true;
+  }, [userSettingsSnap]);
+
+  const monthlyLeadLimit = useMemo(() => resolveMonthlyLeadLimit(userSettingsSnap), [userSettingsSnap]);
+
+  const capturePlanKey = useMemo(
+    () => normalizedSubscriptionPlanKey(userSettingsSnap.subscriptionPlan ?? userSettingsSnap.plan),
+    [userSettingsSnap],
+  );
+
+  const googlePlacesUsedThisMonth = useMemo(() => {
+    let c = 0;
+    for (const l of leads) {
+      if (l.leadSource !== "google_places") continue;
+      if (l.createdAt < monthStartMs) continue;
+      c += 1;
+    }
+    return c;
+  }, [leads, monthStartMs]);
+
+  const remainingThisMonth = useMemo(() => {
+    if (isMasterPlan) return LEAD_CAPTURE_MAX_PER_RUN;
+    return Math.max(0, monthlyLeadLimit - googlePlacesUsedThisMonth);
+  }, [isMasterPlan, monthlyLeadLimit, googlePlacesUsedThisMonth]);
+
+  const allowedSliderMax = useMemo(
+    () => allowedMaxResultsPerCapture({ isMasterPlan, remainingThisMonth }),
+    [isMasterPlan, remainingThisMonth],
+  );
+
+  useEffect(() => {
+    if (!user) {
+      setUserSettingsSnap({});
+      return;
+    }
+    const ref = doc(db, "userSettings", user.uid);
+    const unsub = onSnapshot(ref, (snap) => {
+      setUserSettingsSnap(snap.exists() ? (snap.data() as Record<string, unknown>) : {});
+    });
+    return () => unsub();
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    if (allowedSliderMax <= 0) return;
+    setCaptureMax((prev) => Math.min(Math.max(LEAD_CAPTURE_MIN_PER_RUN, prev), allowedSliderMax));
+  }, [user, allowedSliderMax]);
+
   useEffect(() => {
     fetchLeads();
   }, [fetchLeads]);
@@ -1015,7 +1100,9 @@ function LeadsPageContent() {
         setCaptureCitiesDraft(parsed.citiesDraft);
       }
       if (typeof parsed.max === "number" && Number.isFinite(parsed.max)) {
-        setCaptureMax(Math.min(50, Math.max(1, Math.floor(parsed.max))));
+        setCaptureMax(
+          Math.min(LEAD_CAPTURE_MAX_PER_RUN, Math.max(LEAD_CAPTURE_MIN_PER_RUN, Math.floor(parsed.max))),
+        );
       }
     } catch {
       // Ignora dados inválidos no storage.
@@ -1090,6 +1177,51 @@ function LeadsPageContent() {
   }, [pageCount]);
 
   const hasActiveFilters = Boolean(search.trim()) || statusFilter !== STATUS_FILTER_TODOS;
+
+  const selectedIdSet = useMemo(() => new Set(selectedLeadIds), [selectedLeadIds]);
+
+  const filteredIdSet = useMemo(() => new Set(filteredLeads.map((l) => l.id)), [filteredLeads]);
+
+  useEffect(() => {
+    setSelectedLeadIds((prev) => prev.filter((id) => filteredIdSet.has(id)));
+  }, [filteredIdSet]);
+
+  const allPageSelected =
+    paginatedLeads.length > 0 && paginatedLeads.every((l) => selectedIdSet.has(l.id));
+  const somePageSelected =
+    paginatedLeads.some((l) => selectedIdSet.has(l.id)) && !allPageSelected;
+
+  useEffect(() => {
+    const el = leadsTableHeaderCheckboxRef.current;
+    if (el) el.indeterminate = somePageSelected;
+  }, [somePageSelected, allPageSelected]);
+
+  const toggleLeadSelected = useCallback((id: string) => {
+    setSelectedLeadIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }, []);
+
+  const toggleSelectPage = useCallback(() => {
+    const ids = paginatedLeads.map((l) => l.id);
+    setSelectedLeadIds((prev) => {
+      const next = new Set(prev);
+      const every = ids.length > 0 && ids.every((id) => next.has(id));
+      if (every) ids.forEach((id) => next.delete(id));
+      else ids.forEach((id) => next.add(id));
+      return Array.from(next);
+    });
+  }, [paginatedLeads]);
+
+  const selectAllFiltered = useCallback(() => {
+    setSelectedLeadIds(filteredLeads.map((l) => l.id));
+  }, [filteredLeads]);
+
+  const clearLeadSelection = useCallback(() => setSelectedLeadIds([]), []);
+
+  const exportSelectedLeads = useCallback(() => {
+    const selected = filteredLeads.filter((l) => selectedIdSet.has(l.id));
+    if (selected.length === 0) return;
+    downloadLeadsCsv(selected);
+  }, [filteredLeads, selectedIdSet]);
 
   const openForm = (lead?: Lead) => {
     if (lead) {
@@ -1243,7 +1375,59 @@ function LeadsPageContent() {
 
   const openCapture = () => {
     setCaptureError(null);
+    if (!user) return;
+    if (!isMasterPlan && remainingThisMonth <= 0) {
+      setCaptureLimitModalData({
+        plan: capturePlanKey,
+        monthlyLimit: monthlyLeadLimit,
+        usedThisMonth: googlePlacesUsedThisMonth,
+        remainingThisMonth: 0,
+        addOnPacks: [...LEAD_CAPTURE_ADD_ON_PACKS],
+        reason: "monthly_exhausted",
+      });
+      setCaptureLimitModalOpen(true);
+      return;
+    }
+    const allowed = allowedMaxResultsPerCapture({ isMasterPlan, remainingThisMonth });
+    setCaptureMax((prev) => Math.min(Math.max(LEAD_CAPTURE_MIN_PER_RUN, prev), allowed));
     setCaptureOpen(true);
+  };
+
+  const startLeadAddOnCheckout = async (packId: string) => {
+    if (!user) return;
+    setAddOnCheckoutBusyId(packId);
+    try {
+      const idToken = await user.getIdToken();
+      const res = await fetch("/api/stripe/lead-add-on/checkout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ packId }),
+      });
+      const payload = (await res.json().catch(() => ({}))) as {
+        url?: string;
+        setupRequired?: boolean;
+        message?: string;
+      };
+      if (res.ok && typeof payload.url === "string" && payload.url.startsWith("http")) {
+        window.location.href = payload.url;
+        return;
+      }
+      if (payload.setupRequired || res.status === 503 || res.status === 501) {
+        window.location.href = `mailto:${LEAD_CAPTURE_SALES_EMAIL}?subject=${encodeURIComponent(
+          `Pacote extra de leads (${packId})`,
+        )}&body=${encodeURIComponent(
+          payload.message
+            ? `${payload.message}\n\nQuero fechar o pacote ${packId} quando o Stripe estiver ativo.`
+            : "Quero comprar um pacote extra de leads. Avise-me quando o pagamento online estiver disponível.",
+        )}`;
+        return;
+      }
+    } finally {
+      setAddOnCheckoutBusyId(null);
+    }
   };
 
   const runCapture = async () => {
@@ -1258,7 +1442,11 @@ function LeadsPageContent() {
       setCaptureError("Informe ao menos um nicho e uma cidade (linhas ou separados por vírgula).");
       return;
     }
-    const maxResults = Math.min(50, Math.max(1, Math.floor(Number(captureMax)) || 25));
+    const allowed = allowedMaxResultsPerCapture({ isMasterPlan, remainingThisMonth });
+    const maxResults = Math.min(
+      allowed,
+      Math.max(LEAD_CAPTURE_MIN_PER_RUN, Math.floor(Number(captureMax)) || LEAD_CAPTURE_MIN_PER_RUN),
+    );
     setCaptureError(null);
     setCaptureBusy(true);
     setCaptureProgress(4);
@@ -1278,6 +1466,12 @@ function LeadsPageContent() {
       });
       const payload = (await res.json().catch(() => ({}))) as {
         error?: string;
+        code?: string;
+        plan?: string;
+        monthlyLimit?: number;
+        usedThisMonth?: number;
+        remainingThisMonth?: number;
+        addOnPacks?: LeadCaptureAddOnPack[];
         created?: number;
         requested?: number;
         eligibleUnique?: number;
@@ -1291,6 +1485,19 @@ function LeadsPageContent() {
         };
       };
       if (!res.ok) {
+        if (payload.code === "LEAD_CAPTURE_LIMIT_REACHED") {
+          setCaptureOpen(false);
+          setCaptureLimitModalData({
+            plan: payload.plan || "pro",
+            monthlyLimit: typeof payload.monthlyLimit === "number" ? payload.monthlyLimit : 0,
+            usedThisMonth: typeof payload.usedThisMonth === "number" ? payload.usedThisMonth : 0,
+            remainingThisMonth: typeof payload.remainingThisMonth === "number" ? payload.remainingThisMonth : 0,
+            addOnPacks: Array.isArray(payload.addOnPacks) ? payload.addOnPacks : [],
+            reason: "monthly_exhausted",
+          });
+          setCaptureLimitModalOpen(true);
+          return;
+        }
         setCaptureError(payload.error || "Não foi possível concluir a captura.");
         return;
       }
@@ -1761,7 +1968,7 @@ function LeadsPageContent() {
                     Raio da captação
                   </Label>
                   <p className="text-[12px] leading-relaxed text-zinc-300 sm:text-[13px]">
-                    Quanto maior o valor, mais empresas tentamos trazer.
+                    Quantidade de leads por busca. Respeita a cota do mês (até {LEAD_CAPTURE_MAX_PER_RUN} por execução).
                   </p>
                 </div>
                 <output
@@ -1771,6 +1978,16 @@ function LeadsPageContent() {
                   {captureMax} leads
                 </output>
               </div>
+              <p className="text-[11px] leading-relaxed text-zinc-400">
+                {isMasterPlan ? (
+                  <>Master: até {LEAD_CAPTURE_MAX_PER_RUN} por execução · cota mensal ilimitada.</>
+                ) : (
+                  <>
+                    Mês: {googlePlacesUsedThisMonth}/{monthlyLeadLimit} · máx. agora:{" "}
+                    <span className="font-semibold text-zinc-200">{allowedSliderMax}</span>
+                  </>
+                )}
+              </p>
               <div className="relative pt-1">
                 <div
                   className="pointer-events-none absolute left-0 right-0 top-[calc(50%+2px)] h-2 -translate-y-1/2 rounded-full bg-white/18"
@@ -1779,13 +1996,28 @@ function LeadsPageContent() {
                 <input
                   id="capture-radius"
                   type="range"
-                  min={1}
-                  max={50}
+                  min={LEAD_CAPTURE_MIN_PER_RUN}
+                  max={LEAD_CAPTURE_MAX_PER_RUN}
                   step={1}
                   value={captureMax}
                   onChange={(e) => {
-                    const v = Number(e.target.value);
-                    setCaptureMax(Number.isFinite(v) ? v : 25);
+                    const raw = Number(e.target.value);
+                    const v = Number.isFinite(raw) ? raw : LEAD_CAPTURE_FALLBACK_DEFAULT;
+                    const allowed = allowedMaxResultsPerCapture({ isMasterPlan, remainingThisMonth });
+                    if (!isMasterPlan && v > allowed) {
+                      setCaptureLimitModalData({
+                        plan: capturePlanKey,
+                        monthlyLimit: monthlyLeadLimit,
+                        usedThisMonth: googlePlacesUsedThisMonth,
+                        remainingThisMonth,
+                        addOnPacks: [...LEAD_CAPTURE_ADD_ON_PACKS],
+                        reason: "quota_above_drag",
+                      });
+                      setCaptureLimitModalOpen(true);
+                      setCaptureMax(allowed);
+                      return;
+                    }
+                    setCaptureMax(v);
                   }}
                   className={cn(
                     "relative z-[1] h-2 w-full cursor-pointer appearance-none bg-transparent",
@@ -1794,15 +2026,15 @@ function LeadsPageContent() {
                     "[&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-full [&::-moz-range-track]:bg-transparent",
                     "[&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border [&::-moz-range-thumb]:border-white/25 [&::-moz-range-thumb]:bg-gradient-to-br [&::-moz-range-thumb]:from-[#8a7a4a] [&::-moz-range-thumb]:to-brand [&::-moz-range-thumb]:shadow-[0_2px_10px_rgba(0,0,0,0.35)]",
                   )}
-                  aria-valuemin={1}
-                  aria-valuemax={50}
+                  aria-valuemin={LEAD_CAPTURE_MIN_PER_RUN}
+                  aria-valuemax={LEAD_CAPTURE_MAX_PER_RUN}
                   aria-valuenow={captureMax}
                   aria-valuetext={`${captureMax} leads`}
                 />
               </div>
               <div className="flex justify-between text-xs font-semibold tabular-nums tracking-wide text-zinc-400">
-                <span>1</span>
-                <span>50</span>
+                <span>{LEAD_CAPTURE_MIN_PER_RUN}</span>
+                <span>{LEAD_CAPTURE_MAX_PER_RUN}</span>
               </div>
             </div>
 
@@ -1869,8 +2101,114 @@ function LeadsPageContent() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={captureLimitModalOpen} onOpenChange={setCaptureLimitModalOpen}>
+        <DialogContent
+          showCloseButton
+          className={cn(
+            "w-full max-w-[calc(100%-1.5rem)] gap-0 overflow-hidden border-white/10 bg-zinc-950 p-0 text-zinc-100 shadow-2xl sm:max-w-2xl",
+            "rounded-2xl ring-1 ring-white/10",
+          )}
+        >
+          <div className="border-b border-white/[0.06] bg-white/[0.015] px-6 py-6 sm:px-8 sm:py-7">
+            <DialogHeader className="space-y-3 text-left">
+              <div className="inline-flex w-fit items-center gap-2 rounded-full border border-amber-400/35 bg-amber-500/12 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-200">
+                <TriangleAlert className="size-3.5" aria-hidden />
+                {captureLimitModalData?.reason === "quota_above_drag"
+                  ? "Limite do plano"
+                  : "Cota mensal atingida"}
+              </div>
+              <DialogTitle className="font-heading text-xl font-semibold tracking-tight text-white">
+                {captureLimitModalData?.reason === "quota_above_drag"
+                  ? "Para captar mais leads, amplie a sua cota"
+                  : "Você atingiu o limite mensal de prospecções"}
+              </DialogTitle>
+              <DialogDescription className="text-sm leading-relaxed text-zinc-200">
+                {captureLimitModalData?.reason === "quota_above_drag" ? (
+                  <>
+                    O valor que tentou pedir ultrapassa a captação incluída no seu plano neste ciclo. Para aumentar o
+                    volume de prospecção, adquira um pacote extra; após o pagamento (em breve via Stripe), o limite será
+                    atualizado automaticamente na sua conta.
+                  </>
+                ) : (
+                  <>
+                    Seu plano atual chegou ao teto de captação automática neste mês. Para continuar a prospecção agora,
+                    escolha um pacote extra de leads.
+                  </>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="space-y-5 px-6 py-6 sm:px-8 sm:py-7">
+            <div className="grid gap-3 rounded-xl border border-white/12 bg-white/[0.04] p-4 sm:grid-cols-3">
+              <div className="rounded-lg border border-white/10 bg-black/20 px-3.5 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">Plano</p>
+                <p className="mt-1 inline-flex items-center gap-1.5 text-sm font-semibold text-zinc-100">
+                  <Crown className="size-3.5 text-brand" aria-hidden />
+                  {captureLimitModalData?.plan?.toUpperCase() || "PRO"}
+                </p>
+              </div>
+              <div className="rounded-lg border border-white/10 bg-black/20 px-3.5 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">Utilizado no mês</p>
+                <p className="mt-1 text-sm font-semibold text-zinc-100">
+                  {captureLimitModalData?.usedThisMonth ?? 0} leads
+                </p>
+              </div>
+              <div className="rounded-lg border border-white/10 bg-black/20 px-3.5 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">Limite do plano</p>
+                <p className="mt-1 text-sm font-semibold text-zinc-100">
+                  {captureLimitModalData?.monthlyLimit ?? 0} leads/mês
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Pacotes extras disponíveis</p>
+              <div className="grid gap-3 sm:grid-cols-3">
+                {(captureLimitModalData?.addOnPacks ?? []).map((pack) => (
+                  <div
+                    key={pack.id}
+                    className="flex flex-col rounded-xl border border-white/12 bg-white/[0.04] p-4 transition-colors hover:border-brand/40 hover:bg-white/[0.06]"
+                  >
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">{pack.label}</p>
+                    <p className="mt-1 text-lg font-bold text-zinc-50">+{pack.leads} leads</p>
+                    <p className="mt-2 text-xl font-black text-brand">R$ {pack.price}</p>
+                    <p className="text-[11px] text-zinc-400">pagamento único</p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="mt-3 w-full border-white/15 text-zinc-100 hover:bg-white/10"
+                      disabled={addOnCheckoutBusyId === pack.id}
+                      onClick={() => void startLeadAddOnCheckout(pack.id)}
+                    >
+                      {addOnCheckoutBusyId === pack.id ? (
+                        <Loader2 className="size-4 animate-spin shrink-0" aria-hidden />
+                      ) : null}
+                      {addOnCheckoutBusyId === pack.id ? "A abrir…" : "Comprar (checkout)"}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col-reverse gap-3 border-t border-white/[0.06] bg-white/[0.02] px-6 py-4 sm:flex-row sm:items-center sm:justify-end sm:gap-3 sm:px-8 sm:py-5">
+            <Button type="button" variant="ghost" onClick={() => setCaptureLimitModalOpen(false)}>
+              Agora não
+            </Button>
+            <a
+              href={`mailto:${LEAD_CAPTURE_SALES_EMAIL}?subject=Quero%20comprar%20pacote%20extra%20de%20leads`}
+              className={cn(buttonVariants({ variant: "cta", size: "lg" }), "gap-2")}
+            >
+              Falar com comercial
+            </a>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Card className="overflow-hidden rounded-2xl border border-border bg-card shadow-xl dark:border-white/5 dark:bg-white/[0.02]">
-        <div className="border-b border-border px-4 py-4 dark:border-white/5 sm:px-6">
+        <div className="border-b border-border px-4 pb-2.5 pt-4 dark:border-white/5 sm:px-6">
           <div className="flex flex-col gap-2.5">
             <div className="flex flex-col items-stretch gap-2.5 sm:flex-row sm:items-center sm:gap-3">
               <div className="relative min-w-0 flex-1">
@@ -1942,35 +2280,74 @@ function LeadsPageContent() {
                   ))}
                 </SelectContent>
               </Select>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-10 shrink-0 gap-2 border-border bg-background dark:border-white/10 dark:bg-white/[0.03] dark:text-zinc-200"
+                disabled={selectedLeadIds.length === 0 || filteredLeads.length === 0}
+                onClick={() => exportSelectedLeads()}
+                title="Exportar selecionados como CSV (abre no Excel ou importe no Google Sheets)"
+              >
+                <Download className="size-4 shrink-0" aria-hidden />
+                Exportar
+                {selectedLeadIds.length > 0 ? (
+                  <span className="tabular-nums text-muted-foreground">({selectedLeadIds.length})</span>
+                ) : null}
+              </Button>
             </div>
             {leads.length > 0 ? (
-              <p className="text-[11px] leading-snug text-muted-foreground sm:text-xs">
-                {hasActiveFilters ? (
-                  <>
-                    <span className="text-foreground/80">
-                      {filteredLeads.length} de {leads.length}
-                    </span>{" "}
-                    {leads.length === 1 ? "lead encontrado" : "leads encontrados"}
-                    {filteredLeads.length > 0 && pageCount > 1 ? (
-                      <>
-                        {" "}
-                        · página {safePage} de {pageCount}
-                      </>
+              <div className="mt-7 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[11px] text-muted-foreground sm:mt-8">
+                {filteredLeads.length > 0 ? (
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <button
+                      type="button"
+                      onClick={() => selectAllFiltered()}
+                      className="font-semibold text-brand hover:underline dark:text-brand"
+                    >
+                      Selecionar todos ({filteredLeads.length})
+                    </button>
+                    {selectedLeadIds.length > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => clearLeadSelection()}
+                        className="font-medium text-foreground/70 hover:text-foreground"
+                      >
+                        Limpar seleção
+                      </button>
                     ) : null}
-                  </>
+                  </div>
                 ) : (
-                  <>
-                    <span className="text-foreground/80">{leads.length}</span>{" "}
-                    {leads.length === 1 ? "lead no total" : "leads no total"}
-                    {filteredLeads.length > 0 && pageCount > 1 ? (
-                      <>
-                        {" "}
-                        · página {safePage} de {pageCount}
-                      </>
-                    ) : null}
-                  </>
+                  <span />
                 )}
-              </p>
+                <p className="leading-snug text-right sm:text-xs">
+                  {hasActiveFilters ? (
+                    <>
+                      <span className="text-foreground/80">
+                        {filteredLeads.length} de {leads.length}
+                      </span>{" "}
+                      {leads.length === 1 ? "lead encontrado" : "leads encontrados"}
+                      {filteredLeads.length > 0 && pageCount > 1 ? (
+                        <>
+                          {" "}
+                          · página {safePage} de {pageCount}
+                        </>
+                      ) : null}
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-foreground/80">{leads.length}</span>{" "}
+                      {leads.length === 1 ? "lead no total" : "leads no total"}
+                      {filteredLeads.length > 0 && pageCount > 1 ? (
+                        <>
+                          {" "}
+                          · página {safePage} de {pageCount}
+                        </>
+                      ) : null}
+                    </>
+                  )}
+                </p>
+              </div>
             ) : null}
           </div>
         </div>
@@ -1987,45 +2364,60 @@ function LeadsPageContent() {
             </colgroup>
             <TableHeader>
               <TableRow className="border-border bg-muted/40 hover:bg-transparent dark:border-white/5 dark:bg-white/[0.03]">
-                <TableHead className="relative h-auto py-3 pl-6 pr-3 align-middle text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  Followup
+                <TableHead className="relative h-auto w-10 min-w-0 py-3 pl-6 pr-1 align-middle">
+                  <input
+                    ref={leadsTableHeaderCheckboxRef}
+                    type="checkbox"
+                    checked={allPageSelected}
+                    onChange={() => toggleSelectPage()}
+                    disabled={paginatedLeads.length === 0}
+                    className="size-4 cursor-pointer rounded border-border accent-brand"
+                    aria-label="Selecionar todos os leads desta página"
+                  />
                   <LeadTableColumnResizeHandle
                     leftColumnIndex={0}
                     onResizerMouseDown={onLeadTableColResizeMouseDown}
                   />
                 </TableHead>
                 <TableHead className="relative h-auto px-3 py-3 align-middle text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  Nome
+                  Followup
                   <LeadTableColumnResizeHandle
                     leftColumnIndex={1}
                     onResizerMouseDown={onLeadTableColResizeMouseDown}
                   />
                 </TableHead>
                 <TableHead className="relative h-auto px-3 py-3 align-middle text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  Empresa
+                  Nome
                   <LeadTableColumnResizeHandle
                     leftColumnIndex={2}
                     onResizerMouseDown={onLeadTableColResizeMouseDown}
                   />
                 </TableHead>
                 <TableHead className="relative h-auto px-3 py-3 align-middle text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  E-mail
+                  Empresa
                   <LeadTableColumnResizeHandle
                     leftColumnIndex={3}
                     onResizerMouseDown={onLeadTableColResizeMouseDown}
                   />
                 </TableHead>
                 <TableHead className="relative h-auto px-3 py-3 align-middle text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  Telefone/Whatsapp
+                  E-mail
                   <LeadTableColumnResizeHandle
                     leftColumnIndex={4}
                     onResizerMouseDown={onLeadTableColResizeMouseDown}
                   />
                 </TableHead>
                 <TableHead className="relative h-auto px-3 py-3 align-middle text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  Status
+                  Telefone/Whatsapp
                   <LeadTableColumnResizeHandle
                     leftColumnIndex={5}
+                    onResizerMouseDown={onLeadTableColResizeMouseDown}
+                  />
+                </TableHead>
+                <TableHead className="relative h-auto px-3 py-3 align-middle text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  Status
+                  <LeadTableColumnResizeHandle
+                    leftColumnIndex={6}
                     onResizerMouseDown={onLeadTableColResizeMouseDown}
                   />
                 </TableHead>
@@ -2035,7 +2427,7 @@ function LeadsPageContent() {
             <TableBody>
               {leads.length === 0 ? (
                 <TableRow className="border-b-0 hover:bg-transparent">
-                  <TableCell colSpan={7} className="text-center py-24">
+                  <TableCell colSpan={8} className="text-center py-24">
                     <div className="flex flex-col items-center gap-3">
                       <Users className="size-12 text-muted-foreground/50" />
                       <p className="font-medium text-muted-foreground">Nenhum lead encontrado.</p>
@@ -2044,7 +2436,7 @@ function LeadsPageContent() {
                 </TableRow>
               ) : filteredLeads.length === 0 ? (
                 <TableRow className="border-b-0 hover:bg-transparent">
-                  <TableCell colSpan={7} className="text-center py-16">
+                  <TableCell colSpan={8} className="text-center py-16">
                     <p className="font-medium text-muted-foreground">
                       Nenhum lead corresponde à busca ou ao status selecionado.
                     </p>
@@ -2073,7 +2465,20 @@ function LeadsPageContent() {
                     key={lead.id}
                     className="border-border transition-colors hover:bg-muted/50 dark:border-white/5 dark:hover:bg-white/[0.06] group"
                   >
-                    <TableCell className="py-4 pl-6 pr-3 align-middle">
+                    <TableCell
+                      className="w-10 min-w-0 py-4 pl-6 pr-1 align-middle"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedIdSet.has(lead.id)}
+                        onChange={() => toggleLeadSelected(lead.id)}
+                        className="size-4 cursor-pointer rounded border-border accent-brand"
+                        aria-label={`Selecionar lead ${lead.name || lead.company}`}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </TableCell>
+                    <TableCell className="py-4 pl-2 pr-3 align-middle">
                       <LeadFollowupCell lead={lead} />
                     </TableCell>
                     <TableCell className="px-3 py-4 align-middle">

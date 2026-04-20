@@ -5,13 +5,7 @@ import { cn } from "@/lib/utils"
 
 function Input({ className, type, ...props }: React.ComponentProps<"input">) {
   return (
-    <div
-      className={cn(
-        "w-full min-w-0 transition-transform duration-200 ease-out",
-        "focus-within:-translate-y-1",
-        "has-[[data-slot=input]:disabled]:translate-y-0",
-      )}
-    >
+    <div className="w-full min-w-0">
       <InputPrimitive
         type={type}
         data-slot="input"

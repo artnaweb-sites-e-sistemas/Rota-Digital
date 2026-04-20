@@ -15,13 +15,20 @@ import {
   LogOut,
   SlidersHorizontal,
   Building2,
+  Sparkles,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { isGeneralAdminEmail } from "@/lib/general-admin";
-import { getUserCompanyAboutSettings } from "@/lib/user-settings";
+import { doc, onSnapshot } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
+import { parseUserSettingsDocForDashboard } from "@/lib/user-settings";
+import {
+  planBadgeVisualClasses,
+  sidebarPlanBadgeLabel,
+  type SidebarBillingPlan,
+} from "@/lib/billing-plan-label";
 import { useRouter, usePathname } from "next/navigation";
 import { signOut } from "firebase/auth";
-import { auth } from "@/lib/firebase";
 import type { UserCompanyAboutSettings } from "@/types/user-settings";
 import { cn } from "@/lib/utils";
 
@@ -48,6 +55,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const usuariosSection = pathname.startsWith("/dashboard/usuarios");
   const [mainCollapsed, setMainCollapsed] = useState(false);
   const [companyAbout, setCompanyAbout] = useState<UserCompanyAboutSettings | null>(null);
+  const [sidebarPlan, setSidebarPlan] = useState<SidebarBillingPlan>("Pro");
 
   useEffect(() => {
     try {
@@ -60,19 +68,34 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!user) {
       setCompanyAbout(null);
+      setSidebarPlan("Pro");
       return;
     }
     let cancelled = false;
-    void (async () => {
-      try {
-        const data = await getUserCompanyAboutSettings(user.uid);
-        if (!cancelled) setCompanyAbout(data);
-      } catch {
-        if (!cancelled) setCompanyAbout(null);
-      }
-    })();
+    const settingsRef = doc(db, "userSettings", user.uid);
+    const unsub = onSnapshot(
+      settingsRef,
+      (snap) => {
+        if (cancelled) return;
+        if (!snap.exists()) {
+          setCompanyAbout(null);
+          setSidebarPlan("Pro");
+          return;
+        }
+        const parsed = parseUserSettingsDocForDashboard(snap.data() as Record<string, unknown>);
+        setCompanyAbout(parsed.companyAbout);
+        setSidebarPlan(parsed.plan);
+      },
+      () => {
+        if (!cancelled) {
+          setCompanyAbout(null);
+          setSidebarPlan("Pro");
+        }
+      },
+    );
     return () => {
       cancelled = true;
+      unsub();
     };
   }, [user]);
 
@@ -292,8 +315,20 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                       </p>
                     ) : null}
                   </div>
-                  <span className="inline-flex w-fit items-center rounded-full border border-brand/30 bg-brand/[0.1] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-brand dark:border-brand/40 dark:bg-brand/15 dark:text-brand">
-                    Plano Pro
+                  <span
+                    className={cn(
+                      "inline-flex w-fit items-center rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider",
+                      planBadgeVisualClasses(sidebarPlan),
+                    )}
+                  >
+                    {sidebarPlan === "Master" ? (
+                      <span className="inline-flex items-center gap-1">
+                        <Sparkles className="size-3 opacity-90" aria-hidden />
+                        {sidebarPlanBadgeLabel(sidebarPlan)}
+                      </span>
+                    ) : (
+                      sidebarPlanBadgeLabel(sidebarPlan)
+                    )}
                   </span>
                 </div>
               </div>

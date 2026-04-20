@@ -42,10 +42,10 @@ function SelectTrigger({
       data-size={size}
       className={cn(
         "flex w-fit min-w-0 items-center justify-between gap-2 rounded-md border border-input bg-background text-sm text-foreground shadow-sm outline-none select-none",
-        "transition-[transform,box-shadow,border-color,background-color,color] duration-200 ease-out",
-        "hover:-translate-y-1 hover:border-brand/35 hover:bg-brand/[0.04] hover:shadow-md dark:hover:border-brand/30 dark:hover:bg-brand/[0.08] dark:hover:shadow-lg",
-        "focus:-translate-y-1 focus:border-border focus:shadow-md focus:ring-0 dark:focus:shadow-lg",
-        "disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none disabled:translate-y-0",
+        "transition-[box-shadow,border-color,background-color,color] duration-200 ease-out",
+        "hover:border-brand/35 hover:bg-brand/[0.04] hover:shadow-md dark:hover:border-brand/30 dark:hover:bg-brand/[0.08] dark:hover:shadow-lg",
+        "focus:border-border focus:shadow-md focus:ring-0 dark:focus:shadow-lg",
+        "disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none",
         "aria-invalid:border-destructive/55 aria-invalid:ring-0 aria-invalid:shadow-md dark:aria-invalid:border-destructive/55 dark:aria-invalid:shadow-lg",
         "data-placeholder:text-muted-foreground",
         "dark:border-white/10 dark:bg-white/[0.05] dark:text-zinc-100 dark:data-placeholder:text-zinc-500",

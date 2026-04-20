@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Check, Copy, Link2, Loader2, RefreshCw } from "lucide-react";
+import { ArrowLeft, Check, Copy, Link2, Loader2, RefreshCw, Sparkles } from "lucide-react";
 
 import { PlatformVolumeCharts } from "@/components/admin/platform-volume-charts";
 import {
@@ -12,6 +12,7 @@ import {
   type PlatformPeriodYear,
 } from "@/components/admin/platform-period-selector";
 import { useAuth } from "@/lib/auth-context";
+import { isGeneralAdminEmail } from "@/lib/general-admin";
 import type { AdminListedUser } from "@/types/admin-user-list";
 import type { PlatformSeriesResponse } from "@/types/platform-series";
 import type { PlatformStats } from "@/types/platform-stats";
@@ -26,6 +27,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -33,6 +35,7 @@ import {
   PLATFORM_CHART_COLOR_PROPOSALS,
   PLATFORM_CHART_COLOR_REPORTS,
 } from "@/lib/platform-chart-colors";
+import { planBadgeVisualClasses } from "@/lib/billing-plan-label";
 import { cn } from "@/lib/utils";
 
 function formatDatePt(iso: string | null): string {
@@ -47,9 +50,68 @@ function formatDatePt(iso: string | null): string {
   }
 }
 
+function splitDateTimePt(value: string): { date: string; time: string | null } {
+  if (!value || value === "—") return { date: "—", time: null };
+  const [date, time] = value.split(", ");
+  if (!date) return { date: value, time: null };
+  return { date, time: time ?? null };
+}
+
 function formatBrlFromCents(cents: number | null | undefined): string {
   if (cents == null || !Number.isFinite(cents)) return "—";
   return (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+type BillingPlan = "Starter" | "Pro" | "Agency" | "Master";
+
+const LEADS_MONTHLY_LIMIT_BY_PLAN: Record<BillingPlan, number | null> = {
+  Starter: 30,
+  Pro: 30,
+  Agency: 100,
+  Master: null,
+};
+
+const REPORTS_MONTHLY_LIMIT_BY_PLAN: Record<BillingPlan, number | null> = {
+  Starter: 2,
+  Pro: 20,
+  Agency: 50,
+  Master: null,
+};
+
+const PROPOSALS_MONTHLY_LIMIT_BY_PLAN: Record<BillingPlan, number | null> = {
+  Starter: 2,
+  Pro: 30,
+  Agency: null,
+  Master: null,
+};
+
+const PLAN_MONTHLY_PRICE_CENTS_BY_PLAN: Record<BillingPlan, number> = {
+  Starter: 0,
+  Pro: 12_700,
+  Agency: 34_700,
+  Master: 0,
+};
+
+function normalizedPlanLabel(raw: string | null | undefined): BillingPlan {
+  const text = String(raw ?? "")
+    .trim()
+    .toLowerCase();
+  if (text.includes("master")) return "Master";
+  if (text.includes("agency") || text.includes("enterprise")) return "Agency";
+  if (text.includes("starter") || text.includes("free") || text.includes("trial")) return "Starter";
+  return "Pro";
+}
+
+function sumUsageInSeries(series: PlatformSeriesResponse | null): { leads: number; reports: number; proposals: number } {
+  if (!series?.days?.length) return { leads: 0, reports: 0, proposals: 0 };
+  return series.days.reduce(
+    (acc, day) => ({
+      leads: acc.leads + (Number.isFinite(day.leads) ? day.leads : 0),
+      reports: acc.reports + (Number.isFinite(day.reports) ? day.reports : 0),
+      proposals: acc.proposals + (Number.isFinite(day.proposals) ? day.proposals : 0),
+    }),
+    { leads: 0, reports: 0, proposals: 0 },
+  );
 }
 
 export default function UsuarioAdminDetailPage() {
@@ -63,17 +125,27 @@ export default function UsuarioAdminDetailPage() {
   const [loading, setLoading] = useState(true);
   const [toggleBusy, setToggleBusy] = useState(false);
   const [toggleDialogOpen, setToggleDialogOpen] = useState(false);
+  const [planDialogOpen, setPlanDialogOpen] = useState(false);
+  const [planDraft, setPlanDraft] = useState<BillingPlan>("Pro");
+  const [planBusy, setPlanBusy] = useState(false);
+  const [planError, setPlanError] = useState<string | null>(null);
   const [resetOpen, setResetOpen] = useState(false);
   const [resetBusy, setResetBusy] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
   const [resetLink, setResetLink] = useState<string | null>(null);
   const [copyDone, setCopyDone] = useState(false);
+  const [uidCopied, setUidCopied] = useState(false);
 
   const [periodYear, setPeriodYear] = useState<PlatformPeriodYear>(() => new Date().getFullYear());
   const [periodMonth, setPeriodMonth] = useState<PlatformPeriodMonth>(() => new Date().getMonth() + 1);
   const [platformSeries, setPlatformSeries] = useState<PlatformSeriesResponse | null>(null);
   const [chartsLoading, setChartsLoading] = useState(false);
   const [seriesLoadError, setSeriesLoadError] = useState<string | null>(null);
+  const createdAtParts = useMemo(() => splitDateTimePt(formatDatePt(detail?.createdAt ?? null)), [detail?.createdAt]);
+  const lastSignInParts = useMemo(
+    () => splitDateTimePt(formatDatePt(detail?.lastSignInAt ?? null)),
+    [detail?.lastSignInAt],
+  );
 
   const seriesQueryString = useMemo(() => {
     if (periodYear === "all" && periodMonth === "all") return "year=all&month=all";
@@ -94,6 +166,35 @@ export default function UsuarioAdminDetailPage() {
         proposalsCount: detail.proposalsCount,
       }
     : null;
+  const selectedUsage = useMemo(() => {
+    const fromSeries = sumUsageInSeries(platformSeries);
+    if (!platformSeries?.days?.length && detail) {
+      return {
+        leads: detail.leadsCount,
+        reports: detail.reportsCount,
+        proposals: detail.proposalsCount,
+      };
+    }
+    return fromSeries;
+  }, [detail, platformSeries]);
+  const effectivePlan = useMemo(() => normalizedPlanLabel(detail?.plan), [detail?.plan]);
+  const canAssignMasterPlan = useMemo(() => isGeneralAdminEmail(detail?.email), [detail?.email]);
+  const selectedMonthKey = useMemo(() => {
+    if (typeof periodYear !== "number" || typeof periodMonth !== "number") return null;
+    const month = String(periodMonth).padStart(2, "0");
+    return `${periodYear}-${month}`;
+  }, [periodMonth, periodYear]);
+  const addOnPaidInSelectedMonthCents = useMemo(() => {
+    if (!detail?.addOnPaidByMonthCents || !selectedMonthKey) return 0;
+    return detail.addOnPaidByMonthCents[selectedMonthKey] ?? 0;
+  }, [detail?.addOnPaidByMonthCents, selectedMonthKey]);
+  const displayedPlanMonthlyCents = useMemo(
+    () => detail?.planPriceCents ?? PLAN_MONTHLY_PRICE_CENTS_BY_PLAN[effectivePlan],
+    [detail?.planPriceCents, effectivePlan],
+  );
+  const totalPaidInSelectedPeriodCents = useMemo(() => {
+    return Math.max(0, displayedPlanMonthlyCents + addOnPaidInSelectedMonthCents);
+  }, [addOnPaidInSelectedMonthCents, displayedPlanMonthlyCents]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -214,6 +315,34 @@ export default function UsuarioAdminDetailPage() {
     }
   };
 
+  const onSavePlan = async () => {
+    if (!user || !detail) return;
+    setPlanBusy(true);
+    setPlanError(null);
+    try {
+      const idToken = await user.getIdToken();
+      const res = await fetch(`/api/admin-users/${encodeURIComponent(uid)}`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${idToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ plan: planDraft }),
+      });
+      const body = (await res.json().catch(() => ({}))) as AdminListedUser & { error?: string };
+      if (!res.ok) {
+        setPlanError(typeof body.error === "string" ? body.error : "Falha ao atualizar plano.");
+        return;
+      }
+      setDetail(body);
+      setPlanDialogOpen(false);
+    } catch {
+      setPlanError("Erro de rede ao atualizar plano.");
+    } finally {
+      setPlanBusy(false);
+    }
+  };
+
   const onGenerateReset = async () => {
     if (!user) return;
     setResetBusy(true);
@@ -247,6 +376,17 @@ export default function UsuarioAdminDetailPage() {
       setTimeout(() => setCopyDone(false), 2000);
     } catch {
       setResetError("Não foi possível copiar. Selecione o link manualmente.");
+    }
+  };
+
+  const onCopyUid = async () => {
+    if (!detail?.uid) return;
+    try {
+      await navigator.clipboard.writeText(detail.uid);
+      setUidCopied(true);
+      setTimeout(() => setUidCopied(false), 1800);
+    } catch {
+      // Silencioso: o campo continua selecionável manualmente.
     }
   };
 
@@ -338,15 +478,37 @@ export default function UsuarioAdminDetailPage() {
               <dl className="grid gap-2 border-t border-border pt-3 text-xs dark:border-white/10 sm:text-sm">
                 <div className="flex justify-between gap-4">
                   <dt className="text-muted-foreground">Criado</dt>
-                  <dd className="tabular-nums">{formatDatePt(detail.createdAt)}</dd>
+                  <dd className="tabular-nums">
+                    {createdAtParts.date}
+                    {createdAtParts.time ? <span className="text-muted-foreground/75">, {createdAtParts.time}</span> : null}
+                  </dd>
                 </div>
                 <div className="flex justify-between gap-4">
                   <dt className="text-muted-foreground">Último acesso</dt>
-                  <dd className="tabular-nums">{formatDatePt(detail.lastSignInAt)}</dd>
+                  <dd className="tabular-nums">
+                    {lastSignInParts.date}
+                    {lastSignInParts.time ? <span className="text-muted-foreground/75">, {lastSignInParts.time}</span> : null}
+                  </dd>
                 </div>
                 <div className="flex justify-between gap-4">
                   <dt className="text-muted-foreground">UID</dt>
-                  <dd className="max-w-[min(100%,14rem)] truncate font-mono text-[11px]">{detail.uid}</dd>
+                  <dd className="flex max-w-[min(100%,14rem)] items-center gap-1.5">
+                    <span className="truncate font-mono text-[11px] text-muted-foreground/80">{detail.uid}</span>
+                    <button
+                      type="button"
+                      onClick={() => void onCopyUid()}
+                      className={cn(
+                        "inline-flex size-5 shrink-0 items-center justify-center rounded-md transition-colors",
+                        uidCopied
+                          ? "text-emerald-400"
+                          : "text-muted-foreground/70 hover:bg-muted hover:text-foreground",
+                      )}
+                      aria-label={uidCopied ? "UID copiado" : "Copiar UID"}
+                      title={uidCopied ? "UID copiado" : "Copiar UID"}
+                    >
+                      {uidCopied ? <Check className="size-3.5" aria-hidden /> : <Copy className="size-3.5" aria-hidden />}
+                    </button>
+                  </dd>
                 </div>
               </dl>
               <div className="flex flex-wrap gap-2 border-t border-border pt-4 dark:border-white/10">
@@ -387,51 +549,123 @@ export default function UsuarioAdminDetailPage() {
                 <span className="text-muted-foreground">Plano</span>
                 <Badge
                   variant="outline"
-                  className={cn(
-                    "font-semibold",
-                    "border-sidebar-primary/45 bg-sidebar-primary/12 text-sidebar-primary",
-                    "dark:border-sidebar-primary/50 dark:bg-sidebar-primary/15 dark:text-sidebar-primary",
-                  )}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => {
+                    let next = normalizedPlanLabel(detail.plan);
+                    if (next === "Master" && !canAssignMasterPlan) next = "Pro";
+                    setPlanDraft(next);
+                    setPlanError(null);
+                    setPlanDialogOpen(true);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      let next = normalizedPlanLabel(detail.plan);
+                      if (next === "Master" && !canAssignMasterPlan) next = "Pro";
+                      setPlanDraft(next);
+                      setPlanError(null);
+                      setPlanDialogOpen(true);
+                    }
+                  }}
+                  className={cn("cursor-pointer font-semibold", planBadgeVisualClasses(effectivePlan))}
+                  title="Clique para alterar o plano"
                 >
-                  {detail.plan}
+                  {effectivePlan === "Master" ? (
+                    <span className="inline-flex items-center gap-1">
+                      <Sparkles className="size-3 opacity-90" aria-hidden />
+                      Plano Master
+                    </span>
+                  ) : (
+                    effectivePlan
+                  )}
                 </Badge>
               </div>
               <dl className="grid gap-3">
                 <div className="flex justify-between gap-4">
                   <dt className="text-muted-foreground">Valor do plano (mensal / referência)</dt>
-                  <dd className="font-medium tabular-nums">{formatBrlFromCents(detail.planPriceCents)}</dd>
+                  <dd className="text-sm font-medium tabular-nums text-muted-foreground/85">
+                    {formatBrlFromCents(displayedPlanMonthlyCents)}
+                  </dd>
                 </div>
                 <div className="flex justify-between gap-4">
-                  <dt className="text-muted-foreground">Total pago até agora</dt>
-                  <dd className="font-medium tabular-nums">{formatBrlFromCents(detail.lifetimePaidCents)}</dd>
+                  <dt className="text-muted-foreground">Add-on pago no período</dt>
+                  <dd className="text-sm font-medium tabular-nums text-muted-foreground/85">
+                    {formatBrlFromCents(addOnPaidInSelectedMonthCents)}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-muted-foreground">Total pago no mês</dt>
+                  <dd className="font-semibold tabular-nums text-foreground">
+                    {formatBrlFromCents(totalPaidInSelectedPeriodCents)}
+                  </dd>
                 </div>
               </dl>
               <dl className="grid gap-2 border-t border-border pt-3 dark:border-white/10">
                 <div className="flex justify-between gap-4">
                   <dt className="text-muted-foreground">Leads gerados</dt>
-                  <dd
-                    className="text-lg font-semibold tabular-nums"
-                    style={{ color: PLATFORM_CHART_COLOR_LEADS }}
-                  >
-                    {detail.leadsCount.toLocaleString("pt-BR")}
+                  <dd className="text-base font-medium tabular-nums">
+                    <span style={{ color: PLATFORM_CHART_COLOR_LEADS }}>
+                      {selectedUsage.leads.toLocaleString("pt-BR")}
+                    </span>
+                    <span className="px-0.5 text-xs text-muted-foreground/75">/</span>
+                    <span
+                      className={cn(
+                        "text-xs",
+                        LEADS_MONTHLY_LIMIT_BY_PLAN[effectivePlan] != null &&
+                          selectedUsage.leads >= LEADS_MONTHLY_LIMIT_BY_PLAN[effectivePlan]!
+                          ? "font-semibold text-red-400"
+                          : "text-muted-foreground/75",
+                      )}
+                    >
+                      {LEADS_MONTHLY_LIMIT_BY_PLAN[effectivePlan] == null
+                        ? "ilimitado"
+                        : LEADS_MONTHLY_LIMIT_BY_PLAN[effectivePlan]!.toLocaleString("pt-BR")}
+                    </span>
                   </dd>
                 </div>
                 <div className="flex justify-between gap-4">
                   <dt className="text-muted-foreground">Rotas digitais</dt>
-                  <dd
-                    className="text-lg font-semibold tabular-nums"
-                    style={{ color: PLATFORM_CHART_COLOR_REPORTS }}
-                  >
-                    {detail.reportsCount.toLocaleString("pt-BR")}
+                  <dd className="text-base font-medium tabular-nums">
+                    <span style={{ color: PLATFORM_CHART_COLOR_REPORTS }}>
+                      {selectedUsage.reports.toLocaleString("pt-BR")}
+                    </span>
+                    <span className="px-0.5 text-xs text-muted-foreground/75">/</span>
+                    <span
+                      className={cn(
+                        "text-xs",
+                        REPORTS_MONTHLY_LIMIT_BY_PLAN[effectivePlan] != null &&
+                          selectedUsage.reports >= REPORTS_MONTHLY_LIMIT_BY_PLAN[effectivePlan]!
+                          ? "font-semibold text-red-400"
+                          : "text-muted-foreground/75",
+                      )}
+                    >
+                      {REPORTS_MONTHLY_LIMIT_BY_PLAN[effectivePlan] == null
+                        ? "ilimitado"
+                        : REPORTS_MONTHLY_LIMIT_BY_PLAN[effectivePlan]!.toLocaleString("pt-BR")}
+                    </span>
                   </dd>
                 </div>
                 <div className="flex justify-between gap-4">
                   <dt className="text-muted-foreground">Propostas</dt>
-                  <dd
-                    className="text-lg font-semibold tabular-nums"
-                    style={{ color: PLATFORM_CHART_COLOR_PROPOSALS }}
-                  >
-                    {detail.proposalsCount.toLocaleString("pt-BR")}
+                  <dd className="text-base font-medium tabular-nums">
+                    <span style={{ color: PLATFORM_CHART_COLOR_PROPOSALS }}>
+                      {selectedUsage.proposals.toLocaleString("pt-BR")}
+                    </span>
+                    <span className="px-0.5 text-xs text-muted-foreground/75">/</span>
+                    <span
+                      className={cn(
+                        "text-xs",
+                        PROPOSALS_MONTHLY_LIMIT_BY_PLAN[effectivePlan] != null &&
+                          selectedUsage.proposals >= PROPOSALS_MONTHLY_LIMIT_BY_PLAN[effectivePlan]!
+                          ? "font-semibold text-red-400"
+                          : "text-muted-foreground/75",
+                      )}
+                    >
+                      {PROPOSALS_MONTHLY_LIMIT_BY_PLAN[effectivePlan] == null
+                        ? "ilimitado"
+                        : PROPOSALS_MONTHLY_LIMIT_BY_PLAN[effectivePlan]!.toLocaleString("pt-BR")}
+                    </span>
                   </dd>
                 </div>
               </dl>
@@ -480,6 +714,115 @@ export default function UsuarioAdminDetailPage() {
               )}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={planDialogOpen} onOpenChange={setPlanDialogOpen}>
+        <DialogContent
+          showCloseButton
+          className={cn(
+            "gap-0 overflow-hidden border-white/10 bg-zinc-950 p-0 text-zinc-100 shadow-2xl sm:max-w-md",
+            "rounded-2xl ring-1 ring-white/10",
+          )}
+        >
+          <div className="relative border-b border-white/[0.06] bg-white/[0.015] px-6 pb-5 pt-6 pr-14 sm:px-8 sm:pb-6 sm:pt-7 sm:pr-16">
+            <div
+              className="pointer-events-none absolute -right-20 -top-16 h-32 w-32 rounded-full bg-brand/15 blur-3xl"
+              aria-hidden
+            />
+            <DialogHeader className="gap-2 space-y-0 text-left">
+              <DialogTitle className="font-heading text-lg font-semibold tracking-tight text-white sm:text-xl">
+                Alterar plano
+              </DialogTitle>
+              <DialogDescription className="text-[13px] leading-relaxed text-zinc-400 sm:text-sm">
+                Define o plano base para limites e métricas de faturamento deste utilizador. Alterações aplicam-se
+                imediatamente após guardar.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="space-y-5 px-6 py-6 sm:px-8 sm:py-7">
+            <div className="space-y-2">
+              <Label htmlFor="admin-user-plan-select" className="text-xs font-medium text-zinc-300">
+                Plano
+              </Label>
+              <Select value={planDraft} onValueChange={(value) => setPlanDraft(value as BillingPlan)}>
+                <SelectTrigger
+                  id="admin-user-plan-select"
+                  aria-label="Selecionar plano"
+                  className="h-11 w-full rounded-md border-white/10 bg-white/[0.04] text-sm text-zinc-100 focus-visible:border-brand/45 focus-visible:ring-2 focus-visible:ring-brand/20"
+                >
+                  <SelectValue placeholder="Selecione o plano" />
+                </SelectTrigger>
+                <SelectContent
+                  align="start"
+                  className="border-white/10 bg-zinc-950 text-zinc-100 shadow-xl"
+                >
+                  <SelectItem value="Starter" className="focus:bg-white/10">
+                    Starter
+                  </SelectItem>
+                  <SelectItem value="Pro" className="focus:bg-white/10">
+                    Pro
+                  </SelectItem>
+                  <SelectItem value="Agency" className="focus:bg-white/10">
+                    Agency
+                  </SelectItem>
+                  {canAssignMasterPlan ? (
+                    <SelectItem value="Master" className="focus:bg-white/10">
+                      <span className="inline-flex items-center gap-2">
+                        <Sparkles className="size-3.5 text-amber-400/90" aria-hidden />
+                        Plano Master
+                      </span>
+                    </SelectItem>
+                  ) : null}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {canAssignMasterPlan ? (
+              <p className="rounded-lg border border-amber-500/20 bg-amber-500/[0.07] px-3 py-2.5 text-[11px] leading-relaxed text-amber-100/90">
+                <span className="font-semibold text-amber-200">Plano Master:</span> exclusivo para a conta do
+                administrador geral. Inclui uso ilimitado de leads, rotas e propostas na plataforma.
+              </p>
+            ) : (
+              <p className="text-[11px] leading-relaxed text-zinc-500">
+                Planos comerciais (Starter, Pro e Agency) aplicam-se a todas as contas. O Plano Master só aparece
+                quando estiver a editar a conta do administrador geral.
+              </p>
+            )}
+
+            {planError ? (
+              <p
+                role="alert"
+                className="rounded-lg border border-red-400/35 bg-red-500/10 px-3 py-2 text-sm text-red-200"
+              >
+                {planError}
+              </p>
+            ) : null}
+          </div>
+
+          <div className="flex flex-col-reverse gap-3 border-t border-white/[0.06] bg-white/[0.02] px-6 py-4 sm:flex-row sm:items-center sm:justify-end sm:gap-3 sm:px-8 sm:py-5">
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={planBusy}
+              onClick={() => setPlanDialogOpen(false)}
+              className="h-10 text-zinc-300 hover:bg-white/10 hover:text-white"
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              variant="cta"
+              size="lg"
+              className="min-w-[10rem] gap-2"
+              disabled={planBusy}
+              onClick={() => void onSavePlan()}
+            >
+              {planBusy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
+              Salvar plano
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 

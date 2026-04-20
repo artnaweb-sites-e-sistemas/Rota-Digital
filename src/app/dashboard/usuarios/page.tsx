@@ -10,6 +10,7 @@ import {
   Copy,
   Loader2,
   Search,
+  Sparkles,
   UserPlus,
   X,
 } from "lucide-react";
@@ -49,6 +50,7 @@ import {
   PLATFORM_CHART_COLOR_PROPOSALS,
   PLATFORM_CHART_COLOR_REPORTS,
 } from "@/lib/platform-chart-colors";
+import { billingPlanFromUserSettingsRaw, planBadgeVisualClasses } from "@/lib/billing-plan-label";
 import { cn } from "@/lib/utils";
 import type { AdminListedUser, AdminUsersListResponse } from "@/types/admin-user-list";
 import type { PlatformSeriesResponse } from "@/types/platform-series";
@@ -160,10 +162,23 @@ function filterAdminUsers(
 }
 
 function sortAdminUsers(users: AdminListedUser[], sort: UsersSortState): AdminListedUser[] {
-  if (!sort.key) return users;
-  const mult = sort.dir === "asc" ? 1 : -1;
   const copy = [...users];
+  if (!sort.key) {
+    copy.sort((a, b) => {
+      const aMaster = a.plan?.trim().toLowerCase() === "master" ? 1 : 0;
+      const bMaster = b.plan?.trim().toLowerCase() === "master" ? 1 : 0;
+      if (aMaster !== bMaster) return bMaster - aMaster;
+      return a.uid.localeCompare(b.uid);
+    });
+    return copy;
+  }
+  const mult = sort.dir === "asc" ? 1 : -1;
   copy.sort((a, b) => {
+    // Prioridade absoluta: Plano Master sempre no topo.
+    const aMaster = a.plan?.trim().toLowerCase() === "master" ? 1 : 0;
+    const bMaster = b.plan?.trim().toLowerCase() === "master" ? 1 : 0;
+    if (aMaster !== bMaster) return bMaster - aMaster;
+
     switch (sort.key) {
       case "leads": {
         const cmp = a.leadsCount - b.leadsCount;
@@ -903,11 +918,17 @@ export default function UsuariosAdminPage() {
                         variant="outline"
                         className={cn(
                           "text-[10px] font-semibold",
-                          "border-sidebar-primary/45 bg-sidebar-primary/12 text-sidebar-primary",
-                          "dark:border-sidebar-primary/50 dark:bg-sidebar-primary/15 dark:text-sidebar-primary",
+                          planBadgeVisualClasses(billingPlanFromUserSettingsRaw(row.plan)),
                         )}
                       >
-                        {row.plan}
+                        {billingPlanFromUserSettingsRaw(row.plan) === "Master" ? (
+                          <span className="inline-flex items-center gap-1">
+                            <Sparkles className="size-3.5 text-amber-300/95" aria-hidden />
+                            {row.plan}
+                          </span>
+                        ) : (
+                          row.plan
+                        )}
                       </Badge>
                     </TableCell>
                     <TableCell

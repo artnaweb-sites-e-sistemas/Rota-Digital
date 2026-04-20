@@ -4,13 +4,7 @@ import { cn } from "@/lib/utils"
 
 function Textarea({ className, ...props }: React.ComponentProps<"textarea">) {
   return (
-    <div
-      className={cn(
-        "w-full min-w-0 transition-transform duration-200 ease-out",
-        "focus-within:-translate-y-1",
-        "has-[[data-slot=textarea]:disabled]:translate-y-0",
-      )}
-    >
+    <div className="w-full min-w-0">
       <textarea
         data-slot="textarea"
         className={cn(

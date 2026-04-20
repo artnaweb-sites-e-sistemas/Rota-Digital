@@ -9,6 +9,7 @@ import type {
 } from "@/types/user-settings";
 import { coerceUserAiPromptSettingsRaw } from "@/lib/user-ai-prompt-coerce";
 import { coerceProposalPlansArray, proposalPlanToFirestoreValue } from "@/lib/proposal-plan-coerce";
+import { billingPlanFromUserSettingsRaw, type SidebarBillingPlan } from "@/lib/billing-plan-label";
 
 const USER_SETTINGS_COLLECTION = "userSettings";
 
@@ -91,6 +92,17 @@ export async function getUserCompanyAboutSettings(
   const snap = await getDoc(doc(db, USER_SETTINGS_COLLECTION, userId));
   if (!snap.exists()) return null;
   return coerceCompanyAboutSettings(snap.data() as Record<string, unknown>);
+}
+
+/** Mesmo documento `userSettings`: empresa + plano (para sidebar em tempo real). */
+export function parseUserSettingsDocForDashboard(raw: Record<string, unknown>): {
+  companyAbout: UserCompanyAboutSettings;
+  plan: SidebarBillingPlan;
+} {
+  return {
+    companyAbout: coerceCompanyAboutSettings(raw),
+    plan: billingPlanFromUserSettingsRaw(raw.subscriptionPlan ?? raw.plan),
+  };
 }
 
 export async function saveUserCompanyAboutSettings(

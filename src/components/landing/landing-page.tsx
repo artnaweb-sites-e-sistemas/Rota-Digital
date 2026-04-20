@@ -963,38 +963,6 @@ export function LandingPage() {
               ))}
             </div>
 
-            {/* --- Pacotes de Leads --- */}
-            <div className="mt-16">
-              <div className="mx-auto max-w-2xl text-center">
-                <p className="text-sm font-bold uppercase tracking-widest text-brand">Add-on</p>
-                <h3 className="mt-2 text-2xl font-extrabold tracking-tight">Precisa de mais prospecções?</h3>
-                <p className="mt-3 text-sm text-muted-foreground">
-                  Disponível para assinantes Pro e Agency. Créditos de leads extras, sem mudar de plano.
-                </p>
-              </div>
-              <div className="mt-8 grid gap-4 sm:grid-cols-3">
-                {[
-                  { leads: "50", price: "37", label: "Básico" },
-                  { leads: "100", price: "67", label: "Pro" },
-                  { leads: "200", price: "127", label: "Max" },
-                ].map((pack) => (
-                  <div
-                    key={pack.leads}
-                    className="flex items-center justify-between rounded-xl border border-border/60 bg-white px-6 py-5 shadow-sm dark:bg-zinc-950/20"
-                  >
-                    <div>
-                      <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">{pack.label}</p>
-                      <p className="mt-0.5 text-lg font-extrabold">+{pack.leads} leads</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-2xl font-black text-foreground">R$ {pack.price}</p>
-                      <p className="text-xs text-muted-foreground">pagamento único</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
           </div>
         </section>
 
