@@ -15,7 +15,7 @@ const PLAN_MONTHLY_PRICE_CENTS = {
 /** Valor alto para compatibilidade; o limite real de leads é ignorado quando o plano é Master. */
 const PLAN_LEADS_MONTHLY_LIMIT = {
   starter: 30,
-  pro: 30,
+  pro: 50,
   agency: 100,
   master: 999_999_999,
 } as const;
@@ -111,6 +111,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
           subscriptionPriceCents: PLAN_MONTHLY_PRICE_CENTS[planKey],
           leadCaptureMonthlyLimit: PLAN_LEADS_MONTHLY_LIMIT[planKey],
           planMasterUnlimited: planKey === "master" ? true : false,
+          subscriptionCycleAnchorAt: Date.now(),
         },
         { merge: true },
       );

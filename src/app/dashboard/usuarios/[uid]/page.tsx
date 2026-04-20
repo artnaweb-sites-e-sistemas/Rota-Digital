@@ -66,7 +66,7 @@ type BillingPlan = "Starter" | "Pro" | "Agency" | "Master";
 
 const LEADS_MONTHLY_LIMIT_BY_PLAN: Record<BillingPlan, number | null> = {
   Starter: 30,
-  Pro: 30,
+  Pro: 50,
   Agency: 100,
   Master: null,
 };

@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { doc, getDoc } from "firebase/firestore";
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   ArrowRight,
@@ -69,6 +70,10 @@ import {
 } from "@/lib/proposal-lead-from-source";
 import { updateProposal } from "@/lib/proposals";
 import { describeManualUploadFailure, uploadUserProposalImage } from "@/lib/evidence-storage";
+import { db } from "@/lib/firebase";
+import { useAuth } from "@/lib/auth-context";
+import { PlanLimitModal, type PlanLimitModalState } from "@/components/limits/plan-limit-modal";
+import { normalizedSubscriptionPlanKey, planAllowsCustomLogo, type PlanKey } from "@/lib/plan-quotas";
 import { getUserCompanyAboutSettings, getUserReportCtaSettings } from "@/lib/user-settings";
 import { maskPhoneDisplayLoose, resolveReportCtas, type ResolvedReportCta } from "@/lib/report-cta";
 import type { UserCompanyAboutSettings } from "@/types/user-settings";
@@ -1476,13 +1481,15 @@ function SummaryStat({
 
 export function ProposalView({ proposal, variant, onProposalChange, reportCta: reportCtaProp }: ProposalViewProps) {
   const isDashboard = variant === "dashboard";
+  const { user } = useAuth();
   const proposalRef = useRef(proposal);
   proposalRef.current = proposal;
+  const coverFileInputRef = useRef<HTMLInputElement | null>(null);
   const [copied, setCopied] = useState(false);
   const [publicLinkOrigin, setPublicLinkOrigin] = useState("");
   const [editingProfile, setEditingProfile] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
-  const [uploadingSlot, setUploadingSlot] = useState<"lead" | "agency" | null>(null);
+  const [uploadingSlot, setUploadingSlot] = useState<"lead" | "agency" | "cover" | null>(null);
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [reportCtaClient, setReportCtaClient] = useState<ResolvedReportCta | null>(null);
   const [nextStepsEditing, setNextStepsEditing] = useState(false);
@@ -1495,6 +1502,16 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
   const [removePlanBusy, setRemovePlanBusy] = useState(false);
   const [companyAboutLive, setCompanyAboutLive] = useState<UserCompanyAboutSettings | null>(null);
   const [linkedLeadLive, setLinkedLeadLive] = useState<Lead | null>(null);
+  const [limitModalState, setLimitModalState] = useState<PlanLimitModalState | null>(null);
+  const [planKeyForLogo, setPlanKeyForLogo] = useState<PlanKey>("starter");
+  /** null = a carregar; false = Starter sem direito a marca / personalização institucional nesta proposta. */
+  const [agencyImageUploadAllowed, setAgencyImageUploadAllowed] = useState<boolean | null>(null);
+  const [editingAgencySummary, setEditingAgencySummary] = useState(false);
+  const [agencySummaryDraft, setAgencySummaryDraft] = useState("");
+  const [savingAgencySummary, setSavingAgencySummary] = useState(false);
+  const [editingAgencyContacts, setEditingAgencyContacts] = useState(false);
+  const [agencyContactDraft, setAgencyContactDraft] = useState<ProposalAgencySnapshot>(() => proposal.agencySnapshot);
+  const [savingAgencyContacts, setSavingAgencyContacts] = useState(false);
   const [profileDraft, setProfileDraft] = useState({
     executiveSummary: proposal.companyProfile.executiveSummary,
   });
@@ -1504,6 +1521,18 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
       executiveSummary: proposal.companyProfile.executiveSummary,
     });
   }, [proposal]);
+
+  useEffect(() => {
+    if (!editingAgencySummary) {
+      setAgencySummaryDraft(proposal.agencySnapshot.companySummary);
+    }
+  }, [proposal.id, proposal.updatedAt, proposal.agencySnapshot.companySummary, editingAgencySummary]);
+
+  useEffect(() => {
+    if (!editingAgencyContacts) {
+      setAgencyContactDraft(proposal.agencySnapshot);
+    }
+  }, [proposal.id, proposal.updatedAt, proposal.agencySnapshot, editingAgencyContacts]);
 
   useEffect(() => {
     setNextStepsEditing(false);
@@ -1564,6 +1593,47 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
   }, [isDashboard, proposal.userId]);
 
   useEffect(() => {
+    if (!isDashboard || !proposal.userId) {
+      setAgencyImageUploadAllowed(null);
+      return;
+    }
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const snap = await getDoc(doc(db, "userSettings", proposal.userId));
+        if (cancelled) return;
+        if (!snap.exists()) {
+          setPlanKeyForLogo("starter");
+          setAgencyImageUploadAllowed(false);
+          return;
+        }
+        const raw = snap.data() as Record<string, unknown>;
+        setPlanKeyForLogo(normalizedSubscriptionPlanKey(raw.subscriptionPlan ?? raw.plan));
+        setAgencyImageUploadAllowed(planAllowsCustomLogo(raw));
+      } catch {
+        if (!cancelled) setAgencyImageUploadAllowed(false);
+      }
+    };
+    void load();
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") void load();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [isDashboard, proposal.userId]);
+
+  /** Plano Starter: bloqueia apenas o texto institucional (deve manter o padrão
+   *  da Rota Digital) e uploads de imagem. Contatos e serviços ficam liberados. */
+  useEffect(() => {
+    if (agencyImageUploadAllowed === false) {
+      setEditingAgencySummary(false);
+    }
+  }, [agencyImageUploadAllowed]);
+
+  useEffect(() => {
     if (!isDashboard || !proposal.leadId?.trim()) {
       setLinkedLeadLive(null);
       return;
@@ -1612,12 +1682,6 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
     return live || snapAgencyName;
   }, [isDashboard, companyAboutLive?.companyName, snapAgencyName]);
 
-  const displayAgencySummary = useMemo(() => {
-    if (!isDashboard) return snapAgencySummary;
-    const live = companyAboutLive?.companySummary?.trim();
-    return live || snapAgencySummary;
-  }, [isDashboard, companyAboutLive?.companySummary, snapAgencySummary]);
-
   const leadImageUrl = proposal.evidences?.leadImageUrl?.trim();
 
   /** No dashboard: dados do lead atual no CRM; página pública mantém o snapshot gravado. */
@@ -1659,23 +1723,25 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
     return proposal.agencySnapshot.primaryImageUrl?.trim() || "";
   }, [isDashboard, companyAboutLive?.primaryImageUrl, proposal.agencySnapshot.primaryImageUrl]);
 
-  /** Capa (secundária nas Configurações ou snapshot); só para destaque no cartão institucional. */
+  /** Capa só desta proposta: override em evidências → snapshot; sem misturar Configurações globais. */
   const displayAgencyCoverUrl = useMemo(() => {
-    if (isDashboard) {
-      const live = companyAboutLive?.secondaryImageUrl?.trim();
-      if (live) return live;
-    }
+    const proposalCover = proposal.evidences?.agencyCoverUrl?.trim();
+    if (proposalCover) return proposalCover;
     return proposal.agencySnapshot.secondaryImageUrl?.trim() || "";
-  }, [isDashboard, companyAboutLive?.secondaryImageUrl, proposal.agencySnapshot.secondaryImageUrl]);
+  }, [proposal.evidences?.agencyCoverUrl, proposal.agencySnapshot.secondaryImageUrl]);
 
   const companyOverviewText =
     proposal.companyProfile.executiveSummary.trim() || proposal.companyProfile.companyProfile.trim();
   const companyOverviewParagraphs = splitReadableParagraphs(companyOverviewText);
-  const agencySummaryParagraphs = splitReadableParagraphs(displayAgencySummary);
+  /** Só o snapshot desta proposta (edições aqui não alteram Configurações globais). */
+  const agencySummaryParagraphs = useMemo(
+    () => splitReadableParagraphs(snapAgencySummary),
+    [snapAgencySummary],
+  );
 
   const agencyContactRows = useMemo(
-    () => buildAgencyContactRows(proposal.agencySnapshot, companyAboutLive, isDashboard),
-    [proposal.agencySnapshot, companyAboutLive, isDashboard],
+    () => buildAgencyContactRows(proposal.agencySnapshot, null, false),
+    [proposal.agencySnapshot],
   );
 
   const removePlanPendingTitle = useMemo(() => {
@@ -1877,8 +1943,103 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
     }
   };
 
+  const tryStartAgencyCustomization = (mode: "summary" | "contacts") => {
+    if (!isDashboard) return;
+    /** O texto institucional (resumo) é personalizável apenas em planos pagos;
+     *  no Starter ele permanece com o padrão da Rota Digital. Contatos/serviços
+     *  ficam liberados em qualquer plano. */
+    if (mode === "summary") {
+      if (agencyImageUploadAllowed === null) {
+        setFieldError("A carregar as permissões do plano…");
+        return;
+      }
+      if (!agencyImageUploadAllowed) {
+        setFieldError(null);
+        setLimitModalState({ kind: "logo", plan: planKeyForLogo });
+        return;
+      }
+    }
+    setEditingAgencySummary(false);
+    setEditingAgencyContacts(false);
+    setFieldError(null);
+    if (mode === "summary") {
+      setAgencySummaryDraft(proposal.agencySnapshot.companySummary);
+      setEditingAgencySummary(true);
+    } else {
+      setAgencyContactDraft({ ...proposal.agencySnapshot });
+      setEditingAgencyContacts(true);
+    }
+  };
+
+  const cancelAgencySummaryEdit = () => {
+    setAgencySummaryDraft(proposal.agencySnapshot.companySummary);
+    setEditingAgencySummary(false);
+  };
+
+  const handleSaveAgencySummary = async () => {
+    setSavingAgencySummary(true);
+    setFieldError(null);
+    try {
+      await applyProposalPatch({
+        agencySnapshot: {
+          ...proposal.agencySnapshot,
+          companySummary: agencySummaryDraft.trim(),
+        },
+        updatedAt: Date.now(),
+      });
+      setEditingAgencySummary(false);
+    } catch (e) {
+      console.error(e);
+      setFieldError("Não foi possível salvar o texto institucional desta proposta.");
+    } finally {
+      setSavingAgencySummary(false);
+    }
+  };
+
+  const cancelAgencyContactsEdit = () => {
+    setAgencyContactDraft(proposal.agencySnapshot);
+    setEditingAgencyContacts(false);
+  };
+
+  const handleSaveAgencyContacts = async () => {
+    setSavingAgencyContacts(true);
+    setFieldError(null);
+    try {
+      await applyProposalPatch({
+        agencySnapshot: {
+          ...proposal.agencySnapshot,
+          companyPhone: agencyContactDraft.companyPhone?.trim() || "",
+          whatsApp: agencyContactDraft.whatsApp?.trim() || "",
+          address: agencyContactDraft.address?.trim() || "",
+          websiteUrl: agencyContactDraft.websiteUrl?.trim() || "",
+          instagramUrl: agencyContactDraft.instagramUrl?.trim() || "",
+          youtubeUrl: agencyContactDraft.youtubeUrl?.trim() || "",
+          services: agencyContactDraft.services?.trim() || "",
+        },
+        updatedAt: Date.now(),
+      });
+      setEditingAgencyContacts(false);
+    } catch (e) {
+      console.error(e);
+      setFieldError("Não foi possível salvar os dados de contacto desta proposta.");
+    } finally {
+      setSavingAgencyContacts(false);
+    }
+  };
+
   const handleImageReplace = async (slot: "lead" | "agency", file: File) => {
     if (!isDashboard) return;
+    if (slot === "agency") {
+      if (agencyImageUploadAllowed === null) {
+        setFieldError("A carregar as permissões do plano…");
+        return;
+      }
+      if (!agencyImageUploadAllowed) {
+        setFieldError(null);
+        setLimitModalState({ kind: "logo", plan: planKeyForLogo });
+        return;
+      }
+    }
     setUploadingSlot(slot);
     setFieldError(null);
     try {
@@ -1909,8 +2070,67 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
     }
   };
 
+  const openAgencyCoverPicker = () => {
+    if (!isDashboard) return;
+    if (agencyImageUploadAllowed === null) {
+      setFieldError("A carregar as permissões do plano…");
+      return;
+    }
+    if (!agencyImageUploadAllowed) {
+      setFieldError(null);
+      setLimitModalState({ kind: "logo", plan: planKeyForLogo });
+      return;
+    }
+    coverFileInputRef.current?.click();
+  };
+
+  const handleCoverReplace = async (file: File) => {
+    if (!isDashboard) return;
+    if (agencyImageUploadAllowed === null) {
+      setFieldError("A carregar as permissões do plano…");
+      return;
+    }
+    if (!agencyImageUploadAllowed) {
+      setFieldError(null);
+      setLimitModalState({ kind: "logo", plan: planKeyForLogo });
+      return;
+    }
+    setUploadingSlot("cover");
+    setFieldError(null);
+    try {
+      const result = await uploadUserProposalImage({
+        file,
+        userId: proposal.userId,
+        leadId: proposal.leadId,
+        proposalId: proposal.id,
+        slotLabel: "agency-cover",
+      });
+      if (!result.ok) {
+        setFieldError(describeManualUploadFailure(result));
+        return;
+      }
+      await applyProposalPatch({
+        evidences: {
+          ...(proposal.evidences || {}),
+          agencyCoverUrl: result.url,
+        },
+        updatedAt: Date.now(),
+      });
+    } catch (e) {
+      console.error(e);
+      setFieldError("Não foi possível enviar a capa agora.");
+    } finally {
+      setUploadingSlot(null);
+    }
+  };
+
   return (
     <div className="min-w-0 space-y-8">
+      <PlanLimitModal
+        state={limitModalState}
+        onClose={() => setLimitModalState(null)}
+        getIdToken={user ? () => user.getIdToken() : undefined}
+      />
       <section className="relative overflow-visible rounded-2xl border border-border bg-card shadow-xl dark:border-white/5 dark:bg-white/[0.02]">
         <div
           className="pointer-events-none absolute inset-0 z-0 overflow-hidden rounded-2xl bg-[radial-gradient(circle_at_top_left,rgba(190,149,83,0.18),transparent_42%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.08),transparent_34%)]"
@@ -2033,7 +2253,7 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
                   fallback={displayAgencyName}
                   tone="brand"
                   shrinkOnNarrow
-                  busy={uploadingSlot === "agency"}
+                  busy={uploadingSlot === "agency" || (isDashboard && agencyImageUploadAllowed === null)}
                   replaceButtonSide="right"
                   onPickFile={
                     isDashboard ? (file) => void handleImageReplace("agency", file) : undefined
@@ -2141,9 +2361,21 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
         <Card
           className={cn(
             "min-w-0 overflow-hidden border-border bg-card shadow-xl dark:border-white/5 dark:bg-white/[0.02]",
-            displayAgencyCoverUrl ? "gap-0 pt-0" : null,
+            displayAgencyCoverUrl || isDashboard ? "gap-0 pt-0" : null,
           )}
         >
+          <input
+            ref={coverFileInputRef}
+            type="file"
+            accept="image/*"
+            className="sr-only"
+            tabIndex={-1}
+            onChange={(event) => {
+              const f = event.target.files?.[0];
+              if (f) void handleCoverReplace(f);
+              event.currentTarget.value = "";
+            }}
+          />
           {displayAgencyCoverUrl ? (
             <div className="relative aspect-[2.1/1] w-full min-h-[6.5rem] max-h-[11rem] sm:min-h-[7.5rem] sm:max-h-[12rem]">
               <Image
@@ -2157,17 +2389,59 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
                 className="pointer-events-none absolute inset-0 bg-gradient-to-t from-card/40 to-transparent"
                 aria-hidden
               />
+              {isDashboard ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={openAgencyCoverPicker}
+                  disabled={uploadingSlot === "cover"}
+                  className="absolute bottom-3 right-3 z-[8] size-9 rounded-md border border-border/80 bg-background/95 text-muted-foreground shadow-md backdrop-blur-sm hover:bg-muted hover:text-foreground sm:bottom-4 sm:right-4"
+                  aria-label="Trocar capa desta proposta"
+                >
+                  {uploadingSlot === "cover" ? (
+                    <Loader2 className="size-4 animate-spin" aria-hidden />
+                  ) : (
+                    <ImagePlus className="size-4" aria-hidden />
+                  )}
+                </Button>
+              ) : null}
+            </div>
+          ) : isDashboard ? (
+            <div className="relative flex min-h-[6.5rem] flex-col items-center justify-center gap-2 border-b border-dashed border-border/80 bg-muted/20 px-4 py-6 sm:min-h-[7.5rem]">
+              <p className="text-center text-xs text-muted-foreground">Capa só desta proposta (não altera Configurações)</p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={openAgencyCoverPicker}
+                disabled={uploadingSlot === "cover"}
+              >
+                {uploadingSlot === "cover" ? (
+                  <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                ) : (
+                  <ImagePlus className="size-3.5" aria-hidden />
+                )}
+                Adicionar capa
+              </Button>
             </div>
           ) : null}
           <CardHeader
             className={cn(
               "border-b border-border pb-5 dark:border-white/5",
-              displayAgencyCoverUrl ? "pt-5" : null,
+              /* Com imagem de capa: respiro habitual. Sem capa no dashboard: placeholder acima — mais padding para não colar ao tracejado. Público sem capa: primeiro bloco do cartão. */
+              displayAgencyCoverUrl ? "pt-5" : isDashboard ? "pt-7 sm:pt-8" : "pt-6",
             )}
           >
             <CardTitle className="text-xl font-bold text-foreground">Sobre a {displayAgencyName}</CardTitle>
             <CardDescription className="mt-2 text-sm leading-relaxed text-muted-foreground">
               Conheca, em poucas linhas, quem conduz este projeto ao seu lado.
+              {isDashboard ? (
+                <span className="mt-2 block text-xs text-muted-foreground/90">
+                  O texto e os contactos nesta coluna podem ser ajustados só para esta proposta. Alterações globais da agência ficam em Configurações.
+                </span>
+              ) : null}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5 pt-6">
@@ -2199,75 +2473,249 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
 
             <div
               className={cn(
-                "border border-border bg-muted/35 p-5 text-sm leading-relaxed text-muted-foreground dark:border-white/10 dark:bg-white/[0.03]",
+                "relative border border-border bg-muted/35 p-5 text-sm leading-relaxed text-muted-foreground dark:border-white/10 dark:bg-white/[0.03]",
                 RR.panel,
+                isDashboard && !editingAgencySummary ? "pb-11 sm:pb-12" : null,
               )}
             >
-              {agencySummaryParagraphs.length ? (
+              {editingAgencySummary && isDashboard ? (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="proposal-agency-summary">Texto institucional (só esta proposta)</Label>
+                    <Textarea
+                      id="proposal-agency-summary"
+                      value={agencySummaryDraft}
+                      onChange={(e) => setAgencySummaryDraft(e.target.value)}
+                      disabled={savingAgencySummary}
+                      rows={8}
+                      className="min-h-[8rem] resize-y text-[14.5px] leading-relaxed text-foreground"
+                      placeholder="Apresente a sua agência para o cliente."
+                    />
+                  </div>
+                  <div className="mt-4 flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="cta"
+                      size="sm"
+                      className="gap-1.5"
+                      disabled={savingAgencySummary}
+                      onClick={() => void handleSaveAgencySummary()}
+                    >
+                      {savingAgencySummary ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Check className="size-4" aria-hidden />}
+                      Salvar
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={savingAgencySummary}
+                      onClick={cancelAgencySummaryEdit}
+                    >
+                      Cancelar
+                    </Button>
+                  </div>
+                </>
+              ) : agencySummaryParagraphs.length ? (
                 <div className="space-y-3">
-                  {agencySummaryParagraphs.map((paragraph) => (
-                    <p key={paragraph}>{paragraph}</p>
+                  {agencySummaryParagraphs.map((paragraph, idx) => (
+                    <p key={`${idx}-${paragraph.slice(0, 48)}`} className="text-muted-foreground">
+                      {paragraph}
+                    </p>
                   ))}
                 </div>
               ) : (
-                "Em breve, este espaco trara uma apresentacao institucional da agencia."
+                <p className="text-muted-foreground">
+                  {isDashboard
+                    ? "Ainda não há texto institucional nesta proposta. Use «Editar» para adicionar."
+                    : "Em breve, este espaco trara uma apresentacao institucional da agencia."}
+                </p>
               )}
+              {isDashboard && !editingAgencySummary ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  disabled={savingAgencySummary}
+                  onClick={() => tryStartAgencyCustomization("summary")}
+                  className="no-print absolute bottom-3 right-4 z-20 size-8 rounded-md border border-border/70 bg-background/95 text-muted-foreground shadow-sm backdrop-blur-sm hover:bg-muted hover:text-foreground sm:bottom-4 sm:right-7"
+                  aria-label="Editar texto institucional desta proposta"
+                >
+                  <Pencil className="size-3.5" aria-hidden />
+                </Button>
+              ) : null}
             </div>
 
-            {agencyContactRows.length ? (
+            {editingAgencyContacts && isDashboard ? (
+              <div className="space-y-4 rounded-xl border border-border bg-muted/20 p-5 dark:border-white/10 dark:bg-white/[0.03]">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Contactos e serviços (só esta proposta — não altera Configurações).
+                </p>
+                <div className="grid gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="proposal-agency-phone">Telefone</Label>
+                    <Input
+                      id="proposal-agency-phone"
+                      value={agencyContactDraft.companyPhone ?? ""}
+                      onChange={(e) => setAgencyContactDraft((p) => ({ ...p, companyPhone: e.target.value }))}
+                      disabled={savingAgencyContacts}
+                      autoComplete="off"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="proposal-agency-wa">WhatsApp</Label>
+                    <Input
+                      id="proposal-agency-wa"
+                      value={agencyContactDraft.whatsApp ?? ""}
+                      onChange={(e) => setAgencyContactDraft((p) => ({ ...p, whatsApp: e.target.value }))}
+                      disabled={savingAgencyContacts}
+                      autoComplete="off"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="proposal-agency-address">Endereço</Label>
+                    <Textarea
+                      id="proposal-agency-address"
+                      value={agencyContactDraft.address ?? ""}
+                      onChange={(e) => setAgencyContactDraft((p) => ({ ...p, address: e.target.value }))}
+                      disabled={savingAgencyContacts}
+                      rows={2}
+                      className="resize-y"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="proposal-agency-site">Site</Label>
+                    <Input
+                      id="proposal-agency-site"
+                      value={agencyContactDraft.websiteUrl ?? ""}
+                      onChange={(e) => setAgencyContactDraft((p) => ({ ...p, websiteUrl: e.target.value }))}
+                      disabled={savingAgencyContacts}
+                      autoComplete="off"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="proposal-agency-ig">Instagram</Label>
+                    <Input
+                      id="proposal-agency-ig"
+                      value={agencyContactDraft.instagramUrl ?? ""}
+                      onChange={(e) => setAgencyContactDraft((p) => ({ ...p, instagramUrl: e.target.value }))}
+                      disabled={savingAgencyContacts}
+                      autoComplete="off"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="proposal-agency-yt">YouTube</Label>
+                    <Input
+                      id="proposal-agency-yt"
+                      value={agencyContactDraft.youtubeUrl ?? ""}
+                      onChange={(e) => setAgencyContactDraft((p) => ({ ...p, youtubeUrl: e.target.value }))}
+                      disabled={savingAgencyContacts}
+                      autoComplete="off"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="proposal-agency-services">Serviços</Label>
+                    <Textarea
+                      id="proposal-agency-services"
+                      value={agencyContactDraft.services ?? ""}
+                      onChange={(e) => setAgencyContactDraft((p) => ({ ...p, services: e.target.value }))}
+                      disabled={savingAgencyContacts}
+                      rows={4}
+                      className="resize-y"
+                      placeholder="Um tópico por linha ou parágrafos separados."
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <Button
+                    type="button"
+                    variant="cta"
+                    size="sm"
+                    className="gap-1.5"
+                    disabled={savingAgencyContacts}
+                    onClick={() => void handleSaveAgencyContacts()}
+                  >
+                    {savingAgencyContacts ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Check className="size-4" aria-hidden />}
+                    Salvar
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" disabled={savingAgencyContacts} onClick={cancelAgencyContactsEdit}>
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+            ) : isDashboard || agencyContactRows.length ? (
               <div
                 className={cn(
-                  "min-w-0 overflow-hidden border border-border bg-muted/25 p-5 dark:border-white/10 dark:bg-white/[0.03]",
+                  "relative min-w-0 overflow-hidden border border-border bg-muted/25 p-5 dark:border-white/10 dark:bg-white/[0.03]",
                   RR.panel,
+                  isDashboard ? "pb-11 sm:pb-12" : null,
                 )}
               >
-                <ul className="m-0 min-w-0 list-none space-y-4 p-0">
-                  {agencyContactRows.map((row) => {
-                    const Icon = row.icon;
-                    const body =
-                      row.topicLines && row.topicLines.length > 0 ? (
-                        <ul className="m-0 min-w-0 list-none space-y-2.5 p-0" aria-label={row.label}>
-                          {row.topicLines.map((line, idx) => (
-                            <li key={`${row.key}-${idx}`} className="flex min-w-0 gap-2.5">
-                              <span
-                                className="mt-2 size-1.5 shrink-0 rounded-full bg-brand ring-1 ring-brand/35"
-                                aria-hidden
-                              />
-                              <span className="min-w-0 break-words text-sm font-medium leading-snug text-foreground">
-                                {line}
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : row.href ? (
-                        <a
-                          href={row.href}
-                          className="block min-w-0 max-w-full break-all text-sm font-medium text-foreground underline decoration-brand/35 underline-offset-2 transition-colors hover:text-brand sm:break-words"
-                          {...(row.external ? { target: "_blank", rel: "noreferrer" } : {})}
-                        >
-                          {row.value}
-                        </a>
-                      ) : (
-                        <span
-                          className={cn(
-                            "block min-w-0 max-w-full text-sm font-medium text-foreground/90 [overflow-wrap:anywhere]",
-                            row.multiline ? "whitespace-pre-line" : "",
-                          )}
-                        >
-                          {row.value}
-                        </span>
+                {agencyContactRows.length ? (
+                  <ul className="m-0 min-w-0 list-none space-y-4 p-0">
+                    {agencyContactRows.map((row) => {
+                      const Icon = row.icon;
+                      const body =
+                        row.topicLines && row.topicLines.length > 0 ? (
+                          <ul className="m-0 min-w-0 list-none space-y-2.5 p-0" aria-label={row.label}>
+                            {row.topicLines.map((line, idx) => (
+                              <li key={`${row.key}-${idx}`} className="flex min-w-0 gap-2.5">
+                                <span
+                                  className="mt-2 size-1.5 shrink-0 rounded-full bg-brand ring-1 ring-brand/35"
+                                  aria-hidden
+                                />
+                                <span className="min-w-0 break-words text-sm font-medium leading-snug text-foreground">
+                                  {line}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : row.href ? (
+                          <a
+                            href={row.href}
+                            className="block min-w-0 max-w-full break-all text-sm font-medium text-foreground underline decoration-brand/35 underline-offset-2 transition-colors hover:text-brand sm:break-words"
+                            {...(row.external ? { target: "_blank", rel: "noreferrer" } : {})}
+                          >
+                            {row.value}
+                          </a>
+                        ) : (
+                          <span
+                            className={cn(
+                              "block min-w-0 max-w-full text-sm font-medium text-foreground/90 [overflow-wrap:anywhere]",
+                              row.multiline ? "whitespace-pre-line" : "",
+                            )}
+                          >
+                            {row.value}
+                          </span>
+                        );
+                      return (
+                        <li key={row.key} className="min-w-0 space-y-1">
+                          <div className="flex min-w-0 items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                            <Icon className="size-3.5 shrink-0 text-brand" aria-hidden />
+                            <span className="min-w-0">{row.label}</span>
+                          </div>
+                          <div className="min-w-0 max-w-full pl-5">{body}</div>
+                        </li>
                       );
-                    return (
-                      <li key={row.key} className="min-w-0 space-y-1">
-                        <div className="flex min-w-0 items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                          <Icon className="size-3.5 shrink-0 text-brand" aria-hidden />
-                          <span className="min-w-0">{row.label}</span>
-                        </div>
-                        <div className="min-w-0 max-w-full pl-5">{body}</div>
-                      </li>
-                    );
-                  })}
-                </ul>
+                    })}
+                  </ul>
+                ) : isDashboard ? (
+                  <p className="text-sm text-muted-foreground">
+                    Sem dados de contacto nesta proposta. Use «Editar» para preencher.
+                  </p>
+                ) : null}
+                {isDashboard && !editingAgencyContacts ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    disabled={savingAgencyContacts}
+                    onClick={() => tryStartAgencyCustomization("contacts")}
+                    className="no-print absolute bottom-3 right-4 z-20 size-8 rounded-md border border-border/70 bg-background/95 text-muted-foreground shadow-sm backdrop-blur-sm hover:bg-muted hover:text-foreground sm:bottom-4 sm:right-7"
+                    aria-label="Editar contactos da agência nesta proposta"
+                  >
+                    <Pencil className="size-3.5" aria-hidden />
+                  </Button>
+                ) : null}
               </div>
             ) : null}
           </CardContent>

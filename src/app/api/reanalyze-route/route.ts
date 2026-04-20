@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { getAuth } from "firebase-admin/auth";
+import { getFirestore } from "firebase-admin/firestore";
 
+import { getFirebaseAdminApp } from "@/lib/firebase-admin-app";
+import { incrementCycleUsageAdmin, readCycleUsage } from "@/lib/cycle-usage";
+import {
+  ROTAS_ADD_ON_PACKS,
+  resolveCycleStartMs,
+  resolveQuotaLimit,
+} from "@/lib/plan-quotas";
+import { countReportsSinceAdmin } from "@/lib/reports-admin";
 import type { DiagnosticScore, RotaDigitalReport } from "@/types/report";
 import {
   type GeminiInlineImagePart,
@@ -192,6 +202,69 @@ export async function POST(req: NextRequest) {
         { error: "Informe uma observação para reanálise." },
         { status: 400 }
       );
+    }
+
+    const adminApp = getFirebaseAdminApp();
+    if (!adminApp) {
+      return NextResponse.json(
+        { error: "Servidor sem Firebase Admin (`FIREBASE_SERVICE_ACCOUNT_JSON`)." },
+        { status: 503 },
+      );
+    }
+    const authHeader = req.headers.get("authorization") ?? "";
+    const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+    if (!bearerToken) {
+      return NextResponse.json({ error: "Token ausente. Faça login novamente." }, { status: 401 });
+    }
+    let authedUid: string;
+    try {
+      const decoded = await getAuth(adminApp).verifyIdToken(bearerToken);
+      authedUid = decoded.uid;
+    } catch {
+      return NextResponse.json({ error: "Sessão inválida ou expirada." }, { status: 401 });
+    }
+    if (authedUid !== String(report.userId ?? "")) {
+      return NextResponse.json({ error: "Relatório não pertence a esta conta." }, { status: 403 });
+    }
+
+    const priorReanalyses = Array.isArray(report.aiUsage?.reanalysis)
+      ? report.aiUsage!.reanalysis!.length
+      : 0;
+    const isFreeReanalysis = priorReanalyses < 1;
+    let reanalysisChargeContext: {
+      periodStartMs: number;
+      docsUsed: number;
+    } | null = null;
+    if (!isFreeReanalysis) {
+      const db = getFirestore(adminApp);
+      const userSettingsSnap = await db.collection("userSettings").doc(authedUid).get();
+      const userSettings = userSettingsSnap.exists
+        ? (userSettingsSnap.data() as Record<string, unknown>)
+        : {};
+      const quota = resolveQuotaLimit(userSettings, "rotas");
+      if (!quota.isUnlimited) {
+        const periodStartMs = resolveCycleStartMs(userSettings, Date.now());
+        const [docsUsed, counterUsed] = await Promise.all([
+          countReportsSinceAdmin(authedUid, periodStartMs),
+          Promise.resolve(readCycleUsage(userSettings, periodStartMs, "rotas")),
+        ]);
+        const usedThisCycle = Math.max(docsUsed, counterUsed);
+        if (usedThisCycle >= quota.limit) {
+          return NextResponse.json(
+            {
+              error:
+                "Reanálises extras consomem 1 Rota Digital da cota, e seu ciclo já está esgotado.",
+              code: "ROTAS_LIMIT_REACHED",
+              plan: quota.plan,
+              monthlyLimit: quota.limit,
+              usedThisMonth: usedThisCycle,
+              addOnPacks: ROTAS_ADD_ON_PACKS,
+            },
+            { status: 429 },
+          );
+        }
+        reanalysisChargeContext = { periodStartMs, docsUsed };
+      }
     }
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -394,6 +467,20 @@ Retorne SOMENTE um JSON válido com os campos atualizados:
     const totalEstimatedCostBrl =
       Number(report.aiUsage?.totalEstimatedCostBrl || 0) +
       Number(reanalysisEstimatedCostBrl || 0);
+
+    if (reanalysisChargeContext) {
+      try {
+        await incrementCycleUsageAdmin({
+          uid: authedUid,
+          resource: "rotas",
+          cycleStartMs: reanalysisChargeContext.periodStartMs,
+          by: 1,
+          seed: Math.max(0, reanalysisChargeContext.docsUsed),
+        });
+      } catch (counterErr) {
+        console.error("[reanalyze-route] falha ao incrementar cycleUsage", counterErr);
+      }
+    }
 
     return NextResponse.json({
       report: {

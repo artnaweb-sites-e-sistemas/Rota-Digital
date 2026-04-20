@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { QuotaGuardLink } from "@/components/limits/quota-gate-context";
 import { LinkButton } from "@/components/ui/link-button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -177,10 +178,10 @@ export default function PropostasPage() {
           <h1 className="text-3xl font-bold text-foreground">Propostas</h1>
           <p className="mt-1 text-muted-foreground">Páginas comerciais geradas para apresentar e fechar novos projetos.</p>
         </div>
-        <LinkButton href="/dashboard/propostas/new" className="gap-2">
+        <QuotaGuardLink href="/dashboard/propostas/new" quotaKind="propostas" variant="cta" size="lg" className="gap-2">
           <ScrollText className="size-4" aria-hidden />
           Gerar Proposta
-        </LinkButton>
+        </QuotaGuardLink>
       </div>
 
       {loading ? (
@@ -192,10 +193,10 @@ export default function PropostasPage() {
           <FileText className="mx-auto mb-4 size-10 text-muted-foreground" aria-hidden />
           <p className="text-lg font-semibold text-foreground">Nenhuma proposta gerada ainda.</p>
           <p className="mt-2 text-sm text-muted-foreground">Crie a primeira proposta e compartilhe uma página profissional com o lead.</p>
-          <LinkButton href="/dashboard/propostas/new" className="mt-6 gap-2">
+          <QuotaGuardLink href="/dashboard/propostas/new" quotaKind="propostas" variant="cta" size="lg" className="mt-6 gap-2">
             <ScrollText className="size-4" aria-hidden />
             Gerar Proposta
-          </LinkButton>
+          </QuotaGuardLink>
         </div>
       ) : (
         <>

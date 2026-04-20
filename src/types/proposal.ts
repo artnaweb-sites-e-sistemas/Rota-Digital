@@ -56,6 +56,8 @@ export type ProposalAgencySnapshot = {
 export type ProposalEvidences = {
   leadImageUrl?: string;
   agencyImageUrl?: string;
+  /** Capa institucional só desta proposta (não altera Configurações globais). */
+  agencyCoverUrl?: string;
 };
 
 export interface Proposal {

@@ -4,6 +4,17 @@ import {
   DynamicRetrievalMode,
 } from "@google/generative-ai";
 import { randomBytes } from "crypto";
+import { getAuth } from "firebase-admin/auth";
+import { getFirestore } from "firebase-admin/firestore";
+
+import { getFirebaseAdminApp } from "@/lib/firebase-admin-app";
+import { incrementCycleUsageAdmin, readCycleUsage } from "@/lib/cycle-usage";
+import {
+  ROTAS_ADD_ON_PACKS,
+  resolveCycleStartMs,
+  resolveQuotaLimit,
+} from "@/lib/plan-quotas";
+import { countReportsSinceAdmin } from "@/lib/reports-admin";
 import type { DiagnosticScore, RotaDigitalReport } from "@/types/report";
 import type {
   AiRecommendedChannelsPolicy,
@@ -1798,6 +1809,59 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const adminApp = getFirebaseAdminApp();
+    if (!adminApp) {
+      return NextResponse.json(
+        { error: "Servidor sem Firebase Admin (`FIREBASE_SERVICE_ACCOUNT_JSON`)." },
+        { status: 503 },
+      );
+    }
+
+    const authHeader = req.headers.get("authorization") ?? "";
+    const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+    if (!bearerToken) {
+      return NextResponse.json({ error: "Token ausente. Faça login novamente." }, { status: 401 });
+    }
+    let authedUid: string;
+    try {
+      const decoded = await getAuth(adminApp).verifyIdToken(bearerToken);
+      authedUid = decoded.uid;
+    } catch {
+      return NextResponse.json({ error: "Sessão inválida ou expirada." }, { status: 401 });
+    }
+    if (authedUid !== String(userId)) {
+      return NextResponse.json({ error: "Conta não corresponde ao token." }, { status: 403 });
+    }
+
+    const db = getFirestore(adminApp);
+    const userSettingsSnap = await db.collection("userSettings").doc(authedUid).get();
+    const userSettings = userSettingsSnap.exists
+      ? (userSettingsSnap.data() as Record<string, unknown>)
+      : {};
+    const quota = resolveQuotaLimit(userSettings, "rotas");
+    const periodStartMs = resolveCycleStartMs(userSettings, Date.now());
+    if (!quota.isUnlimited) {
+      const [docsUsed, counterUsed] = await Promise.all([
+        countReportsSinceAdmin(authedUid, periodStartMs),
+        Promise.resolve(readCycleUsage(userSettings, periodStartMs, "rotas")),
+      ]);
+      const usedThisCycle = Math.max(docsUsed, counterUsed);
+      if (usedThisCycle >= quota.limit) {
+        return NextResponse.json(
+          {
+            error:
+              "Você atingiu o limite de Rotas Digital do seu ciclo atual. Amplie a cota para gerar uma nova rota.",
+            code: "ROTAS_LIMIT_REACHED",
+            plan: quota.plan,
+            monthlyLimit: quota.limit,
+            usedThisMonth: usedThisCycle,
+            addOnPacks: ROTAS_ADD_ON_PACKS,
+          },
+          { status: 429 },
+        );
+      }
+    }
+
     if (!process.env.GEMINI_API_KEY) {
       return NextResponse.json(
         { error: "Chave da API Gemini não configurada." },
@@ -2266,6 +2330,23 @@ export async function POST(req: NextRequest) {
         estimatedCostBrl: generationEstimatedCostBrl ?? null,
       },
     };
+    if (!quota.isUnlimited) {
+      try {
+        const docsUsed = await countReportsSinceAdmin(authedUid, periodStartMs);
+        await incrementCycleUsageAdmin({
+          uid: authedUid,
+          resource: "rotas",
+          cycleStartMs: periodStartMs,
+          by: 1,
+          /** Reports são gravados client-side; o contador persistente garante que
+           *  exclusões no painel não devolvem cota. Seed preserva valor já existente. */
+          seed: Math.max(0, docsUsed),
+        });
+      } catch (counterErr) {
+        console.error("[generate-route] falha ao incrementar cycleUsage", counterErr);
+      }
+    }
+
     return NextResponse.json({ report, debug });
   } catch (error: unknown) {
     console.error("Error generating route:", error);

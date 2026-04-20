@@ -50,6 +50,7 @@ export async function generateMetadata({
     `Proposta comercial preparada para ${merged.lead.company}.`;
   const image =
     merged.evidences?.leadImageUrl ||
+    merged.evidences?.agencyCoverUrl ||
     merged.evidences?.agencyImageUrl ||
     merged.agencySnapshot.primaryImageUrl ||
     merged.agencySnapshot.secondaryImageUrl;

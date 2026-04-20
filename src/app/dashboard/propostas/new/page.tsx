@@ -30,6 +30,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { isLeadStatusSelectable } from "@/lib/lead-status-rules";
+import { PlanLimitModal, type PlanLimitModalState } from "@/components/limits/plan-limit-modal";
+import { normalizedSubscriptionPlanKey } from "@/lib/plan-quotas";
 
 function futureDateIso(daysAhead: number): string {
   const date = new Date();
@@ -146,6 +148,7 @@ export default function NewProposalPage() {
   const [loadingContext, setLoadingContext] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [limitModalState, setLimitModalState] = useState<PlanLimitModalState | null>(null);
 
   const [leadId, setLeadId] = useState("");
   const [leadQuery, setLeadQuery] = useState("");
@@ -485,8 +488,21 @@ export default function NewProposalPage() {
       });
       const payload = (await response.json().catch(() => ({}))) as {
         error?: string;
+        code?: string;
+        plan?: string;
+        monthlyLimit?: number;
+        usedThisMonth?: number;
         proposalId?: string;
       };
+      if (response.status === 429 && payload.code === "PROPOSTAS_LIMIT_REACHED") {
+        setLimitModalState({
+          kind: "propostas",
+          plan: normalizedSubscriptionPlanKey(payload.plan ?? "pro"),
+          monthlyLimit: payload.monthlyLimit,
+          usedThisMonth: payload.usedThisMonth,
+        });
+        return;
+      }
       if (!response.ok || !payload.proposalId) {
         throw new Error(payload.error || "Não foi possível gerar a proposta agora.");
       }
@@ -502,6 +518,11 @@ export default function NewProposalPage() {
 
   return (
     <div className="space-y-8">
+      <PlanLimitModal
+        state={limitModalState}
+        onClose={() => setLimitModalState(null)}
+        getIdToken={user ? () => user.getIdToken() : undefined}
+      />
       <div className="flex flex-col gap-2">
         <h1 className="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
           Gerar Proposta

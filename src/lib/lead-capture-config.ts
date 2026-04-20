@@ -7,7 +7,7 @@ export const LEAD_CAPTURE_FALLBACK_DEFAULT = 25;
 
 export const LEAD_CAPTURE_MONTHLY_LIMIT_BY_PLAN = {
   starter: 30,
-  pro: 30,
+  pro: 50,
   agency: 100,
   master: 999_999_999,
 } as const;

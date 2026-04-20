@@ -72,6 +72,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { LinkButton } from "@/components/ui/link-button";
+import { QuotaGuardLink } from "@/components/limits/quota-gate-context";
 import BorderGlow from "@/components/BorderGlow";
 import { CardSpotlight } from "@/components/ui/card-spotlight";
 import { cn } from "@/lib/utils";
@@ -79,6 +80,9 @@ import { WhatsAppIcon } from "@/components/icons/whatsapp-icon";
 import type { UserReportCtaSettings } from "@/types/user-settings";
 import { PublicThemeToggle } from "@/components/public-theme-toggle";
 import { PublicThemeToggleHint } from "@/components/public-theme-toggle-hint";
+import { auth } from "@/lib/firebase";
+import { PlanLimitModal, type PlanLimitModalState } from "@/components/limits/plan-limit-modal";
+import { normalizedSubscriptionPlanKey } from "@/lib/plan-quotas";
 
 const PRIORITY_COLORS: Record<string, string> = {
   Alta:
@@ -1822,6 +1826,7 @@ export function RotaDigitalReportView({
   const [reanalyzeNotes, setReanalyzeNotes] = useState("");
   const [reanalyzing, setReanalyzing] = useState(false);
   const [reanalyzeError, setReanalyzeError] = useState<string | null>(null);
+  const [limitModalState, setLimitModalState] = useState<PlanLimitModalState | null>(null);
   const [reanalyzeProgressOpen, setReanalyzeProgressOpen] = useState(false);
   const [reanalyzeProgress, setReanalyzeProgress] = useState(0);
   const [reanalyzeProgressCompleting, setReanalyzeProgressCompleting] = useState(false);
@@ -2107,15 +2112,33 @@ export function RotaDigitalReportView({
     }, 250);
 
     try {
+      const idToken = auth?.currentUser ? await auth.currentUser.getIdToken() : null;
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (idToken) headers.Authorization = `Bearer ${idToken}`;
       const res = await fetch("/api/reanalyze-route", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           report,
           observation: reanalyzeNotes.trim(),
         }),
       });
       const data = await res.json();
+      if (res.status === 429 && data?.code === "ROTAS_LIMIT_REACHED") {
+        clearReanalyzeProgressTimer();
+        setReanalyzeProgressCompleting(false);
+        setReanalyzeProgressOpen(false);
+        setReanalyzeProgress(0);
+        reanalyzeProgressRef.current = 0;
+        setReanalyzing(false);
+        setLimitModalState({
+          kind: "rotas",
+          plan: normalizedSubscriptionPlanKey(data?.plan ?? "pro"),
+          monthlyLimit: data?.monthlyLimit,
+          usedThisMonth: data?.usedThisMonth,
+        });
+        return;
+      }
       if (!res.ok) throw new Error(data.error || "Falha na reanálise.");
 
       const updatedReport = {
@@ -2456,6 +2479,18 @@ export function RotaDigitalReportView({
           .print-white { background: white !important; color: black !important; border-color: #e5e7eb !important; }
         }
       `}</style>
+      <PlanLimitModal
+        state={limitModalState}
+        onClose={() => setLimitModalState(null)}
+        getIdToken={
+          auth && auth.currentUser
+            ? () => {
+                const current = auth?.currentUser;
+                return current ? current.getIdToken() : Promise.resolve(null);
+              }
+            : undefined
+        }
+      />
 
       {/* Header */}
       <div
@@ -2515,15 +2550,16 @@ export function RotaDigitalReportView({
                 Ver Proposta
               </LinkButton>
             ) : (
-              <LinkButton
+              <QuotaGuardLink
                 href={`/dashboard/propostas/new?leadId=${encodeURIComponent(report.leadId)}`}
+                quotaKind="propostas"
                 variant="outline"
                 size="default"
                 className="gap-2 no-print"
               >
                 <FileText size={16} />
                 Gerar Proposta
-              </LinkButton>
+              </QuotaGuardLink>
             )}
             <Button
               type="button"

@@ -1,10 +1,11 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Building2, Check, FileText, ImagePlus, Loader2, Repeat2, Upload } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Building2, Check, FileText, ImagePlus, Loader2, Lock, Repeat2, Upload } from "lucide-react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,6 +13,10 @@ import { useAuth } from "@/lib/auth-context";
 import { ProposalPlanSectionEditor } from "@/components/propostas/proposal-plan-section-editor";
 import { sortPaymentMethods } from "@/components/propostas/plan-payment-methods";
 import { describeManualUploadFailure, uploadUserSettingsImage } from "@/lib/evidence-storage";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { normalizedSubscriptionPlanKey, planAllowsCustomLogo, type PlanKey } from "@/lib/plan-quotas";
+import { PlanLimitModal, type PlanLimitModalState } from "@/components/limits/plan-limit-modal";
 import { createEmptyProposalPlan } from "@/lib/proposal-plan-factory";
 import { normalizeRecurringPlansForSave } from "@/lib/proposal-plan-coerce";
 import { normalizeInstallmentCount } from "@/lib/proposal-plan-installments";
@@ -55,6 +60,36 @@ const previewBoxStyle = {
   minHeight: SETTINGS_IMAGE_PREVIEW_PX,
   maxHeight: SETTINGS_IMAGE_PREVIEW_PX,
 } as const;
+
+/** Campos de nome/resumo institucional: só editáveis com plano pago (mesma regra do logo). */
+function BrandingLockedOverlay({
+  locked,
+  onLockedClick,
+  children,
+}: {
+  locked: boolean;
+  onLockedClick: () => void;
+  children: ReactNode;
+}) {
+  if (!locked) return <>{children}</>;
+  return (
+    <div className="relative w-full min-w-0">
+      {children}
+      <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-md bg-background/60 backdrop-blur-[1px] dark:bg-background/65">
+        <Button
+          type="button"
+          variant="cta"
+          size="sm"
+          className="pointer-events-auto gap-1.5 shadow-md"
+          onClick={onLockedClick}
+        >
+          <Lock className="size-3.5" aria-hidden />
+          Bloqueado
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 function SettingsImageCard({
   title,
@@ -143,6 +178,9 @@ export function CompanyAboutSettingsForm() {
   const [uploadingSlot, setUploadingSlot] = useState<"primary" | "secondary" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [planKey, setPlanKey] = useState<PlanKey>("pro");
+  const [canUploadLogo, setCanUploadLogo] = useState(true);
+  const [limitModalState, setLimitModalState] = useState<PlanLimitModalState | null>(null);
   const formRef = useRef(form);
   formRef.current = form;
   const hydratedRef = useRef(false);
@@ -166,11 +204,29 @@ export function CompanyAboutSettingsForm() {
     [form],
   );
 
+  /** Nome e resumo institucional: exigem plano pago (Pro/Agency); Starter vê overlay «Bloqueado». */
+  const brandingLocked = !loading && !canUploadLogo;
+
   const load = useCallback(async () => {
     if (!user) return;
     setLoading(true);
     setError(null);
     try {
+      try {
+        const snap = await getDoc(doc(db, "userSettings", user.uid));
+        if (snap.exists()) {
+          const raw = snap.data() as Record<string, unknown>;
+          const key = normalizedSubscriptionPlanKey(raw.subscriptionPlan ?? raw.plan);
+          setPlanKey(key);
+          setCanUploadLogo(planAllowsCustomLogo(raw));
+        } else {
+          setPlanKey("starter");
+          setCanUploadLogo(false);
+        }
+      } catch {
+        setPlanKey("pro");
+        setCanUploadLogo(true);
+      }
       const data = await getUserCompanyAboutSettings(user.uid);
       if (!data) {
         setForm(DEFAULT_FORM);
@@ -327,6 +383,10 @@ export function CompanyAboutSettingsForm() {
 
   const handleImageUpload = async (slot: "primary" | "secondary", file: File) => {
     if (!user) return;
+    if (!canUploadLogo) {
+      setLimitModalState({ kind: "logo", plan: planKey });
+      return;
+    }
     setUploadingSlot(slot);
     setError(null);
     try {
@@ -382,13 +442,26 @@ export function CompanyAboutSettingsForm() {
                   Nome da empresa{" "}
                   <span className="font-normal normal-case text-muted-foreground/80">(opcional)</span>
                 </Label>
-                <Input
-                  id="company-about-name"
-                  value={form.companyName}
-                  onChange={(e) => setForm((prev) => ({ ...prev, companyName: e.target.value }))}
-                  placeholder={`Vazio = “${DEFAULT_COMPANY_ABOUT_NAME}” na proposta`}
-                  className="h-11"
-                />
+                <BrandingLockedOverlay
+                  locked={brandingLocked}
+                  onLockedClick={() => setLimitModalState({ kind: "logo", plan: planKey })}
+                >
+                  <Input
+                    id="company-about-name"
+                    value={form.companyName}
+                    onChange={(e) => setForm((prev) => ({ ...prev, companyName: e.target.value }))}
+                    placeholder={`Vazio = “${DEFAULT_COMPANY_ABOUT_NAME}” na proposta`}
+                    className="h-11"
+                    disabled={brandingLocked}
+                    readOnly={brandingLocked}
+                    aria-describedby={brandingLocked ? "company-about-name-locked-hint" : undefined}
+                  />
+                </BrandingLockedOverlay>
+                {brandingLocked ? (
+                  <p id="company-about-name-locked-hint" className="sr-only">
+                    Disponível em planos pagos. Use o botão Bloqueado para ver opções de assinatura.
+                  </p>
+                ) : null}
               </div>
 
               <div className="space-y-2">
@@ -396,13 +469,26 @@ export function CompanyAboutSettingsForm() {
                   Resumo institucional{" "}
                   <span className="font-normal normal-case text-muted-foreground/80">(opcional)</span>
                 </Label>
-                <Textarea
-                  id="company-about-summary"
-                  value={form.companySummary}
-                  onChange={(e) => setForm((prev) => ({ ...prev, companySummary: e.target.value }))}
-                  placeholder="O que a agência faz e para quem. Se deixar vazio, guardamos um resumo de apoio sobre a Rota Digital (dois parágrafos) para usar nas propostas."
-                  className="min-h-40 resize-y"
-                />
+                <BrandingLockedOverlay
+                  locked={brandingLocked}
+                  onLockedClick={() => setLimitModalState({ kind: "logo", plan: planKey })}
+                >
+                  <Textarea
+                    id="company-about-summary"
+                    value={form.companySummary}
+                    onChange={(e) => setForm((prev) => ({ ...prev, companySummary: e.target.value }))}
+                    placeholder="O que a agência faz e para quem. Se deixar vazio, guardamos um resumo de apoio sobre a Rota Digital (dois parágrafos) para usar nas propostas."
+                    className="min-h-40 resize-y"
+                    disabled={brandingLocked}
+                    readOnly={brandingLocked}
+                    aria-describedby={brandingLocked ? "company-about-summary-locked-hint" : undefined}
+                  />
+                </BrandingLockedOverlay>
+                {brandingLocked ? (
+                  <p id="company-about-summary-locked-hint" className="sr-only">
+                    Disponível em planos pagos. Use o botão Bloqueado para ver opções de assinatura.
+                  </p>
+                ) : null}
               </div>
 
               <div className="space-y-3 rounded-xl border border-border bg-muted/20 p-4 dark:border-white/10 dark:bg-white/[0.02]">
@@ -590,6 +676,11 @@ export function CompanyAboutSettingsForm() {
           </>
         )}
       </CardContent>
+      <PlanLimitModal
+        state={limitModalState}
+        onClose={() => setLimitModalState(null)}
+        getIdToken={user ? () => user.getIdToken() : undefined}
+      />
     </Card>
   );
 }

@@ -31,6 +31,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { signOut } from "firebase/auth";
 import type { UserCompanyAboutSettings } from "@/types/user-settings";
 import { cn } from "@/lib/utils";
+import { QuotaGateProvider } from "@/components/limits/quota-gate-context";
 
 const SIDEBAR_COLLAPSED_KEY = "rota-digital-sidebar-collapsed";
 
@@ -413,7 +414,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         className="min-h-0 min-w-0 max-h-full flex-1 overflow-y-auto overflow-x-hidden bg-background dark:bg-zinc-950"
       >
         <div className="mx-auto w-full min-h-0 min-w-0 max-w-[1760px] px-4 py-10 sm:px-6 md:px-8 lg:px-10">
-          {children}
+          <QuotaGateProvider>{children}</QuotaGateProvider>
         </div>
       </main>
     </div>

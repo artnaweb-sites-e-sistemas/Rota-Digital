@@ -42,6 +42,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { GenerateRouteProgressOverlay } from "@/components/rotas/generate-route-progress-overlay";
+import { PlanLimitModal, type PlanLimitModalState } from "@/components/limits/plan-limit-modal";
+import { normalizedSubscriptionPlanKey, type PlanKey } from "@/lib/plan-quotas";
 import { cn } from "@/lib/utils";
 
 const MAX_AI_GUIDELINES_ROUTE = 3000;
@@ -141,6 +143,7 @@ export default function NewRotaPage() {
   const [loadingLeads, setLoadingLeads] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [limitModalState, setLimitModalState] = useState<PlanLimitModalState | null>(null);
 
   const [leadId, setLeadId] = useState<string>("");
   const [leadQuery, setLeadQuery] = useState("");
@@ -414,9 +417,19 @@ export default function NewRotaPage() {
         aiCustomServiceLabels,
         aiScoringStrictness: scoringForPayload,
       };
+      const idToken = await user.getIdToken();
       const parseApiResponse = async (res: Response) => {
         const rawBody = await res.text();
-        let parsed: { error?: string; report?: Record<string, unknown>; debug?: unknown; preparedEvidence?: unknown } = {};
+        let parsed: {
+          error?: string;
+          code?: string;
+          plan?: string;
+          monthlyLimit?: number;
+          usedThisMonth?: number;
+          report?: Record<string, unknown>;
+          debug?: unknown;
+          preparedEvidence?: unknown;
+        } = {};
         try {
           parsed = rawBody ? JSON.parse(rawBody) : {};
         } catch {
@@ -424,17 +437,36 @@ export default function NewRotaPage() {
         }
         return parsed;
       };
+      const maybeHandleQuotaResponse = (
+        res: Response,
+        parsed: Awaited<ReturnType<typeof parseApiResponse>>,
+      ): boolean => {
+        if (res.status !== 429 || parsed.code !== "ROTAS_LIMIT_REACHED") return false;
+        const plan: PlanKey = normalizedSubscriptionPlanKey(parsed.plan ?? "pro");
+        setLimitModalState({
+          kind: "rotas",
+          plan,
+          monthlyLimit: parsed.monthlyLimit,
+          usedThisMonth: parsed.usedThisMonth,
+        });
+        setProgressOverlayOpen(false);
+        clearProgressTimer();
+        return true;
+      };
 
       // Etapa 1: coleta de evidências (prints, bio, URLs verificadas).
       const collectRes = await fetch("/api/generate-route", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({
           ...payload,
           mode: "collectEvidence",
         }),
       });
       const collectData = await parseApiResponse(collectRes);
+      if (maybeHandleQuotaResponse(collectRes, collectData)) {
+        return;
+      }
       if (!collectRes.ok || !collectData.preparedEvidence) {
         const fallbackMessage =
           collectRes.status === 504
@@ -446,7 +478,7 @@ export default function NewRotaPage() {
       // Etapa 2: geração do relatório com IA usando as evidências já coletadas.
       const generateRes = await fetch("/api/generate-route", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({
           ...payload,
           mode: "generateFromEvidence",
@@ -454,6 +486,9 @@ export default function NewRotaPage() {
         }),
       });
       const data = await parseApiResponse(generateRes);
+      if (maybeHandleQuotaResponse(generateRes, data)) {
+        return;
+      }
       if (!generateRes.ok) {
         const fallbackMessage =
           generateRes.status === 504
@@ -599,6 +634,11 @@ export default function NewRotaPage() {
         progress={analysisProgress}
         companyName={selectedLead?.company}
         instantBarWidth={completingFinalStretch}
+      />
+      <PlanLimitModal
+        state={limitModalState}
+        onClose={() => setLimitModalState(null)}
+        getIdToken={user ? () => user.getIdToken() : undefined}
       />
       <div>
         <h1 className="text-3xl font-bold text-foreground">Gerar Rota Digital</h1>

@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils";
 import type { Lead } from "@/types/lead";
 import type { RotaDigitalReport } from "@/types/report";
 import { ReportSiteAvatar } from "@/components/report-site-avatar";
-import { LinkButton } from "@/components/ui/link-button";
+import { QuotaGuardLink } from "@/components/limits/quota-gate-context";
 
 function formatInt(n: number) {
   return n.toLocaleString("pt-BR");
@@ -462,10 +462,10 @@ export default function DashboardPage() {
             ) : latestReports.length === 0 ? (
               <div className="rounded-md border border-dashed border-border bg-muted/30 px-4 py-10 text-center dark:border-white/10 dark:bg-white/[0.02]">
                 <p className="text-sm font-medium text-muted-foreground">Nenhuma rota gerada ainda.</p>
-                <LinkButton href="/dashboard/rotas/new" className="mt-4 gap-2">
+                <QuotaGuardLink href="/dashboard/rotas/new" quotaKind="rotas" variant="cta" size="lg" className="mt-4 gap-2">
                   <Plus className="size-4 shrink-0" aria-hidden />
                   Gerar primeira rota
-                </LinkButton>
+                </QuotaGuardLink>
               </div>
             ) : (
               <div className="space-y-2">

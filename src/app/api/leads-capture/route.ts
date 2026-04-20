@@ -14,10 +14,10 @@ import {
   LEAD_CAPTURE_ADD_ON_PACKS,
   LEAD_CAPTURE_MAX_PER_RUN,
   LEAD_CAPTURE_MIN_PER_RUN,
-  monthStartUtcMs,
   normalizedSubscriptionPlanKey,
   resolveMonthlyLeadLimit,
 } from "@/lib/lead-capture-config";
+import { resolveCycleStartMs } from "@/lib/plan-quotas";
 
 export const runtime = "nodejs";
 
@@ -152,7 +152,7 @@ export async function POST(req: NextRequest) {
     const isMasterPlan =
       normalizedPlan === "master" || userSettings.planMasterUnlimited === true;
     const monthlyLimit = resolveMonthlyLeadLimit(userSettings);
-    const periodStartMs = monthStartUtcMs(Date.now());
+    const periodStartMs = resolveCycleStartMs(userSettings, Date.now());
     const usedThisMonth = existing.filter(
       (lead) => lead.leadSource === "google_places" && lead.createdAt >= periodStartMs,
     ).length;

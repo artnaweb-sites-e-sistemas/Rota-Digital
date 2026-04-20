@@ -952,7 +952,7 @@ export function LandingPage() {
                   description: "Diagnósticos diários e prospecção consistente para sua agência crescer.",
                   features: [
                     "20 diagnósticos (Rota Digital) com IA.",
-                    "30 prospecções de leads.",
+                    "50 prospecções de leads.",
                     "30 gerações de propostas",
                     { before: "Link Público", gold: "com a sua marca" },
                   ] satisfies LandingPlanFeature[],

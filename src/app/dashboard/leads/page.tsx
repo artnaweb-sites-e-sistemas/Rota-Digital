@@ -95,6 +95,7 @@ import {
   Users,
 } from "lucide-react";
 import Link from "next/link";
+import { QuotaGuardLink } from "@/components/limits/quota-gate-context";
 import { WhatsAppIcon } from "@/components/icons/whatsapp-icon";
 import { LeadCaptureProgressOverlay } from "@/components/leads/lead-capture-progress-overlay";
 // import { toast } from "sonner"; // If not available, we can use a simple alert or just implement without it
@@ -620,15 +621,16 @@ function LeadTableSharedRouteLink({
   if (canOpenNewRotaForm) {
     const href = `/dashboard/rotas/new?leadId=${encodeURIComponent(lead.id)}`;
     return (
-      <Link
+      <QuotaGuardLink
         href={href}
+        quotaKind="rotas"
         className={TABLE_CREATE_ROUTE_CHIP_DIMMED_CLASS}
         aria-label={`Gerar rota digital para ${lead.name}`}
         title="Ainda sem rota — abrir formulário para criar (lead já selecionado)"
         onClick={(e) => e.stopPropagation()}
       >
         <Compass className="size-3 shrink-0" aria-hidden />
-      </Link>
+      </QuotaGuardLink>
     );
   }
 
@@ -705,15 +707,16 @@ function LeadTableProposalLink({
   }
   const href = `/dashboard/propostas/new?leadId=${encodeURIComponent(lead.id)}`;
   return (
-    <Link
+    <QuotaGuardLink
       href={href}
+      quotaKind="propostas"
       className={TABLE_PROPOSAL_CHIP_DIMMED_CLASS}
       aria-label={`Gerar proposta para ${lead.name}`}
       title="Ainda sem proposta — abrir formulário para criar (lead já selecionado)"
       onClick={(e) => e.stopPropagation()}
     >
       <FileText className="size-3 shrink-0" aria-hidden />
-    </Link>
+    </QuotaGuardLink>
   );
 }
 

@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, ExternalLink, Sparkles, Compass, Calendar, Eye, Trash2, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
-import { LinkButton } from "@/components/ui/link-button";
+import { QuotaGuardLink } from "@/components/limits/quota-gate-context";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ReportSiteAvatar } from "@/components/report-site-avatar";
@@ -157,10 +157,10 @@ export default function RotasPage() {
           <h1 className="text-3xl font-bold text-foreground">Rotas Digitais</h1>
           <p className="text-muted-foreground mt-1">Relatórios gerados por IA para seus leads</p>
         </div>
-        <LinkButton href="/dashboard/rotas/new" className="gap-2">
+        <QuotaGuardLink href="/dashboard/rotas/new" quotaKind="rotas" variant="cta" size="lg" className="gap-2">
           <Compass size={16} aria-hidden />
           Gerar Rota
-        </LinkButton>
+        </QuotaGuardLink>
       </div>
 
       {loading ? (
@@ -171,10 +171,10 @@ export default function RotasPage() {
         <div className="rounded-lg border border-border bg-card p-12 text-center dark:border-zinc-800 dark:bg-zinc-900">
           <Sparkles className="mx-auto mb-4 text-muted-foreground" size={32} />
           <p className="text-lg font-medium text-foreground">Nenhum relatório gerado ainda</p>
-          <LinkButton href="/dashboard/rotas/new" className="mt-6 gap-2">
+          <QuotaGuardLink href="/dashboard/rotas/new" quotaKind="rotas" variant="cta" size="lg" className="mt-6 gap-2">
             <Compass size={16} aria-hidden />
             Gerar Rota
-          </LinkButton>
+          </QuotaGuardLink>
         </div>
       ) : (
         <>

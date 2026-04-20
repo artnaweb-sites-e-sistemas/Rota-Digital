@@ -8,6 +8,20 @@ import { normalizeLeadStatus, type LeadStatus } from "@/types/lead";
 const PROPOSALS_COLLECTION = "proposals";
 const LEADS_COLLECTION = "leads";
 
+/** Conta propostas criadas pelo utilizador desde `fromMs` (inclusive). */
+export async function countProposalsSinceAdmin(userId: string, fromMs: number): Promise<number> {
+  const app = getFirebaseAdminApp();
+  if (!app) throw new Error("Firebase Admin não configurado.");
+  const db = getFirestore(app);
+  const snap = await db
+    .collection(PROPOSALS_COLLECTION)
+    .where("userId", "==", userId)
+    .where("createdAt", ">=", fromMs)
+    .count()
+    .get();
+  return snap.data().count ?? 0;
+}
+
 export type CreateProposalAdminOptions = {
   /** Atualiza o lead na mesma operação em batch (junto com a proposta). */
   advanceLeadStatusTo?: LeadStatus;

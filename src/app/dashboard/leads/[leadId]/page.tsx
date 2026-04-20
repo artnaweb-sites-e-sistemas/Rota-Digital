@@ -54,6 +54,7 @@ import {
   User,
 } from "lucide-react";
 import { LinkButton } from "@/components/ui/link-button";
+import { QuotaGuardLink } from "@/components/limits/quota-gate-context";
 
 function leadWebsiteHref(raw: string | undefined): string {
   const t = raw?.trim() ?? "";
@@ -688,10 +689,10 @@ export default function LeadDetailPage() {
                 Para gerar, abra o formulário de rota, selecione este lead e preencha site, instagram, serviços e
                 objetivo.
               </p>
-              <LinkButton href={`/dashboard/rotas/new?leadId=${lead.id}`} className="gap-2">
+              <QuotaGuardLink href={`/dashboard/rotas/new?leadId=${lead.id}`} quotaKind="rotas" variant="cta" size="lg" className="gap-2">
                 <Sparkles size={16} />
                 Ir para Gerar Rota
-              </LinkButton>
+              </QuotaGuardLink>
             </div>
           )}
         </CardContent>
