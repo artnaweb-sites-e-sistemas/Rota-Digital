@@ -466,8 +466,8 @@ export function LandingPage() {
                   contentClassName="rounded-lg"
                 >
                   <Link
-                    href="#planos"
-                    onClick={(e) => handleInPageNavClick(e, "#planos")}
+                    href="#planos-ciclo"
+                    onClick={(e) => handleInPageNavClick(e, "#planos-ciclo")}
                     className="flex w-full items-center justify-center gap-2 text-base font-semibold transition-colors"
                   >
                     Começar Agora
@@ -839,7 +839,12 @@ export function LandingPage() {
               description="Comece no ritmo certo e evolua conforme sua agência ganha volume, consistência e ambição comercial."
             />
 
-            <div className="mt-12 flex justify-center px-2">
+            {/* Âncora do CTA "Começar Agora": alinha com o espaçador do header fixo (hero) para o toggle ficar logo abaixo da barra. */}
+            <div
+              id="planos-ciclo"
+              className="scroll-mt-[calc(4rem+1.375rem)] sm:scroll-mt-[calc(4rem+1.5rem)]"
+            >
+              <div className="mt-12 flex justify-center px-2">
               <div
                 className={cn(
                   "relative inline-flex h-[3.25rem] items-stretch rounded-full border p-1 text-sm",
@@ -920,6 +925,7 @@ export function LandingPage() {
                     </span>
                   </motion.button>
                 </div>
+              </div>
               </div>
             </div>
 
@@ -1169,12 +1175,12 @@ export function LandingPage() {
             <div className="pointer-events-none absolute inset-0 z-[1] rounded-2xl bg-gradient-to-b from-[#f2e2ba]/64 via-[#e8cf96]/42 to-[#d9b973]/48" />
 
             <div className="relative z-10 mx-auto flex max-w-2xl flex-col gap-5 sm:gap-6">
-              <h2 className="pr-2 text-2xl font-bold leading-[1.12] tracking-tight text-zinc-900 sm:text-4xl sm:leading-[1.14] lg:text-5xl">
+              <h2 className="pr-2 text-xl font-bold leading-snug tracking-tight text-zinc-900 sm:text-4xl sm:leading-[1.14] lg:text-5xl">
                 Pronto para escalar os
                 <br />
                 resultados da sua agência?
               </h2>
-              <p className="text-base leading-relaxed text-[#6f5a2f] sm:text-lg">
+              <p className="text-sm leading-relaxed text-[#6f5a2f] sm:text-lg">
                 Pare de perder tempo com propostas em PDF. Impressione seus clientes desde o primeiro diagnóstico.
               </p>
 
