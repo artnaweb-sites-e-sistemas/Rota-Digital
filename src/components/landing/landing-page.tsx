@@ -3,14 +3,25 @@
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
-import { useMemo, useState, type MouseEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+  type Dispatch,
+  type MouseEvent,
+  type ReactNode,
+  type SetStateAction,
+} from "react";
 import { motion } from "motion/react";
 import {
+  ArrowDown,
   ArrowRight,
   Bot,
   CheckCircle2,
   ChevronRight,
   Compass,
+  Crown,
   FileText,
   AlertCircle,
   Link2,
@@ -127,6 +138,135 @@ function handleInPageNavClick(e: MouseEvent<HTMLAnchorElement>, hash: string) {
   }
 }
 
+const MD_UP_QUERY = "(min-width: 768px)";
+
+function subscribeMdUp(onStoreChange: () => void) {
+  if (typeof window === "undefined") return () => {};
+  const mq = window.matchMedia(MD_UP_QUERY);
+  mq.addEventListener("change", onStoreChange);
+  return () => mq.removeEventListener("change", onStoreChange);
+}
+
+function getMdUpSnapshot() {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia(MD_UP_QUERY).matches;
+}
+
+/** `true` a partir de `md` — no SSR devolve `false` (barra leve, sem Glass). */
+function useIsMdUp() {
+  return useSyncExternalStore(subscribeMdUp, getMdUpSnapshot, () => false);
+}
+
+function LandingHeaderNav({
+  isMobileMenuOpen,
+  setIsMobileMenuOpen,
+}: {
+  isMobileMenuOpen: boolean;
+  setIsMobileMenuOpen: Dispatch<SetStateAction<boolean>>;
+}) {
+  return (
+    <>
+      <div className="flex h-16 w-full min-w-0 max-w-full items-center justify-between gap-2 px-3 sm:gap-3 sm:px-4">
+        <Link href="/" className="flex min-w-0 shrink items-center gap-2 font-bold tracking-tight transition-transform hover:scale-105 sm:gap-2.5">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/70 text-primary-foreground shadow-lg shadow-primary/20 sm:size-9">
+            <Compass className="size-4 sm:size-5" aria-hidden />
+          </span>
+          <span className="truncate text-base sm:text-lg">Rota Digital</span>
+        </Link>
+        <nav className="hidden min-w-0 items-center gap-0 md:flex" aria-label="Navegação Principal">
+          {NAV_LINKS.map((item) => (
+            <a
+              key={item.href}
+              href={item.href}
+              onClick={(e) => handleInPageNavClick(e, item.href)}
+              className="rounded-lg px-1.5 py-2 text-[11px] font-medium text-muted-foreground transition-all hover:bg-black/[0.04] hover:text-foreground sm:px-2 sm:text-xs dark:hover:bg-white/[0.06]"
+            >
+              {item.label}
+            </a>
+          ))}
+        </nav>
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+          <LinkButton
+            href="/login"
+            variant="cta"
+            size="default"
+            className="hidden h-9 min-w-[12.5rem] shrink-0 gap-2 rounded-lg px-5 text-sm font-semibold shadow-lg shadow-primary/15 sm:h-10 sm:min-w-[15rem] sm:px-7 md:flex md:min-w-[16.5rem] md:px-8"
+          >
+            <LogIn className="size-4 shrink-0" aria-hidden />
+            <span className="whitespace-nowrap">Acessar Plataforma</span>
+          </LinkButton>
+          <div className="flex items-center gap-1.5 md:gap-2">
+            <PublicThemeToggle
+              id="landing-theme-toggle"
+              className={cn(
+                "h-9 min-h-9 w-9 shrink-0 rounded-lg border border-solid border-border/55 bg-background/50 shadow-none transition-all hover:border-border hover:bg-accent/80 sm:h-10 sm:min-h-10 sm:w-10",
+                "[&_svg]:text-foreground",
+                "dark:border-white/15 dark:bg-zinc-900/40",
+              )}
+            />
+            <button
+              type="button"
+              onClick={() => setIsMobileMenuOpen((o) => !o)}
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-border/55 bg-background/50 text-foreground transition-all hover:bg-accent md:hidden"
+              aria-expanded={isMobileMenuOpen}
+              aria-label={isMobileMenuOpen ? "Fechar menu" : "Abrir menu"}
+            >
+              {isMobileMenuOpen ? <XCircle className="size-5" /> : <Menu className="size-5" />}
+            </button>
+          </div>
+        </div>
+      </div>
+      <div
+        className={cn(
+          "w-full min-w-0 overflow-hidden border-t border-border/40 md:hidden",
+          !isMobileMenuOpen && "hidden",
+        )}
+      >
+        <LandingHeaderMobileNavLinks setIsMobileMenuOpen={setIsMobileMenuOpen} />
+      </div>
+    </>
+  );
+}
+
+function LandingHeaderMobileNavLinks({
+  setIsMobileMenuOpen,
+}: {
+  setIsMobileMenuOpen: Dispatch<SetStateAction<boolean>>;
+}) {
+  return (
+    <nav
+      className="flex w-full min-w-0 flex-col gap-0.5 px-3 pb-5 pt-2 sm:px-4"
+      aria-label="Navegação principal (mobile)"
+    >
+      {NAV_LINKS.map((item) => (
+        <a
+          key={item.href}
+          href={item.href}
+          onClick={(e) => {
+            handleInPageNavClick(e, item.href);
+            setIsMobileMenuOpen(false);
+          }}
+          className="flex w-full min-w-0 items-center gap-3 rounded-xl px-3 py-3.5 text-left text-[15px] font-medium text-foreground/90 transition-colors hover:bg-foreground/[0.06] active:bg-foreground/[0.08] dark:hover:bg-white/[0.06]"
+        >
+          <span className="min-w-0 flex-1 whitespace-nowrap">{item.label}</span>
+          <ChevronRight className="size-4 shrink-0 text-muted-foreground/50" aria-hidden />
+        </a>
+      ))}
+      <div className="mt-3 border-t border-border/40 pt-4">
+        <LinkButton
+          href="/login"
+          variant="cta"
+          size="lg"
+          className="box-border min-h-12 w-full min-w-0 max-w-full shrink rounded-xl px-4 py-3.5 text-sm font-bold shadow-lg shadow-primary/15 sm:text-[0.9375rem]"
+        >
+          <LogIn className="size-4 shrink-0" aria-hidden />
+          Acessar Plataforma
+        </LinkButton>
+      </div>
+    </nav>
+  );
+}
+
 function SectionTitle({
   eyebrow,
   eyebrowClassName,
@@ -201,7 +341,12 @@ function HeroVisual({ className }: { className?: string }) {
 export function LandingPage() {
   const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const isMdUp = useIsMdUp();
   const { resolvedTheme } = useTheme();
+
+  useEffect(() => {
+    if (isMdUp) setIsMobileMenuOpen(false);
+  }, [isMdUp]);
   const heroHyperspeedOptions = useMemo(
     () => getRotaHeroHyperspeedOptions(resolvedTheme),
     [resolvedTheme],
@@ -242,116 +387,38 @@ export function LandingPage() {
           className="mx-auto box-border min-w-0 px-4 sm:px-6"
           style={{ width: "100%", maxWidth: 1000 }}
         >
-          <GlassSurface
-            width="100%"
-            height="auto"
-            borderRadius={14}
-            borderWidth={0.065}
-            brightness={54}
-            opacity={0.88}
-            blur={13}
-            displace={2.8}
-            backgroundOpacity={0.6}
-            saturation={1.12}
-            distortionScale={-130}
-            redOffset={0}
-            greenOffset={8}
-            blueOffset={18}
-            mixBlendMode="normal"
-            edge="subtle"
-            innerClassName="!flex !h-auto !min-h-16 !w-full !min-w-0 !max-w-full !flex-col !items-stretch !justify-start !p-0"
-            className="box-border w-full min-w-0 max-w-full rounded-xl"
-            style={{ maxWidth: 1000, boxSizing: "border-box" }}
-          >
-            <div className="flex h-16 w-full min-w-0 max-w-full items-center justify-between gap-2 px-3 sm:gap-3 sm:px-4">
-              <Link href="/" className="flex min-w-0 shrink items-center gap-2 font-bold tracking-tight transition-transform hover:scale-105 sm:gap-2.5">
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/70 text-primary-foreground shadow-lg shadow-primary/20 sm:size-9">
-                  <Compass className="size-4 sm:size-5" aria-hidden />
-                </span>
-                <span className="truncate text-base sm:text-lg">Rota Digital</span>
-              </Link>
-              <nav className="hidden min-w-0 items-center gap-0 md:flex" aria-label="Navegação Principal">
-                {NAV_LINKS.map((item) => (
-                  <a
-                    key={item.href}
-                    href={item.href}
-                    onClick={(e) => handleInPageNavClick(e, item.href)}
-                    className="rounded-lg px-1.5 py-2 text-[11px] font-medium text-muted-foreground transition-all hover:bg-black/[0.04] hover:text-foreground sm:px-2 sm:text-xs dark:hover:bg-white/[0.06]"
-                  >
-                    {item.label}
-                  </a>
-                ))}
-              </nav>
-              <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-                <LinkButton
-                  href="/login"
-                  variant="cta"
-                  size="default"
-                  className="hidden h-9 min-w-[12.5rem] shrink-0 gap-2 rounded-lg px-5 text-sm font-semibold shadow-lg shadow-primary/15 sm:h-10 sm:min-w-[15rem] sm:px-7 md:flex md:min-w-[16.5rem] md:px-8"
-                >
-                  <LogIn className="size-4 shrink-0" aria-hidden />
-                  <span className="whitespace-nowrap">Acessar Plataforma</span>
-                </LinkButton>
-                <div className="flex items-center gap-1.5 md:gap-2">
-                  <PublicThemeToggle
-                    id="landing-theme-toggle"
-                    className={cn(
-                      "h-9 min-h-9 w-9 shrink-0 rounded-lg border border-solid border-border/55 bg-background/50 shadow-none transition-all hover:border-border hover:bg-accent/80 sm:h-10 sm:min-h-10 sm:w-10",
-                      "[&_svg]:text-foreground",
-                      "dark:border-white/15 dark:bg-zinc-900/40",
-                    )}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                    className="flex h-9 w-9 items-center justify-center rounded-lg border border-border/55 bg-background/50 text-foreground transition-all hover:bg-accent md:hidden"
-                    aria-label="Menu"
-                  >
-                    {isMobileMenuOpen ? <XCircle className="size-5" /> : <Menu className="size-5" />}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Mobile menu — mesmo fluxo em coluna que o header (evita flex-row do GlassSurface a empurrar o painel para a direita) */}
-            <motion.div
-              initial={false}
-              animate={isMobileMenuOpen ? { height: "auto", opacity: 1 } : { height: 0, opacity: 0 }}
-              className="w-full min-w-0 overflow-hidden border-t border-border/40 md:hidden"
-              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+          {isMdUp ? (
+            <GlassSurface
+              width="100%"
+              height="auto"
+              borderRadius={14}
+              borderWidth={0.065}
+              brightness={54}
+              opacity={0.88}
+              blur={13}
+              displace={2.8}
+              backgroundOpacity={0.6}
+              saturation={1.12}
+              distortionScale={-130}
+              redOffset={0}
+              greenOffset={8}
+              blueOffset={18}
+              mixBlendMode="normal"
+              edge="subtle"
+              innerClassName="!flex !h-auto !min-h-16 !w-full !min-w-0 !max-w-full !flex-col !items-stretch !justify-start !p-0"
+              className="box-border w-full min-w-0 max-w-full rounded-xl"
+              style={{ maxWidth: 1000, boxSizing: "border-box" }}
             >
-              <nav
-                className="flex w-full min-w-0 flex-col gap-0.5 px-3 pb-5 pt-2 sm:px-4"
-                aria-label="Navegação principal (mobile)"
-              >
-                {NAV_LINKS.map((item) => (
-                  <a
-                    key={item.href}
-                    href={item.href}
-                    onClick={(e) => {
-                      handleInPageNavClick(e, item.href);
-                      setIsMobileMenuOpen(false);
-                    }}
-                    className="flex w-full min-w-0 items-center gap-3 rounded-xl px-3 py-3.5 text-left text-[15px] font-medium text-foreground/90 transition-colors hover:bg-foreground/[0.06] active:bg-foreground/[0.08] dark:hover:bg-white/[0.06]"
-                  >
-                    <span className="min-w-0 flex-1 whitespace-nowrap">{item.label}</span>
-                    <ChevronRight className="size-4 shrink-0 text-muted-foreground/50" aria-hidden />
-                  </a>
-                ))}
-                <div className="mt-3 border-t border-border/40 pt-4">
-                  <LinkButton
-                    href="/login"
-                    variant="cta"
-                    size="lg"
-                    className="box-border min-h-12 w-full min-w-0 max-w-full shrink rounded-xl px-4 py-3.5 text-sm font-bold shadow-lg shadow-primary/15 sm:text-[0.9375rem]"
-                  >
-                    <LogIn className="size-4 shrink-0" aria-hidden />
-                    Acessar Plataforma
-                  </LinkButton>
-                </div>
-              </nav>
-            </motion.div>
-          </GlassSurface>
+              <LandingHeaderNav isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} />
+            </GlassSurface>
+          ) : (
+            <div
+              className="box-border w-full min-w-0 max-w-full rounded-xl border border-border/55 bg-background/95 shadow-sm dark:border-white/10 dark:bg-zinc-950/95"
+              style={{ maxWidth: 1000, boxSizing: "border-box" }}
+            >
+              <LandingHeaderNav isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} />
+            </div>
+          )}
         </div>
       </header>
 
@@ -398,11 +465,12 @@ export function LandingPage() {
                   contentClassName="rounded-lg"
                 >
                   <Link
-                    href="/login"
-                    className="flex w-full items-center justify-center gap-2 text-base font-semibold transition-colors hover:text-brand"
+                    href="#planos"
+                    onClick={(e) => handleInPageNavClick(e, "#planos")}
+                    className="flex w-full items-center justify-center gap-2 text-base font-semibold transition-colors"
                   >
                     Começar Agora
-                    <ArrowRight className="size-4" />
+                    <ArrowDown className="size-4 text-brand" />
                   </Link>
                 </StarBorder>
               </div>
@@ -895,7 +963,7 @@ export function LandingPage() {
                     "Propostas ilimitadas",
                     { before: "Link Público", gold: "com a sua marca" },
                   ] satisfies LandingPlanFeature[],
-                  buttonText: "Falar com Consultor",
+                  buttonText: "Assinar Agency",
                   ctaHref: "/login",
                   isFeatured: false,
                 },
@@ -966,7 +1034,10 @@ export function LandingPage() {
                   ) : (
                     <Card className="flex h-full w-full flex-col overflow-hidden rounded-xl border-border/50 bg-white shadow-sm transition-all hover:shadow-md dark:bg-zinc-950/20">
                       <div className="flex flex-1 flex-col p-8">
-                        <h4 className="text-xl font-bold">{plan.name}</h4>
+                        <h4 className="flex items-center gap-2 text-xl font-bold">
+                          <span>{plan.name}</span>
+                          {plan.name === "Agency" ? <Crown className="size-[1.05rem] text-brand" aria-hidden /> : null}
+                        </h4>
                         <div className="mt-5 flex flex-col">
                           {plan.originalPrice && (
                             <span className="text-sm font-medium text-muted-foreground/60 line-through decoration-brand decoration-2">
@@ -1097,16 +1168,16 @@ export function LandingPage() {
             <div className="pointer-events-none absolute inset-0 z-[1] rounded-2xl bg-gradient-to-b from-[#f2e2ba]/64 via-[#e8cf96]/42 to-[#d9b973]/48" />
 
             <div className="relative z-10 mx-auto flex max-w-2xl flex-col gap-5 sm:gap-6">
-              <h2 className="pr-2 text-3xl font-bold leading-[1.14] tracking-tight text-zinc-900 sm:text-4xl lg:text-5xl">
+              <h2 className="pr-2 text-2xl font-bold leading-[1.12] tracking-tight text-zinc-900 sm:text-4xl sm:leading-[1.14] lg:text-5xl">
                 Pronto para escalar os
                 <br />
                 resultados da sua agência?
               </h2>
-              <p className="text-lg leading-relaxed text-[#6f5a2f]">
+              <p className="text-base leading-relaxed text-[#6f5a2f] sm:text-lg">
                 Pare de perder tempo com propostas em PDF. Impressione seus clientes desde o primeiro diagnóstico.
               </p>
 
-              <div className="mt-10 flex justify-center">
+              <div className="mt-1 flex justify-center sm:mt-10">
                 <Link
                   href="/cadastro"
                   className={cn(
@@ -1114,14 +1185,15 @@ export function LandingPage() {
                     "border border-zinc-900/10 bg-zinc-900 text-white",
                     "shadow-[0_10px_24px_-12px_rgba(24,24,27,0.45)]",
                     "backdrop-blur-xl backdrop-saturate-150",
-                    "transition-[color,border-color,background-image] duration-300 ease-out",
-                    "hover:border-[#d2b56a]/60 hover:bg-[#d2b56a] hover:text-zinc-900",
+                    "transition-[box-shadow,border-color,background-color] duration-300 ease-out",
+                    "hover:bg-zinc-800 hover:border-white/18",
+                    "hover:shadow-[0_16px_40px_-16px_rgba(24,24,27,0.5)]",
                     "active:scale-[0.99]",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/25 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f6f2e8]",
                   )}
                 >
                   Criar Minha Conta Grátis
-                  <ArrowRight className="size-5 shrink-0" aria-hidden />
+                  <ArrowRight className="size-5 shrink-0 text-brand" aria-hidden />
                 </Link>
               </div>
             </div>
