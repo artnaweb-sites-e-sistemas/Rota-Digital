@@ -713,13 +713,13 @@ export default function UsuariosAdminPage() {
                     type="button"
                     className="inline-flex w-full min-w-0 items-center justify-end gap-1 rounded-md py-0.5 pr-5 text-[10px] font-bold uppercase tracking-widest outline-none ring-offset-background hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
                     onClick={() => toggleColumnSort("leads")}
-                    title="Total de leads no Firestore (todos os períodos)"
+                    title="Total de leads no Firestore (registos existentes; excluídos não entram)"
                     aria-label={
                       sort.key === "leads"
                         ? sort.dir === "asc"
                           ? "Leads ordenados do menor para o maior; clicar para inverter"
                           : "Leads ordenados do maior para o menor; clicar para inverter"
-                        : "Ordenar por total de leads (Firestore, todos os períodos)"
+                        : "Ordenar por total de leads existentes no Firestore"
                     }
                   >
                     Leads
@@ -741,13 +741,13 @@ export default function UsuariosAdminPage() {
                     type="button"
                     className="inline-flex w-full min-w-0 items-center justify-end gap-1 rounded-md py-0.5 pr-5 text-[10px] font-bold uppercase tracking-widest outline-none ring-offset-background hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
                     onClick={() => toggleColumnSort("reports")}
-                    title="Total de rotas no Firestore (todos os períodos)"
+                    title="Uso no ciclo de faturação atual: relatórios existentes ou gerados (inclui apagados)"
                     aria-label={
                       sort.key === "reports"
                         ? sort.dir === "asc"
                           ? "Rotas ordenadas do menor para o maior; clicar para inverter"
                           : "Rotas ordenadas do maior para o menor; clicar para inverter"
-                        : "Ordenar por total de rotas (Firestore, todos os períodos)"
+                        : "Ordenar por uso de rotas no ciclo atual (inclui apagados)"
                     }
                   >
                     Rotas
@@ -769,13 +769,13 @@ export default function UsuariosAdminPage() {
                     type="button"
                     className="inline-flex w-full min-w-0 items-center justify-end gap-1 rounded-md py-0.5 pr-5 text-[10px] font-bold uppercase tracking-widest outline-none ring-offset-background hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
                     onClick={() => toggleColumnSort("proposals")}
-                    title="Total de propostas no Firestore (todos os períodos)"
+                    title="Uso no ciclo de faturação atual: propostas existentes ou criadas (inclui apagadas)"
                     aria-label={
                       sort.key === "proposals"
                         ? sort.dir === "asc"
                           ? "Propostas ordenadas do menor para o maior; clicar para inverter"
                           : "Propostas ordenadas do maior para o menor; clicar para inverter"
-                        : "Ordenar por total de propostas (Firestore, todos os períodos)"
+                        : "Ordenar por uso de propostas no ciclo atual (inclui apagadas)"
                     }
                   >
                     Propostas

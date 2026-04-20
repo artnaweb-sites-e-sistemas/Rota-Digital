@@ -1,6 +1,8 @@
 import type { Auth, UserRecord } from "firebase-admin/auth";
 import type { Firestore } from "firebase-admin/firestore";
 
+import { readCycleUsage } from "@/lib/cycle-usage";
+import { resolveCycleStartMs } from "@/lib/plan-quotas";
 import type { AdminListedUser } from "@/types/admin-user-list";
 
 const USER_SETTINGS_COLLECTION = "userSettings";
@@ -122,12 +124,19 @@ async function enrichOne(
   const settingsData = settingsSnap.exists
     ? (settingsSnap.data() as Record<string, unknown>)
     : undefined;
+  const reportsInDb = reportsSnap.data().count;
+  const proposalsInDb = proposalsSnap.data().count;
+  /** Inclui gerações já apagadas no ciclo atual (contador persistente em `userSettings.cycleUsage`). */
+  const periodStartMs = resolveCycleStartMs(settingsData, Date.now());
+  const rotasUsage = readCycleUsage(settingsData, periodStartMs, "rotas");
+  const propostasUsage = readCycleUsage(settingsData, periodStartMs, "propostas");
   const base: AdminListedUser = {
     ...u,
     companyName: companyNameFromSettings(settingsData),
     plan: planFromSettings(settingsData),
-    reportsCount: reportsSnap.data().count,
-    proposalsCount: proposalsSnap.data().count,
+    reportsCount: Math.max(reportsInDb, rotasUsage),
+    proposalsCount: Math.max(proposalsInDb, propostasUsage),
+    /** Leads: só documentos existentes no Firestore (excluídos não contam). */
     leadsCount: leadsSnap.data().count,
   };
   if (includeBilling && settingsData) {
