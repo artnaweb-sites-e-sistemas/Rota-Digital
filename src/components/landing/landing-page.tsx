@@ -791,12 +791,12 @@ export function LandingPage() {
                 ))}
               </div>
 
-              {/* Bottom badge */}
+              {/* Legenda acima do vídeo (BorderGlow) */}
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ delay: 0.6 }}
+                transition={{ delay: 0.5 }}
                 className="mx-auto mt-14 max-w-fit"
               >
                 <BorderGlow
@@ -825,6 +825,26 @@ export function LandingPage() {
                     Links públicos seguros com experiência responsiva
                   </div>
                 </BorderGlow>
+              </motion.div>
+
+              {/* Vídeo do link partilhável — fora do BorderGlow, sem moldura/fundo */}
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.6 }}
+                className="mx-auto mt-3 w-full max-w-lg sm:mt-4 sm:max-w-2xl"
+              >
+                <video
+                  className="mx-auto block h-auto w-full max-h-[min(52vh,340px)] max-w-full object-contain sm:max-h-[420px] md:max-h-[480px]"
+                  src="/videos/landing/link%20compartilhavel.webm"
+                  muted
+                  loop
+                  playsInline
+                  autoPlay
+                  preload="auto"
+                  aria-label="Demonstração do link público partilhável"
+                />
               </motion.div>
             </div>
           </div>

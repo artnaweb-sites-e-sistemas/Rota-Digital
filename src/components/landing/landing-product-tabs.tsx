@@ -7,11 +7,15 @@ import { Building2, Compass, FileText, Users, ChevronRight, CheckCircle2 } from 
 import { cn } from "@/lib/utils";
 import BorderGlow from "@/components/BorderGlow";
 
+/** Mesmo asset de demo em todos os módulos da secção #produto (layout alinhado ao card). */
+const PRODUCT_PANEL_VIDEO_SRC = "/videos/landing/rota-digital-dark2.webm" as const;
+
 const TABS = [
   {
     id: "leads",
     label: "Prospecção",
     icon: Users,
+    videoSrc: PRODUCT_PANEL_VIDEO_SRC,
     title: "Controle total do seu funil",
     description: "Veja os leads em um só lugar e saiba exatamente com quem falar e o que fazer em seguida.",
     bullets: [
@@ -24,6 +28,7 @@ const TABS = [
     id: "rota",
     label: "Rota Digital",
     icon: Compass,
+    videoSrc: PRODUCT_PANEL_VIDEO_SRC,
     title: "Diagnóstico que prepara a venda",
     description: "A plataforma analisa o site e o Instagram da empresa e mostra, de forma simples, onde ela pode melhorar.",
     bullets: [
@@ -36,6 +41,7 @@ const TABS = [
     id: "proposta",
     label: "Proposta",
     icon: FileText,
+    videoSrc: PRODUCT_PANEL_VIDEO_SRC,
     title: "Propostas com mais poder de fechamento",
     description: "Monte propostas mais claras e profissionais, com base no que o cliente realmente precisa.",
     bullets: [
@@ -180,8 +186,8 @@ export function LandingProductTabs() {
             disablePointerTracking
             loopEntranceAnimation
           >
-            <div className="grid h-full gap-8 p-6 sm:p-10 lg:grid-cols-[1fr_1.1fr]">
-              <div className="flex flex-col justify-center">
+            <div className="grid h-full gap-8 px-6 pb-0 pt-6 sm:px-10 sm:pb-0 sm:pt-10 lg:grid-cols-[1fr_1.1fr]">
+              <div className="flex flex-col justify-center pb-6 sm:pb-10">
                 <div className="mb-4 flex items-center gap-2 text-sm font-bold uppercase tracking-[0.15em] text-brand">
                   <Building2 className="size-4" aria-hidden />
                   <span>Módulo {panel.label}</span>
@@ -205,25 +211,18 @@ export function LandingProductTabs() {
                 </ul>
               </div>
 
-              <div className="relative flex aspect-video items-center justify-center overflow-hidden rounded-xl border bg-zinc-50 shadow-inner dark:border-white/5 dark:bg-white/[0.02]">
-                <div className="absolute inset-0 bg-gradient-to-br from-brand/5 via-transparent to-transparent" />
-                <div className="relative z-10 p-4 text-center">
-                  <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-xl bg-white border shadow-sm dark:bg-background dark:border-border/50">
-                    <panel.icon className="size-6 text-brand" />
-                  </div>
-                  <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground/60">Interface Preview</p>
-                  <div className="mt-6 flex flex-col gap-2 w-full max-w-[240px] mx-auto">
-                    <div className="h-2 w-3/4 rounded bg-brand/20" />
-                    <div className="h-2 w-full rounded bg-zinc-200 dark:bg-muted" />
-                    <div className="h-2 w-1/2 rounded bg-zinc-200 dark:bg-muted" />
-                  </div>
-                  <div className="mt-8 grid grid-cols-3 gap-2 w-full max-w-[240px] mx-auto">
-                    {[1, 2, 3].map(i => <div key={i} className="aspect-square rounded-lg bg-zinc-200/70 dark:bg-muted/50" />)}
-                  </div>
-                </div>
-                {/* Decorative Elements */}
-                <div className="absolute -bottom-10 -right-10 size-40 rounded-full bg-brand/10 blur-3xl opacity-50 dark:bg-brand/20" />
-                <div className="absolute -top-10 -left-10 size-40 rounded-full bg-amber-500/5 blur-3xl opacity-30 dark:bg-purple-500/10" />
+              <div className="relative h-full min-h-[12rem] overflow-hidden rounded-br-xl leading-none lg:min-h-0 -mr-[calc(1.5rem+1px)] -mb-4 sm:-mr-[calc(2.5rem+1px)] sm:-mb-6">
+                <video
+                  key={panel.videoSrc}
+                  className="absolute bottom-[-6px] right-0 z-0 block h-auto w-full max-w-none sm:bottom-[-10px]"
+                  src={panel.videoSrc}
+                  muted
+                  loop
+                  playsInline
+                  autoPlay
+                  preload="auto"
+                  aria-label={`Demonstração em vídeo do módulo ${panel.label}`}
+                />
               </div>
             </div>
           </BorderGlow>
