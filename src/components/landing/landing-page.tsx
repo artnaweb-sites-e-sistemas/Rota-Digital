@@ -8,15 +8,17 @@ import { motion } from "motion/react";
 import {
   ArrowRight,
   Bot,
-  Building2,
   CheckCircle2,
   ChevronRight,
   Compass,
   FileText,
+  AlertCircle,
   Link2,
   LogIn,
   Send,
+  Sparkles,
   Users,
+  XCircle,
   Zap,
 } from "lucide-react";
 
@@ -30,6 +32,7 @@ import { LinkButton } from "@/components/ui/link-button";
 import { cn } from "@/lib/utils";
 
 import { LandingProductTabs } from "@/components/landing/landing-product-tabs";
+import { LandingRotasCompare } from "@/components/landing/landing-rotas-compare";
 import BorderGlow from "@/components/BorderGlow";
 import StarBorder from "@/components/StarBorder";
 
@@ -114,23 +117,25 @@ function handleInPageNavClick(e: MouseEvent<HTMLAnchorElement>, hash: string) {
 
 function SectionTitle({
   eyebrow,
+  eyebrowClassName,
   title,
   description,
   className,
 }: {
-  eyebrow?: string;
+  eyebrow?: ReactNode;
+  eyebrowClassName?: string;
   title: string;
   description?: string;
   className?: string;
 }) {
   return (
     <div className={cn("mx-auto max-w-2xl text-center", className)}>
-      {eyebrow ? (
+      {eyebrow != null && eyebrow !== false ? (
         <motion.p
           initial={{ opacity: 0, y: 10 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-primary"
+          className={cn("mb-3 text-xs font-bold uppercase tracking-[0.2em] text-brand", eyebrowClassName)}
         >
           {eyebrow}
         </motion.p>
@@ -312,14 +317,14 @@ export function LandingPage() {
             >
               <div className="mb-6 inline-flex items-center gap-2 rounded-lg border border-brand/25 bg-brand/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-brand shadow-sm">
                 <Compass className="size-3.5 shrink-0" aria-hidden />
-                <span>O Futuro da Gestão de Leads</span>
+                <span>Comercial mais inteligente</span>
               </div>
               <h1 className="font-heading text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl md:text-6xl md:leading-[1.1] lg:text-[4rem]">
                 Transforme<br />
                 <span className="bg-gradient-to-br from-brand to-brand/55 bg-clip-text text-transparent">Leads</span> em Clientes.
               </h1>
               <p className="mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground sm:text-xl">
-                A plataforma definitiva para agências modernas. Organize leads, gere diagnósticos em segundos com IA e entregue propostas que fecham vendas.
+                Centralize sua operação comercial, gere diagnósticos com IA e apresente propostas com mais contexto, valor e poder de fechamento.
               </p>
               <div className="mt-10 flex flex-wrap items-center gap-4">
                 <StarBorder
@@ -383,15 +388,30 @@ export function LandingPage() {
           <div className="mx-auto max-w-7xl">
             <SectionTitle
               eyebrow="A Dor do Mercado"
-              title="Vender serviços digitais não precisa ser sofrido"
+              title="Chega de vender no improviso"
               description="A grande maioria das agências gasta horas estruturando propostas que são ignoradas. Nós mudamos esse jogo."
             />
             <div className="mt-16 grid gap-6 md:grid-cols-3">
               {[
-                { icon: Users, t: "Gestão Desorganizada", d: "Leads perdidos no WhatsApp e planilhas obsoletas." },
-                { icon: Compass, t: "Diagnósticos Demorados", d: "Horas analisando concorrentes e redes sociais manualmente." },
-                { icon: FileText, t: "Propostas Ignoradas", d: "PDFs massantes que não conectam com a dor real do cliente." },
-              ].map(({ icon: Icon, t, d }, idx) => (
+                { 
+                  icon: XCircle, 
+                  t: "Gestão Desorganizada", 
+                  d: "Leads perdidos no WhatsApp e planilhas obsoletas.",
+                  color: "destructive" 
+                },
+                { 
+                  icon: AlertCircle, 
+                  t: "Diagnósticos Demorados", 
+                  d: "Horas analisando concorrentes e redes sociais manualmente.",
+                  color: "orange" 
+                },
+                { 
+                  icon: FileText, 
+                  t: "Propostas Ignoradas", 
+                  d: "PDFs massantes que não conectam com a dor real do cliente.",
+                  color: "destructive" 
+                },
+              ].map(({ icon: Icon, t, d, color }, idx) => (
                 <motion.div
                   key={t}
                   initial={{ opacity: 0, y: 20 }}
@@ -399,21 +419,40 @@ export function LandingPage() {
                   viewport={{ once: true }}
                   transition={{ delay: idx * 0.1 }}
                 >
-                  <Card className="group relative h-full overflow-hidden rounded-xl border border-border bg-white shadow-sm transition-[transform,box-shadow] hover:-translate-y-1 hover:shadow-md dark:border-white/5 dark:bg-white/[0.02] dark:hover:shadow-lg">
-                    {/* Brilho só no topo — sem alterar a cor da borda do card */}
+                  <Card className={cn(
+                    "group relative h-full overflow-hidden rounded-xl border py-0 gap-0 transition-all duration-300 hover:-translate-y-1",
+                    color === "destructive" 
+                      ? "border-destructive/20 bg-destructive/[0.02] hover:border-destructive/40 hover:shadow-lg hover:shadow-destructive/5 dark:border-destructive/10 dark:bg-destructive/[0.01]" 
+                      : "border-orange-500/20 bg-orange-500/[0.02] hover:border-orange-500/40 hover:shadow-lg hover:shadow-orange-500/5 dark:border-orange-500/10 dark:bg-orange-500/[0.01]"
+                  )}>
+                    {/* Brilho no topo com a cor da dor */}
                     <div
                       className="pointer-events-none absolute inset-x-0 top-0 z-[1] h-[2px] opacity-0 transition-opacity duration-300 group-hover:opacity-100"
                       aria-hidden
                     >
-                      <div className="h-full bg-gradient-to-r from-transparent via-brand to-transparent" />
-                      <div className="absolute left-1/2 top-full h-4 w-[85%] max-w-sm -translate-x-1/2 bg-gradient-to-b from-brand/35 to-transparent blur-md" />
+                      <div className={cn(
+                        "h-full bg-gradient-to-r from-transparent via-transparent to-transparent",
+                        color === "destructive" ? "via-destructive" : "via-orange-500"
+                      )} />
+                      <div className={cn(
+                        "absolute left-1/2 top-full h-4 w-[85%] max-w-sm -translate-x-1/2 blur-md",
+                        color === "destructive" ? "bg-gradient-to-b from-destructive/25 to-transparent" : "bg-gradient-to-b from-orange-500/25 to-transparent"
+                      )} />
                     </div>
-                    <CardHeader className="p-8">
-                      <div className="mb-6 flex size-12 items-center justify-center rounded-xl bg-brand-muted text-brand">
+
+                    <CardHeader className="px-5 py-5 sm:px-6">
+                      <div className={cn(
+                        "mb-4 flex size-11 items-center justify-center rounded-xl transition-transform duration-300 group-hover:scale-110 sm:size-12",
+                        color === "destructive" 
+                          ? "bg-destructive/10 text-destructive dark:bg-destructive/20" 
+                          : "bg-orange-500/10 text-orange-500 dark:bg-orange-500/20"
+                      )}>
                         <Icon className="size-6" aria-hidden />
                       </div>
                       <CardTitle className="text-xl font-bold">{t}</CardTitle>
-                      <CardDescription className="mt-3 text-base leading-relaxed">{d}</CardDescription>
+                      <CardDescription className="mt-2 text-base leading-relaxed text-muted-foreground/80">
+                        {d}
+                      </CardDescription>
                     </CardHeader>
                   </Card>
                 </motion.div>
@@ -428,37 +467,32 @@ export function LandingPage() {
             <SectionTitle
               eyebrow="O Ecossistema Completo"
               title="Tudo que você precisa para fechar mais"
-              description="Uma suíte completa: do primeiro contato com o lead até a assinatura do contrato."
+              description="Da prospecção ao fechamento, cada etapa da venda ganha velocidade, contexto e apresentação."
             />
-            <div className="mt-16 grid gap-6 sm:grid-cols-2 lg:gap-8">
+            <div className="mt-16 grid items-start gap-6 sm:grid-cols-2 lg:gap-8">
               {[
                 {
                   icon: Users,
                   title: "Gestão de Leads",
-                  desc: "Domine seu funil de vendas. Cada contato estruturado em um só lugar.",
-                  items: ["Pipeline visual e intuitivo", "Histórico completo de interações", "Fácil conversão para Rota"],
+                  desc: "Organize oportunidades, acompanhe interações e avance negociações com muito mais controle.",
+                  items: ["Pipeline visual para agir rápido", "Histórico centralizado por contato", "Transforme o lead em diagnóstico com um clique"],
                 },
                 {
                   icon: Compass,
-                  title: "Rotas Digitais",
-                  desc: "Diagnósticos criados com IA a partir das URLs da empresa.",
-                  items: ["Mapeamento IA de Instagram/Site", "Notas de maturidade digital", "Link público para o cliente"],
+                  title: "Diagnóstico com IA",
+                  desc: "A plataforma analisa o site e o Instagram da empresa e mostra, em segundos, onde estão as principais oportunidades.",
+                  items: ["Análise automática de site e Instagram", "Resumo claro do que a empresa faz bem e do que pode melhorar", "Link pronto para apresentar ao cliente"],
                 },
                 {
                   icon: FileText,
-                  title: "Propostas Mágicas",
-                  desc: "Gere documentos comerciais matadores a partir do diagnóstico.",
-                  items: ["Geração do escopo em um clique", "Visão limpa e objetiva", "Efeito 'uau' no cliente"],
-                },
-                {
-                  icon: Building2,
-                  title: "A Sua Marca Em Foco",
-                  desc: "Todo material gerado reflete a autoridade da sua agência.",
-                  items: ["Branding personalizado", "Customização de cores e logos", "Experiência White-label"],
+                  title: "Propostas de alta conversão",
+                  desc: "Monte propostas comerciais com base no diagnóstico, sem começar do zero a cada nova oportunidade.",
+                  items: ["Escopo sugerido com base nas necessidades do cliente", "Apresentação clara para mostrar valor", "Proposta online pronta para enviar por link"],
                 },
               ].map((item, idx) => (
                 <motion.div
                   key={item.title}
+                  className="w-full"
                   initial={{ opacity: 0, scale: 0.95 }}
                   whileInView={{ opacity: 1, scale: 1 }}
                   viewport={{ once: true }}
@@ -466,7 +500,7 @@ export function LandingPage() {
                 >
                   <BorderGlow
                     disableBorderGlowOnMobile
-                    className="h-full rounded-xl bg-white dark:bg-zinc-900/40"
+                    className="rounded-xl bg-white dark:bg-zinc-900/40"
                     backgroundColor="var(--background)"
                     borderRadius={12}
                     glowColor="43 38 48"
@@ -480,8 +514,16 @@ export function LandingPage() {
                         <div className="flex size-14 items-center justify-center rounded-xl border border-brand/25 bg-brand/10 dark:border-brand/35 dark:bg-brand/15">
                           <item.icon className="size-7 text-brand" aria-hidden />
                         </div>
+                        {item.title === "Diagnóstico com IA" && (
+                          <div className="flex items-center gap-1.5 rounded-full border border-brand/25 bg-brand/5 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-brand dark:bg-brand/10">
+                            <Sparkles className="size-3" />
+                            Rota Digital
+                          </div>
+                        )}
                       </div>
-                      <h3 className="mt-6 font-heading text-2xl font-bold tracking-tight">{item.title}</h3>
+                      <h3 className="mt-6 font-heading text-2xl font-bold tracking-tight">
+                        {item.title}
+                      </h3>
                       <p className="mt-3 text-base text-muted-foreground">{item.desc}</p>
 
                       <ul className="mt-8 space-y-3">
@@ -496,6 +538,20 @@ export function LandingPage() {
                   </BorderGlow>
                 </motion.div>
               ))}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.3 }}
+                className="min-h-0 w-full"
+              >
+                <LandingRotasCompare
+                  imageBottomSrc="/videos/landing/rotas-white-novo2.png"
+                  imageTopSrc="/videos/landing/rotas-dark-novo2.png"
+                  bottomAlt="Captura da tela Rotas Digitais em modo claro"
+                  topAlt="Captura da tela Rotas Digitais em modo escuro"
+                />
+              </motion.div>
             </div>
           </div>
         </section>
@@ -504,9 +560,9 @@ export function LandingPage() {
         <section id="produto" className="relative z-10 scroll-mt-24 px-4 py-24 sm:px-6 lg:py-32">
           <div className="mx-auto max-w-7xl">
             <SectionTitle
-              eyebrow="Inside The App"
-              title="A plataforma em ação"
-              description="Navegue pelas principais verticais do ecossistema Rota Digital."
+              eyebrow="Por Dentro da Plataforma"
+              title="Veja a operação em movimento"
+              description="Cada módulo foi desenhado para reduzir fricção comercial e aumentar a sua capacidade de fechar."
             />
             <div className="mt-16">
               <LandingProductTabs />
@@ -519,8 +575,8 @@ export function LandingPage() {
           <div className="mx-auto max-w-7xl">
             <SectionTitle
               eyebrow="Jornada de Sucesso"
-              title="Como você fecha mais contratos"
-              description="Quatro passos simples entre a prospecção e o faturamento."
+              title="Do Lead à venda em quatro passos"
+              description="Uma jornada simples para ganhar velocidade comercial sem perder profundidade."
             />
 
             <div className="mt-20">
@@ -528,26 +584,26 @@ export function LandingPage() {
                 {[
                   {
                     icon: Users,
-                    title: "Cadastre o Lead",
-                    desc: "Adicione as URLs do site e Instagram da marca que deseja prospectar.",
+                    title: "Capture o Lead",
+                    desc: "Cadastre a empresa e reúna os links que iniciam a análise comercial.",
                     iconBg: "bg-brand/10 text-brand dark:bg-brand/15 dark:text-brand",
                   },
                   {
                     icon: Zap,
                     title: "Gere o Diagnóstico",
-                    desc: "Nossa IA analisa e pontua a maturidade digital em segundos.",
+                    desc: "A IA cruza sinais do negócio e devolve um retrato claro da maturidade digital.",
                     iconBg: "bg-brand/10 text-brand dark:bg-brand/15 dark:text-brand",
                   },
                   {
                     icon: Send,
-                    title: "Encante o Cliente",
-                    desc: "Envie um link público lindíssimo com o dossiê completo da marca.",
+                    title: "Apresente Valor",
+                    desc: "Compartilhe um link público com contexto, recomendações e autoridade.",
                     iconBg: "bg-brand/10 text-brand dark:bg-brand/15 dark:text-brand",
                   },
                   {
                     icon: FileText,
-                    title: "Feche a Proposta",
-                    desc: "Apresente o escopo final formatado e pronto para assinatura.",
+                    title: "Envie a Proposta",
+                    desc: "Transforme o diagnóstico em um escopo pronto para avançar a negociação.",
                     iconBg: "bg-brand/10 text-brand dark:bg-brand/15 dark:text-brand",
                   },
                 ].map((step, i, arr) => (
@@ -653,7 +709,7 @@ export function LandingPage() {
                 >
                   <div className="flex items-center gap-2.5 px-5 py-2.5 text-sm font-medium text-muted-foreground">
                     <Link2 className="size-4 shrink-0 text-brand" aria-hidden />
-                    Links públicos protegidos com design responsivo
+                    Links públicos seguros com experiência responsiva
                   </div>
                 </BorderGlow>
               </motion.div>
@@ -666,8 +722,8 @@ export function LandingPage() {
           <div className="mx-auto max-w-7xl">
             <SectionTitle
               eyebrow="Investimento"
-              title="Escalabilidade para sua agência"
-              description="Escolha o plano que melhor se adapta ao momento do seu negócio."
+              title="Planos para escalar sua operação"
+              description="Comece no ritmo certo e evolua conforme sua agência ganha volume, consistência e ambição comercial."
             />
 
             <div className="mt-12 flex justify-center px-2">
