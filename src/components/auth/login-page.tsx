@@ -335,33 +335,36 @@ export function LoginPage({ passwordResetSuccess = false }: { passwordResetSucce
               <div className="h-px w-full bg-gradient-to-r from-transparent via-zinc-500/22 to-transparent dark:via-white/20" />
               <div className="pointer-events-none absolute left-1/2 top-full h-2 w-[42%] -translate-x-1/2 bg-gradient-to-b from-zinc-400/8 to-transparent blur-sm dark:from-white/7" />
             </div>
-            <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto_1fr] sm:items-center sm:gap-x-4 sm:gap-y-0">
-            <span className="text-left sm:justify-self-start">
-              Copyright © {new Date().getFullYear()} Rota Digital.
-            </span>
-            <span className="mx-auto flex flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5 sm:mx-0 sm:justify-self-center">
-              <span>Desenvolvido com</span>
-              <span className="inline-flex items-center gap-1">
-                <Heart
-                  className="size-3 shrink-0 fill-red-500 text-red-500 motion-safe:animate-pulse"
-                  aria-hidden
-                />
-                <span className="inline-flex items-center gap-0">
-                  <span>por:&nbsp;</span>
-                  <a
-                    href="https://artnawebsite.com.br"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-medium text-foreground underline-offset-4 hover:text-foreground hover:underline"
-                  >
-                    Artnaweb
-                  </a>
+            <div className="mt-5 flex w-full flex-col items-center gap-2 text-center sm:grid sm:grid-cols-[1fr_auto_1fr] sm:items-center sm:gap-x-4 sm:gap-y-0 sm:text-left">
+              <span className="w-full sm:w-auto sm:justify-self-start sm:text-left">
+                Copyright © {new Date().getFullYear()} Rota Digital.
+              </span>
+              <span className="flex w-full flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5 sm:w-auto sm:justify-self-center">
+                <span>Desenvolvido com</span>
+                <span className="inline-flex items-center gap-1">
+                  <Heart
+                    className="size-3 shrink-0 fill-red-500 text-red-500 motion-safe:animate-pulse"
+                    aria-hidden
+                  />
+                  <span className="inline-flex items-center gap-0">
+                    <span>por:&nbsp;</span>
+                    <a
+                      href="https://artnawebsite.com.br"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-medium text-foreground underline-offset-4 hover:text-foreground hover:underline"
+                    >
+                      Artnaweb
+                    </a>
+                  </span>
                 </span>
               </span>
-            </span>
-            <Link href="/" className="justify-self-end text-right hover:text-foreground">
-              Política de privacidade
-            </Link>
+              <Link
+                href="/"
+                className="block w-full hover:text-foreground sm:w-auto sm:justify-self-end sm:text-right"
+              >
+                Política de privacidade
+              </Link>
             </div>
           </footer>
         </main>

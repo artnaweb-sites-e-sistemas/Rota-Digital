@@ -13,11 +13,11 @@ const TABS = [
     label: "Prospecção",
     icon: Users,
     title: "Controle total do seu funil",
-    description: "Acompanhe cada oportunidade com contexto, prioridade e próximo passo definido.",
+    description: "Veja os leads em um só lugar e saiba exatamente com quem falar e o que fazer em seguida.",
     bullets: [
-      "Pipeline visual para mover leads sem fricção",
-      "Histórico centralizado de contatos e interações",
-      "Qualificação mais rápida com base nos dados do lead",
+      "Organize os leads por etapa da negociação",
+      "Guarde histórico de mensagens, contatos e anotações",
+      "Priorize os leads com mais chance de fechar",
     ],
   },
   {
@@ -25,11 +25,11 @@ const TABS = [
     label: "Rota Digital",
     icon: Compass,
     title: "Diagnóstico que prepara a venda",
-    description: "A IA analisa a presença digital do lead e entrega insumos para você entrar na conversa com autoridade.",
+    description: "A plataforma analisa o site e o Instagram da empresa e mostra, de forma simples, onde ela pode melhorar.",
     bullets: [
-      "Leitura automática de Instagram e site",
-      "Notas de maturidade por dimensão do negócio",
-      "Link público pronto para apresentar",
+      "Analisa automaticamente o site e o Instagram",
+      "Mostra pontos fortes e oportunidades de melhoria",
+      "Gera um link pronto para apresentar ao cliente",
     ],
   },
   {
@@ -37,11 +37,11 @@ const TABS = [
     label: "Proposta",
     icon: FileText,
     title: "Propostas com mais poder de fechamento",
-    description: "Conecte diagnóstico, escopo e valor em uma apresentação comercial mais clara e convincente.",
+    description: "Monte propostas mais claras e profissionais, com base no que o cliente realmente precisa.",
     bullets: [
-      "Escopo gerado com base no diagnóstico",
-      "Apresentação limpa, objetiva e responsiva",
-      "Experiência pensada para aumentar avanço comercial",
+      "Crie o escopo com base no diagnóstico da empresa",
+      "Apresente o valor da sua solução com mais clareza",
+      "Envie uma proposta mais bonita e fácil de entender",
     ],
   },
 ] as const;
@@ -105,7 +105,7 @@ export function LandingProductTabs() {
 
   return (
     <div
-      className="grid gap-10 lg:grid-cols-[minmax(0,260px)_1fr] lg:gap-12"
+      className="grid min-w-0 gap-10 lg:grid-cols-[minmax(0,260px)_1fr] lg:gap-12"
       onMouseEnter={() => setPauseAuto(true)}
       onMouseLeave={() => setPauseAuto(false)}
       onTouchStartCapture={() => setPauseAuto(true)}
@@ -156,15 +156,17 @@ export function LandingProductTabs() {
         })}
       </div>
 
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={active}
-          initial={{ opacity: 0, x: 16 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -16 }}
-          transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-          className="h-full"
-        >
+      {/* `overflow-x-hidden` na grelha força `overflow-y: auto` no mesmo elemento (CSS) e cria scroll vertical falso nas células. Só `min-w-0` + animação em Y. */}
+      <div className="min-h-0 min-w-0">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={active}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+            className="h-full"
+          >
           <BorderGlow
             disableBorderGlowOnMobile
             className="h-full rounded-xl bg-white dark:bg-zinc-950/20"
@@ -225,8 +227,9 @@ export function LandingProductTabs() {
               </div>
             </div>
           </BorderGlow>
-        </motion.div>
-      </AnimatePresence>
+          </motion.div>
+        </AnimatePresence>
+      </div>
     </div>
   );
 }
