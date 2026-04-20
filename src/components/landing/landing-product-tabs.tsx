@@ -57,13 +57,15 @@ export function LandingProductTabs() {
   const panel = TABS.find((t) => t.id === active)!;
 
   /**
-   * No strip horizontal (mobile), mantém o botão ativo visível.
+   * No mobile, mantém o botão ativo visível no "carrossel" (agora vertical).
    * Não usar scrollIntoView — nalguns browsers também faz scroll do documento e a página “salta” para cima.
    */
   useEffect(() => {
     const strip = tabsStripRef.current;
     if (!strip) return;
-    if (strip.scrollWidth <= strip.clientWidth + 1) return;
+    const hasHorizontalOverflow = strip.scrollWidth > strip.clientWidth + 1;
+    const hasVerticalOverflow = strip.scrollHeight > strip.clientHeight + 1;
+    if (!hasHorizontalOverflow && !hasVerticalOverflow) return;
     const btn = strip.querySelector<HTMLElement>(`[data-landing-tab="${active}"]`);
     if (!btn) return;
 
@@ -71,10 +73,19 @@ export function LandingProductTabs() {
       const sr = strip.getBoundingClientRect();
       const br = btn.getBoundingClientRect();
       const pad = 12;
-      let delta = 0;
-      if (br.left < sr.left + pad) delta = br.left - sr.left - pad;
-      else if (br.right > sr.right - pad) delta = br.right - sr.right + pad;
-      if (delta !== 0) strip.scrollBy({ left: delta, behavior: "smooth" });
+      let deltaX = 0;
+      let deltaY = 0;
+      if (hasHorizontalOverflow) {
+        if (br.left < sr.left + pad) deltaX = br.left - sr.left - pad;
+        else if (br.right > sr.right - pad) deltaX = br.right - sr.right + pad;
+      }
+      if (hasVerticalOverflow) {
+        if (br.top < sr.top + pad) deltaY = br.top - sr.top - pad;
+        else if (br.bottom > sr.bottom - pad) deltaY = br.bottom - sr.bottom + pad;
+      }
+      if (deltaX !== 0 || deltaY !== 0) {
+        strip.scrollBy({ left: deltaX, top: deltaY, behavior: "smooth" });
+      }
     };
 
     requestAnimationFrame(align);
@@ -97,10 +108,13 @@ export function LandingProductTabs() {
       className="grid gap-10 lg:grid-cols-[minmax(0,260px)_1fr] lg:gap-12"
       onMouseEnter={() => setPauseAuto(true)}
       onMouseLeave={() => setPauseAuto(false)}
+      onTouchStartCapture={() => setPauseAuto(true)}
+      onTouchEndCapture={() => setPauseAuto(false)}
+      onTouchCancelCapture={() => setPauseAuto(false)}
     >
       <div
         ref={tabsStripRef}
-        className="flex flex-row gap-3 overflow-x-auto pb-4 [scroll-padding-inline:12px] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden lg:flex-col lg:overflow-visible lg:pb-0"
+        className="flex max-h-[15.5rem] flex-col gap-3 overflow-y-auto pb-4 pr-1 [scroll-padding-block:12px] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden lg:max-h-none lg:flex-col lg:overflow-visible lg:pb-0 lg:pr-0"
       >
         {TABS.map((tab) => {
           const Icon = tab.icon;

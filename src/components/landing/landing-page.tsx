@@ -90,10 +90,8 @@ const HeroHyperspeed = dynamic(() => import("@/components/hyperspeed"), {
 });
 
 const NAV_LINKS = [
-  { href: "#visao", label: "Visão" },
-  { href: "#pilares", label: "Ecossistema" },
+  { href: "#pilares", label: "Soluções" },
   { href: "#produto", label: "A Plataforma" },
-  { href: "#como-funciona", label: "Fluxo" },
   { href: "#planos", label: "Planos" },
   { href: "#faq", label: "FAQ" },
 ] as const;
@@ -270,14 +268,6 @@ export function LandingPage() {
                 ))}
               </nav>
               <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-                <PublicThemeToggle
-                  id="landing-theme-toggle"
-                  className={cn(
-                    "h-9 min-h-9 w-9 shrink-0 rounded-lg border border-solid border-border/55 bg-background/50 shadow-none transition-all hover:border-border hover:bg-accent/80 sm:h-10 sm:min-h-10 sm:w-10",
-                    "[&_svg]:text-foreground",
-                    "dark:border-white/15 dark:bg-zinc-900/40",
-                  )}
-                />
                 <LinkButton
                   href="/login"
                   variant="cta"
@@ -287,6 +277,14 @@ export function LandingPage() {
                   <LogIn className="size-4 shrink-0" aria-hidden />
                   <span className="whitespace-nowrap">Acessar Plataforma</span>
                 </LinkButton>
+                <PublicThemeToggle
+                  id="landing-theme-toggle"
+                  className={cn(
+                    "h-9 min-h-9 w-9 shrink-0 rounded-lg border border-solid border-border/55 bg-background/50 shadow-none transition-all hover:border-border hover:bg-accent/80 sm:h-10 sm:min-h-10 sm:w-10",
+                    "[&_svg]:text-foreground",
+                    "dark:border-white/15 dark:bg-zinc-900/40",
+                  )}
+                />
               </div>
             </div>
           </GlassSurface>
@@ -362,29 +360,11 @@ export function LandingPage() {
           </div>
         </section>
 
-        {/* --- Social Proof --- */}
-        <section className="relative z-10 border-y border-brand/25 bg-brand/16 py-16 dark:border-brand/30 dark:bg-brand/14">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6">
-            <div className="flex flex-col items-center justify-center gap-10">
-              <p className="text-center text-xs font-bold uppercase tracking-[0.2em] text-foreground/75 dark:text-foreground/80">
-                Poderosa infraestrutura de inteligência e design
-              </p>
-              <div className="flex flex-wrap items-center justify-center gap-x-16 gap-y-10 opacity-80 transition-all duration-700 hover:opacity-100">
-                {["Google Gemini 1.5 Pro", "Next.js 15 App Router", "Tailwind Engine v4", "Firebase Realtime"].map((tech) => (
-                  <div key={tech} className="group relative flex items-center gap-2">
-                    <span className="text-sm font-bold tracking-tight text-foreground sm:text-base lg:text-xl">
-                      {tech}
-                    </span>
-                    <div className="absolute -bottom-1 left-0 h-[2px] w-0 bg-brand/55 transition-all group-hover:w-full dark:bg-brand/50" />
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-
         {/* --- Para quem (Visão) --- */}
-        <section id="visao" className="relative z-10 scroll-mt-24 px-4 py-24 sm:px-6 lg:py-32">
+        <section
+          id="visao"
+          className="relative z-10 scroll-mt-24 border-t border-amber-500/30 px-4 py-24 sm:px-6 lg:py-32 dark:border-amber-400/25"
+        >
           <div className="mx-auto max-w-7xl">
             <SectionTitle
               eyebrow="A Dor do Mercado"
@@ -462,7 +442,7 @@ export function LandingPage() {
         </section>
 
         {/* --- Pilares (Ecossistema) --- */}
-        <section id="pilares" className="relative z-10 scroll-mt-24 border-t px-4 py-14 sm:px-6 lg:py-20 bg-zinc-50/80 dark:border-white/5 dark:bg-zinc-950/20">
+        <section id="pilares" className="relative z-10 scroll-mt-24 border-t border-amber-500/30 px-4 py-14 sm:px-6 lg:py-20 bg-zinc-50/80 dark:border-amber-400/25 dark:bg-zinc-950/20">
           <div className="mx-auto max-w-7xl">
             <SectionTitle
               eyebrow="O Ecossistema Completo"
@@ -557,7 +537,7 @@ export function LandingPage() {
         </section>
 
         {/* --- Produto em Ação --- */}
-        <section id="produto" className="relative z-10 scroll-mt-24 px-4 py-24 sm:px-6 lg:py-32">
+        <section id="produto" className="relative z-10 scroll-mt-24 border-t border-amber-500/30 px-4 py-24 sm:px-6 lg:py-32 dark:border-amber-400/25">
           <div className="mx-auto max-w-7xl">
             <SectionTitle
               eyebrow="Por Dentro da Plataforma"
@@ -571,7 +551,7 @@ export function LandingPage() {
         </section>
 
         {/* --- Como Funciona --- */}
-        <section id="como-funciona" className="relative z-10 scroll-mt-24 border-t px-4 py-24 sm:px-6 lg:py-32 bg-zinc-50/80 dark:border-white/5 dark:bg-white/[0.01]">
+        <section id="como-funciona" className="relative z-10 scroll-mt-24 border-t border-amber-500/30 px-4 py-24 sm:px-6 lg:py-32 bg-zinc-50/80 dark:border-amber-400/25 dark:bg-white/[0.01]">
           <div className="mx-auto max-w-7xl">
             <SectionTitle
               eyebrow="Jornada de Sucesso"
@@ -718,7 +698,7 @@ export function LandingPage() {
         </section>
 
         {/* --- Planos --- */}
-        <section id="planos" className="relative z-10 scroll-mt-24 px-4 py-24 sm:px-6 lg:py-32">
+        <section id="planos" className="relative z-10 scroll-mt-24 border-t border-amber-500/30 px-4 py-24 sm:px-6 lg:py-32 dark:border-amber-400/25">
           <div className="mx-auto max-w-7xl">
             <SectionTitle
               eyebrow="Investimento"
@@ -863,7 +843,7 @@ export function LandingPage() {
                   {plan.isFeatured ? (
                     <BorderGlow
                       disableBorderGlowOnMobile
-                      className="flex h-full w-full flex-col rounded-xl border-none bg-white p-0 dark:bg-zinc-950/40"
+                      className="flex h-full w-full flex-col rounded-xl border border-brand/45 bg-white p-0 shadow-[0_0_0_1px_rgba(196,178,122,0.22),0_12px_28px_-18px_rgba(196,178,122,0.45)] dark:border-[#e8dcc4]/55 dark:bg-zinc-950/40 dark:shadow-[0_0_0_1px_rgba(232,220,196,0.30),0_14px_30px_-18px_rgba(196,178,122,0.55)] md:border-none md:shadow-none dark:md:shadow-none"
                       backgroundColor="var(--background)"
                       borderRadius={12}
                       glowRadius={40}
@@ -891,7 +871,7 @@ export function LandingPage() {
                           </div>
                           {billingCycle === "yearly" && plan.price !== "0" && (
                             <span className="mt-1 text-[10px] font-bold text-brand uppercase tracking-tight">
-                              ~3 meses grátis · R$ {parseInt(plan.price) * 12},00/ano
+                              ~3 meses grátis · R$ {(parseInt(plan.price, 10) * 12).toLocaleString("pt-BR")},00/ANO
                             </span>
                           )}
                         </div>
@@ -967,7 +947,7 @@ export function LandingPage() {
         </section>
 
         {/* --- FAQ --- */}
-        <section id="faq" className="relative z-10 scroll-mt-24 px-4 py-24 sm:px-6 lg:py-32">
+        <section id="faq" className="relative z-10 scroll-mt-24 border-t border-amber-500/30 px-4 py-24 sm:px-6 lg:py-32 dark:border-amber-400/25">
           <div className="mx-auto max-w-3xl">
             <SectionTitle
               title="Perguntas Frequentes"
@@ -1016,19 +996,44 @@ export function LandingPage() {
         </section>
 
         {/* --- CTA final --- */}
-        <section className="relative z-10 px-4 py-24 sm:px-6 lg:py-32">
-          <div className="relative mx-auto max-w-5xl overflow-hidden rounded-2xl border-0 bg-[#121217] px-6 py-20 text-center shadow-2xl sm:px-16 dark:border dark:border-white/10">
+        <section className="relative z-10 px-4 py-16 sm:px-6 lg:py-20">
+          <div className="relative mx-auto max-w-5xl overflow-hidden rounded-2xl border border-[#d2b56a]/24 bg-[#f9f3e4] px-6 py-10 text-center shadow-2xl sm:px-14 dark:border-[#c9a95f]/24 dark:bg-[#f3ead4]">
             <div className="absolute inset-0 z-0 overflow-hidden rounded-2xl">
-              <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,#2a2416_0%,transparent_70%)]" />
-              <div className="absolute -bottom-[20%] -left-[20%] h-[60%] w-[60%] rounded-full bg-brand/10 blur-[100px] opacity-50" />
-              <div className="absolute top-[10%] right-[10%] h-[40%] w-[40%] rounded-full bg-amber-500/5 blur-[80px]" />
+              <Grainient
+                color1="#f1e3bd"
+                color2="#d5b36a"
+                color3="#a8843d"
+                timeSpeed={0.72}
+                colorBalance={0}
+                warpStrength={1.5}
+                warpFrequency={4}
+                warpSpeed={3.7}
+                warpAmplitude={64}
+                blendAngle={0}
+                blendSoftness={0.05}
+                rotationAmount={500}
+                noiseScale={2}
+                grainAmount={0.1}
+                grainScale={2}
+                grainAnimated={false}
+                contrast={1.58}
+                gamma={1}
+                saturation={1.02}
+                centerX={0}
+                centerY={0}
+                zoom={0.9}
+                className="h-full min-h-full w-full"
+              />
             </div>
+            <div className="pointer-events-none absolute inset-0 z-[1] rounded-2xl bg-gradient-to-b from-[#f2e2ba]/64 via-[#e8cf96]/42 to-[#d9b973]/48" />
 
-            <div className="relative z-10 mx-auto max-w-2xl">
-              <h2 className="font-heading text-3xl font-extrabold tracking-tight text-white sm:text-5xl">
-                Pronto para escalar os resultados da sua agência?
+            <div className="relative z-10 mx-auto flex max-w-2xl flex-col gap-5 sm:gap-6">
+              <h2 className="pr-2 text-3xl font-bold leading-[1.14] tracking-tight text-zinc-900 sm:text-4xl lg:text-5xl">
+                Pronto para escalar os
+                <br />
+                resultados da sua agência?
               </h2>
-              <p className="mt-6 text-lg leading-relaxed text-zinc-100/95 [text-shadow:0_1px_2px_rgba(0,0,0,0.35)]">
+              <p className="text-lg leading-relaxed text-[#6f5a2f]">
                 Pare de perder tempo com propostas em PDF. Impressione seus clientes desde o primeiro diagnóstico.
               </p>
 
@@ -1037,14 +1042,13 @@ export function LandingPage() {
                   href="/login"
                   className={cn(
                     "inline-flex h-14 min-h-14 items-center justify-center gap-2 rounded-md px-10 text-base font-bold",
-                    "border border-white/14 bg-gradient-to-b from-white/[0.11] to-white/[0.04]",
-                    "text-white",
-                    "shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1)]",
+                    "border border-zinc-900/10 bg-zinc-900 text-white",
+                    "shadow-[0_10px_24px_-12px_rgba(24,24,27,0.45)]",
                     "backdrop-blur-xl backdrop-saturate-150",
                     "transition-[color,border-color,background-image] duration-300 ease-out",
-                    "hover:border-white/22 hover:from-white/[0.14] hover:to-white/[0.05] hover:text-white",
+                    "hover:border-[#d2b56a]/60 hover:bg-[#d2b56a] hover:text-zinc-900",
                     "active:scale-[0.99]",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-[#121217]",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/25 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f6f2e8]",
                   )}
                 >
                   Criar Minha Conta Grátis
@@ -1056,10 +1060,23 @@ export function LandingPage() {
         </section>
       </main>
 
-      <footer className="relative z-10 border-t bg-zinc-50 px-4 py-8 sm:px-6 dark:border-white/5 dark:bg-background">
-        <div className="mx-auto max-w-7xl space-y-4 text-center sm:flex sm:items-center sm:justify-between sm:space-y-0 text-sm text-muted-foreground">
-          <p>© {new Date().getFullYear()} Rota Digital SaaS. Todos os direitos reservados.</p>
-          <p className="flex justify-center gap-1">Feito com ⚡️ no Brasil</p>
+      <footer className="relative z-10 bg-zinc-50 px-4 py-7 sm:px-6 dark:bg-background">
+        <div className="mx-auto max-w-7xl">
+          <div className="relative h-px w-full overflow-visible">
+            <div className="h-px w-full bg-gradient-to-r from-transparent via-amber-500/28 to-transparent dark:via-amber-300/22" />
+            <div
+              className="pointer-events-none absolute left-1/2 top-full h-2 w-[42%] -translate-x-1/2 bg-gradient-to-b from-amber-500/12 to-transparent blur-sm dark:from-amber-300/10"
+              aria-hidden
+            />
+          </div>
+        </div>
+        <div className="mx-auto mt-5 grid max-w-7xl gap-3 text-center text-sm text-muted-foreground sm:grid-cols-3 sm:items-center sm:gap-4 sm:text-left">
+          <p>Copyright © {new Date().getFullYear()} Rota Digital.</p>
+          <p className="text-center">
+            Desenvolvido com <span className="text-red-500">❤</span> por:{" "}
+            <span className="font-semibold text-foreground">Artnaweb</span>
+          </p>
+          <p className="text-center sm:text-right">Política de privacidade</p>
         </div>
       </footer>
     </div>

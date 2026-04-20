@@ -92,20 +92,20 @@ export function LoginPage({ passwordResetSuccess = false }: { passwordResetSucce
       <div className="mx-auto flex min-h-0 w-full max-w-[1450px] flex-1 flex-col">
         <div className="flex min-h-0 w-full flex-1 flex-col lg:flex-row lg:gap-x-3">
         <aside
-          className="relative hidden min-h-0 w-[32%] min-w-[280px] max-w-[420px] shrink-0 flex-col justify-between overflow-hidden rounded-3xl bg-[#121217] px-10 py-12 text-white shadow-[0_24px_80px_-24px_rgba(15,23,42,0.14)] lg:flex"
+          className="relative hidden min-h-0 w-[32%] min-w-[280px] max-w-[420px] shrink-0 flex-col justify-between overflow-hidden rounded-3xl border border-[#d2b56a]/24 bg-[#f9f3e4] px-10 py-12 text-zinc-900 shadow-[0_24px_80px_-24px_rgba(15,23,42,0.14)] lg:flex dark:border-[#c9a95f]/24 dark:bg-[#f3ead4]"
           aria-label="Marca Rota Digital"
         >
           <div className="absolute inset-0 z-0 overflow-hidden rounded-3xl">
             <Grainient
-              color1="#e8dcc4"
-              color2="#8e7d4d"
-              color3="#3d3528"
-              timeSpeed={0.25}
+              color1="#f1e3bd"
+              color2="#d5b36a"
+              color3="#a8843d"
+              timeSpeed={0.72}
               colorBalance={0}
-              warpStrength={1}
-              warpFrequency={5}
-              warpSpeed={2}
-              warpAmplitude={50}
+              warpStrength={1.5}
+              warpFrequency={4}
+              warpSpeed={3.7}
+              warpAmplitude={64}
               blendAngle={0}
               blendSoftness={0.05}
               rotationAmount={500}
@@ -113,32 +113,32 @@ export function LoginPage({ passwordResetSuccess = false }: { passwordResetSucce
               grainAmount={0.1}
               grainScale={2}
               grainAnimated={false}
-              contrast={1.5}
+              contrast={1.58}
               gamma={1}
-              saturation={1}
+              saturation={1.02}
               centerX={0}
               centerY={0}
               zoom={0.9}
               className="h-full min-h-full w-full"
             />
           </div>
-          <div className="pointer-events-none absolute inset-0 z-[1] rounded-3xl bg-gradient-to-b from-[#121217]/58 via-[#121217]/16 to-[#121217]/48" />
+          <div className="pointer-events-none absolute inset-0 z-[1] rounded-3xl bg-gradient-to-b from-[#f2e2ba]/64 via-[#e8cf96]/42 to-[#d9b973]/48" />
 
           <div className="relative z-10 flex flex-col gap-5 sm:gap-6">
-            <span className="text-[1.05rem] font-semibold tracking-tight text-white">Rota Digital</span>
-            <h1 className="pr-2 text-4xl font-bold leading-[1.12] tracking-tight text-white sm:text-5xl lg:text-[2.75rem] xl:text-6xl">
+            <span className="text-[1.05rem] font-semibold tracking-tight text-[#8e7d4d]">Rota Digital</span>
+            <h1 className="pr-2 text-4xl font-bold leading-[1.12] tracking-tight text-[#8e7d4d] sm:text-5xl lg:text-[2.75rem] xl:text-6xl">
               Bem-vindo de volta!
             </h1>
           </div>
 
-          <div className="relative z-10 rounded-2xl bg-white/[0.07] px-4 py-3.5 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.2),0_12px_44px_-14px_rgba(0,0,0,0.55)] backdrop-blur-2xl backdrop-saturate-150">
+          <div className="relative z-10 rounded-2xl border border-zinc-900/6 bg-[#fff9ec]/32 px-4 py-3.5 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.34),0_12px_44px_-14px_rgba(0,0,0,0.15)] backdrop-blur-xl backdrop-saturate-140">
             <div className="flex gap-3">
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/12">
-                <Shield className="size-[1.15rem] text-white" strokeWidth={2} aria-hidden />
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#6f5a2f]/12">
+                <Shield className="size-[1.15rem] text-[#6f5a2f]" strokeWidth={2} aria-hidden />
               </div>
               <div className="min-w-0 space-y-0.5">
-                <p className="text-sm font-semibold text-white">Plataforma 100% segura</p>
-                <p className="text-xs leading-snug text-zinc-200/95">Dados totalmente protegidos</p>
+                <p className="text-sm font-semibold text-[#6f5a2f]">Plataforma 100% segura</p>
+                <p className="text-xs leading-snug text-[#6f5a2f]/88">Dados totalmente protegidos</p>
               </div>
             </div>
           </div>
@@ -150,9 +150,9 @@ export function LoginPage({ passwordResetSuccess = false }: { passwordResetSucce
             <Link
               href="/"
               className={cn(
-                "inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground",
+                "inline-flex size-9 items-center justify-center rounded-lg text-[#8e7d4d]",
                 "transition-colors duration-150",
-                "hover:bg-muted/70 hover:text-foreground",
+                "hover:bg-transparent hover:text-white",
                 "focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none",
               )}
               aria-label="Voltar para o início"
@@ -330,7 +330,12 @@ export function LoginPage({ passwordResetSuccess = false }: { passwordResetSucce
           </div>
           </div>
 
-          <footer className="mt-auto grid w-full shrink-0 grid-cols-1 gap-2 border-t border-border pt-5 pb-1 text-xs text-muted-foreground sm:grid-cols-[1fr_auto_1fr] sm:items-center sm:gap-x-4 sm:gap-y-0 sm:pt-6 sm:pb-2">
+          <footer className="mt-auto w-full shrink-0 pt-5 pb-1 text-xs text-muted-foreground sm:pt-6 sm:pb-2">
+            <div className="relative h-px w-full overflow-visible" aria-hidden>
+              <div className="h-px w-full bg-gradient-to-r from-transparent via-zinc-500/22 to-transparent dark:via-white/20" />
+              <div className="pointer-events-none absolute left-1/2 top-full h-2 w-[42%] -translate-x-1/2 bg-gradient-to-b from-zinc-400/8 to-transparent blur-sm dark:from-white/7" />
+            </div>
+            <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto_1fr] sm:items-center sm:gap-x-4 sm:gap-y-0">
             <span className="text-left sm:justify-self-start">
               Copyright © {new Date().getFullYear()} Rota Digital.
             </span>
@@ -357,6 +362,7 @@ export function LoginPage({ passwordResetSuccess = false }: { passwordResetSucce
             <Link href="/" className="justify-self-end text-right hover:text-foreground">
               Política de privacidade
             </Link>
+            </div>
           </footer>
         </main>
         </div>

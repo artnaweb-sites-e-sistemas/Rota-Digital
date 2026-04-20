@@ -1020,6 +1020,12 @@ function LeadsPageContent() {
     () => normalizedSubscriptionPlanKey(userSettingsSnap.subscriptionPlan ?? userSettingsSnap.plan),
     [userSettingsSnap],
   );
+  const capturePlanLabel = useMemo(() => {
+    if (capturePlanKey === "master") return "Master";
+    if (capturePlanKey === "agency") return "Agency";
+    if (capturePlanKey === "starter") return "Starter";
+    return "Pro";
+  }, [capturePlanKey]);
 
   const googlePlacesUsedThisMonth = useMemo(() => {
     let c = 0;
@@ -1562,7 +1568,7 @@ function LeadsPageContent() {
             type="button"
             variant="outline"
             size="lg"
-            className="gap-2 border-white/15 bg-white/[0.03] text-foreground hover:bg-white/[0.06]"
+            className="gap-2 border-none bg-gradient-to-r from-[#1c1910] via-[#4a422c] to-[#5c5235] bg-[length:200%_100%] animate-[gradient-move_3.5s_ease_infinite] font-semibold text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.45)] transition hover:brightness-105 focus-visible:ring-2 focus-visible:ring-white/35 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             onClick={openCapture}
             disabled={captureBusy || !user}
           >
@@ -1968,7 +1974,7 @@ function LeadsPageContent() {
                     Raio da captação
                   </Label>
                   <p className="text-[12px] leading-relaxed text-zinc-300 sm:text-[13px]">
-                    Quantidade de leads por busca. Respeita a cota do mês (até {LEAD_CAPTURE_MAX_PER_RUN} por execução).
+                    Quantidade de leads por busca. Respeita a cota do mês.
                   </p>
                 </div>
                 <output
@@ -1980,10 +1986,11 @@ function LeadsPageContent() {
               </div>
               <p className="text-[11px] leading-relaxed text-zinc-400">
                 {isMasterPlan ? (
-                  <>Master: até {LEAD_CAPTURE_MAX_PER_RUN} por execução · cota mensal ilimitada.</>
+                  <>Plano {capturePlanLabel} · sem limite mensal · até {LEAD_CAPTURE_MAX_PER_RUN} por busca.</>
                 ) : (
                   <>
-                    Mês: {googlePlacesUsedThisMonth}/{monthlyLeadLimit} · máx. agora:{" "}
+                    Plano {capturePlanLabel} · usados no mês: {googlePlacesUsedThisMonth} de {monthlyLeadLimit} ·
+                    disponível nesta busca:{" "}
                     <span className="font-semibold text-zinc-200">{allowedSliderMax}</span>
                   </>
                 )}
@@ -2125,9 +2132,8 @@ function LeadsPageContent() {
               <DialogDescription className="text-sm leading-relaxed text-zinc-200">
                 {captureLimitModalData?.reason === "quota_above_drag" ? (
                   <>
-                    O valor que tentou pedir ultrapassa a captação incluída no seu plano neste ciclo. Para aumentar o
-                    volume de prospecção, adquira um pacote extra; após o pagamento (em breve via Stripe), o limite será
-                    atualizado automaticamente na sua conta.
+                    O valor pedido ultrapassa o limite do seu plano neste ciclo. Para captar mais leads, compre um
+                    pacote extra.
                   </>
                 ) : (
                   <>
@@ -2151,13 +2157,15 @@ function LeadsPageContent() {
               <div className="rounded-lg border border-white/10 bg-black/20 px-3.5 py-3">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">Utilizado no mês</p>
                 <p className="mt-1 text-sm font-semibold text-zinc-100">
-                  {captureLimitModalData?.usedThisMonth ?? 0} leads
+                  {captureLimitModalData?.usedThisMonth ?? 0}{" "}
+                  <span className="text-[11px] font-medium text-zinc-400">leads</span>
                 </p>
               </div>
               <div className="rounded-lg border border-white/10 bg-black/20 px-3.5 py-3">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">Limite do plano</p>
                 <p className="mt-1 text-sm font-semibold text-zinc-100">
-                  {captureLimitModalData?.monthlyLimit ?? 0} leads/mês
+                  {captureLimitModalData?.monthlyLimit ?? 0}{" "}
+                  <span className="text-[11px] font-medium text-zinc-400">leads/mês</span>
                 </p>
               </div>
             </div>
@@ -2171,8 +2179,14 @@ function LeadsPageContent() {
                     className="flex flex-col rounded-xl border border-white/12 bg-white/[0.04] p-4 transition-colors hover:border-brand/40 hover:bg-white/[0.06]"
                   >
                     <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">{pack.label}</p>
-                    <p className="mt-1 text-lg font-bold text-zinc-50">+{pack.leads} leads</p>
-                    <p className="mt-2 text-xl font-black text-brand">R$ {pack.price}</p>
+                    <p className="mt-1 text-lg font-bold text-zinc-50">
+                      +{pack.leads} <span className="text-sm font-semibold text-zinc-300">leads</span>
+                    </p>
+                    <p className="mt-2 inline-flex items-end gap-0.5 text-brand">
+                      <span className="self-start text-xs font-semibold leading-none">R$</span>
+                      <span className="text-[2rem] leading-[0.9] font-black tabular-nums">{pack.price}</span>
+                      <span className="self-start text-xs font-semibold leading-none">,00</span>
+                    </p>
                     <p className="text-[11px] text-zinc-400">pagamento único</p>
                     <Button
                       type="button"
@@ -2185,7 +2199,7 @@ function LeadsPageContent() {
                       {addOnCheckoutBusyId === pack.id ? (
                         <Loader2 className="size-4 animate-spin shrink-0" aria-hidden />
                       ) : null}
-                      {addOnCheckoutBusyId === pack.id ? "A abrir…" : "Comprar (checkout)"}
+                      {addOnCheckoutBusyId === pack.id ? "A abrir…" : "Comprar"}
                     </Button>
                   </div>
                 ))}
