@@ -321,7 +321,7 @@ export function LoginPage({ passwordResetSuccess = false }: { passwordResetSucce
             <p className="mt-9 text-center text-sm text-muted-foreground">
               Não tem uma conta?{" "}
               <Link
-                href="/"
+                href="/cadastro"
                 className="font-semibold text-foreground underline-offset-4 hover:underline"
               >
                 Cadastre-se

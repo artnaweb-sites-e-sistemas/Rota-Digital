@@ -15,6 +15,7 @@ import {
   AlertCircle,
   Link2,
   LogIn,
+  Menu,
   Send,
   Sparkles,
   Users,
@@ -37,6 +38,19 @@ import BorderGlow from "@/components/BorderGlow";
 import StarBorder from "@/components/StarBorder";
 
 type LandingPlanFeature = string | { before: string; gold: string } | { before: string; red: string };
+
+/** Cards de preço na landing — tipo explícito evita união inferida sem `originalPrice`/`ctaHref` (falha no `next build`). */
+type LandingPricingPlan = {
+  name: string;
+  price: string;
+  description: string;
+  features: LandingPlanFeature[];
+  buttonText: string;
+  ctaHref: string;
+  isFeatured: boolean;
+  /** Preço riscado (promo), opcional */
+  originalPrice?: string;
+};
 
 /** Destaca só os algarismos (incl. milhares tipo 1.000) na cor ouro da marca. */
 function goldNumbersInText(text: string): ReactNode {
@@ -186,6 +200,7 @@ function HeroVisual({ className }: { className?: string }) {
 
 export function LandingPage() {
   const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { resolvedTheme } = useTheme();
   const heroHyperspeedOptions = useMemo(
     () => getRotaHeroHyperspeedOptions(resolvedTheme),
@@ -244,7 +259,7 @@ export function LandingPage() {
             blueOffset={18}
             mixBlendMode="normal"
             edge="subtle"
-            innerClassName="!flex !h-auto !min-h-16 !w-full !min-w-0 !max-w-full !items-stretch !justify-center !p-0"
+            innerClassName="!flex !h-auto !min-h-16 !w-full !min-w-0 !max-w-full !flex-col !items-stretch !justify-start !p-0"
             className="box-border w-full min-w-0 max-w-full rounded-xl"
             style={{ maxWidth: 1000, boxSizing: "border-box" }}
           >
@@ -272,21 +287,70 @@ export function LandingPage() {
                   href="/login"
                   variant="cta"
                   size="default"
-                  className="h-9 min-w-[12.5rem] shrink-0 gap-2 rounded-lg px-5 text-sm font-semibold shadow-lg shadow-primary/15 sm:h-10 sm:min-w-[15rem] sm:px-7 md:min-w-[16.5rem] md:px-8"
+                  className="hidden h-9 min-w-[12.5rem] shrink-0 gap-2 rounded-lg px-5 text-sm font-semibold shadow-lg shadow-primary/15 sm:h-10 sm:min-w-[15rem] sm:px-7 md:flex md:min-w-[16.5rem] md:px-8"
                 >
                   <LogIn className="size-4 shrink-0" aria-hidden />
                   <span className="whitespace-nowrap">Acessar Plataforma</span>
                 </LinkButton>
-                <PublicThemeToggle
-                  id="landing-theme-toggle"
-                  className={cn(
-                    "h-9 min-h-9 w-9 shrink-0 rounded-lg border border-solid border-border/55 bg-background/50 shadow-none transition-all hover:border-border hover:bg-accent/80 sm:h-10 sm:min-h-10 sm:w-10",
-                    "[&_svg]:text-foreground",
-                    "dark:border-white/15 dark:bg-zinc-900/40",
-                  )}
-                />
+                <div className="flex items-center gap-1.5 md:gap-2">
+                  <PublicThemeToggle
+                    id="landing-theme-toggle"
+                    className={cn(
+                      "h-9 min-h-9 w-9 shrink-0 rounded-lg border border-solid border-border/55 bg-background/50 shadow-none transition-all hover:border-border hover:bg-accent/80 sm:h-10 sm:min-h-10 sm:w-10",
+                      "[&_svg]:text-foreground",
+                      "dark:border-white/15 dark:bg-zinc-900/40",
+                    )}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                    className="flex h-9 w-9 items-center justify-center rounded-lg border border-border/55 bg-background/50 text-foreground transition-all hover:bg-accent md:hidden"
+                    aria-label="Menu"
+                  >
+                    {isMobileMenuOpen ? <XCircle className="size-5" /> : <Menu className="size-5" />}
+                  </button>
+                </div>
               </div>
             </div>
+
+            {/* Mobile menu — mesmo fluxo em coluna que o header (evita flex-row do GlassSurface a empurrar o painel para a direita) */}
+            <motion.div
+              initial={false}
+              animate={isMobileMenuOpen ? { height: "auto", opacity: 1 } : { height: 0, opacity: 0 }}
+              className="w-full min-w-0 overflow-hidden border-t border-border/40 md:hidden"
+              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <nav
+                className="flex w-full min-w-0 flex-col gap-0.5 px-3 pb-5 pt-2 sm:px-4"
+                aria-label="Navegação principal (mobile)"
+              >
+                {NAV_LINKS.map((item) => (
+                  <a
+                    key={item.href}
+                    href={item.href}
+                    onClick={(e) => {
+                      handleInPageNavClick(e, item.href);
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="flex w-full min-w-0 items-center gap-3 rounded-xl px-3 py-3.5 text-left text-[15px] font-medium text-foreground/90 transition-colors hover:bg-foreground/[0.06] active:bg-foreground/[0.08] dark:hover:bg-white/[0.06]"
+                  >
+                    <span className="min-w-0 flex-1 whitespace-nowrap">{item.label}</span>
+                    <ChevronRight className="size-4 shrink-0 text-muted-foreground/50" aria-hidden />
+                  </a>
+                ))}
+                <div className="mt-3 border-t border-border/40 pt-4">
+                  <LinkButton
+                    href="/login"
+                    variant="cta"
+                    size="lg"
+                    className="box-border min-h-12 w-full min-w-0 max-w-full shrink rounded-xl px-4 py-3.5 text-sm font-bold shadow-lg shadow-primary/15 sm:text-[0.9375rem]"
+                  >
+                    <LogIn className="size-4 shrink-0" aria-hidden />
+                    Acessar Plataforma
+                  </LinkButton>
+                </div>
+              </nav>
+            </motion.div>
           </GlassSurface>
         </div>
       </header>
@@ -791,7 +855,8 @@ export function LandingPage() {
             </div>
 
             <div className="mt-12 grid gap-8 md:grid-cols-3">
-              {[
+              {(
+                [
                 {
                   name: "Starter",
                   price: "0",
@@ -803,6 +868,7 @@ export function LandingPage() {
                     { before: "Link Público", red: "sem a sua marca" },
                   ] satisfies LandingPlanFeature[],
                   buttonText: "Começar Grátis",
+                  ctaHref: "/cadastro",
                   isFeatured: false,
                 },
                 {
@@ -816,6 +882,7 @@ export function LandingPage() {
                     { before: "Link Público", gold: "com a sua marca" },
                   ] satisfies LandingPlanFeature[],
                   buttonText: "Assinar Pro",
+                  ctaHref: "/login",
                   isFeatured: true,
                 },
                 {
@@ -829,9 +896,11 @@ export function LandingPage() {
                     { before: "Link Público", gold: "com a sua marca" },
                   ] satisfies LandingPlanFeature[],
                   buttonText: "Falar com Consultor",
+                  ctaHref: "/login",
                   isFeatured: false,
                 },
-              ].map((plan, i) => (
+                ] as LandingPricingPlan[]
+              ).map((plan, i) => (
                 <motion.div
                   key={plan.name}
                   initial={{ opacity: 0, y: 20 }}
@@ -886,7 +955,7 @@ export function LandingPage() {
                           ))}
                         </ul>
                         <LinkButton
-                          href="/login"
+                          href={plan.ctaHref}
                           variant="cta"
                           className="mt-10 h-12 w-full rounded-lg font-bold"
                         >
@@ -930,7 +999,7 @@ export function LandingPage() {
                           ))}
                         </ul>
                         <LinkButton
-                          href="/login"
+                          href={plan.ctaHref}
                           variant="outline"
                           className="mt-10 h-12 w-full rounded-lg font-bold"
                         >
@@ -1039,7 +1108,7 @@ export function LandingPage() {
 
               <div className="mt-10 flex justify-center">
                 <Link
-                  href="/login"
+                  href="/cadastro"
                   className={cn(
                     "inline-flex h-14 min-h-14 items-center justify-center gap-2 rounded-md px-10 text-base font-bold",
                     "border border-zinc-900/10 bg-zinc-900 text-white",
