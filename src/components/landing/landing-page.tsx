@@ -17,6 +17,7 @@ import { motion } from "motion/react";
 import {
   ArrowDown,
   ArrowRight,
+  Lightbulb,
   Bot,
   CheckCircle2,
   ChevronRight,
@@ -444,8 +445,8 @@ export function LandingPage() {
               transition={{ duration: 0.7, ease: "easeOut" }}
               className="max-w-2xl"
             >
-              <div className="mb-6 inline-flex items-center gap-2 rounded-lg border border-brand/25 bg-brand/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-brand shadow-sm">
-                <Compass className="size-3.5 shrink-0" aria-hidden />
+              <div className="mb-6 inline-flex items-center gap-2 rounded-lg border border-zinc-900/12 bg-white/70 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-900 shadow-sm dark:border-white/18 dark:bg-white/[0.06] dark:text-white">
+                <Lightbulb className="size-3.5 shrink-0 text-brand" aria-hidden />
                 <span>Comercial mais inteligente</span>
               </div>
               <h1 className="font-heading text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl md:text-6xl md:leading-[1.1] lg:text-[4rem]">
@@ -1087,7 +1088,7 @@ export function LandingPage() {
         </section>
 
         {/* --- FAQ --- */}
-        <section id="faq" className="relative z-10 scroll-mt-24 border-t border-amber-500/30 px-4 py-24 sm:px-6 lg:py-32 dark:border-amber-400/25">
+        <section id="faq" className="relative z-10 scroll-mt-24 border-t border-amber-500/30 px-4 pt-24 pb-14 sm:px-6 sm:py-24 lg:py-32 dark:border-amber-400/25">
           <div className="mx-auto max-w-3xl">
             <SectionTitle
               title="Perguntas Frequentes"
@@ -1118,7 +1119,7 @@ export function LandingPage() {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: idx * 0.1 }}
-                  className="group rounded-xl border bg-white shadow-sm transition-all open:shadow-md dark:border-white/5 dark:bg-zinc-950/40"
+                  className="group rounded-xl border border-zinc-300/70 bg-white shadow-sm transition-all open:shadow-md dark:border-white/12 dark:bg-zinc-950/40"
                 >
                   <summary className="flex cursor-pointer list-none items-center justify-between px-6 py-5 text-sm font-bold text-foreground sm:text-base">
                     <span>{item.q}</span>

@@ -114,7 +114,7 @@ export function LandingProductTabs() {
     >
       <div
         ref={tabsStripRef}
-        className="flex max-h-[15.5rem] flex-col gap-3 overflow-y-auto pb-4 pr-1 [scroll-padding-block:12px] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden lg:max-h-none lg:flex-col lg:overflow-visible lg:pb-0 lg:pr-0"
+        className="flex flex-col gap-3 pb-1 pr-0 lg:max-h-none lg:flex-col lg:overflow-visible lg:pb-0 lg:pr-0"
       >
         {TABS.map((tab) => {
           const Icon = tab.icon;
