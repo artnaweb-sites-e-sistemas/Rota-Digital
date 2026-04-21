@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import type Stripe from "stripe";
 
 import { fulfillStripeAddOnIfPaid } from "@/lib/stripe-fulfill-add-on";
-import { fulfillStripeSubscriptionIfPaid } from "@/lib/stripe-fulfill-subscription";
+import {
+  fulfillStripeSubscriptionFromStripeSubscription,
+  fulfillStripeSubscriptionIfPaid,
+} from "@/lib/stripe-fulfill-subscription";
 import { getStripe } from "@/lib/stripe-server";
 
 export const runtime = "nodejs";
@@ -39,6 +42,9 @@ export async function POST(req: NextRequest) {
       const session = event.data.object as Stripe.Checkout.Session;
       await fulfillStripeAddOnIfPaid(session);
       await fulfillStripeSubscriptionIfPaid(session);
+    } else if (event.type === "customer.subscription.created") {
+      const subscription = event.data.object as Stripe.Subscription;
+      await fulfillStripeSubscriptionFromStripeSubscription(subscription);
     }
   } catch (e) {
     console.error("[stripe webhook] fulfill", e);

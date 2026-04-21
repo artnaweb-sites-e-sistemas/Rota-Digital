@@ -14,25 +14,33 @@ import {
 
 const USER_SETTINGS = "userSettings";
 const PROCESSED = "stripeCheckoutSessions";
+const PROCESSED_SUBSCRIPTION = "stripeSubscriptionFulfillments";
 
-/**
- * Atualiza plano e IDs Stripe após checkout de assinatura pago.
- */
-export async function fulfillStripeSubscriptionIfPaid(session: Stripe.Checkout.Session): Promise<void> {
-  if (session.mode !== "subscription") return;
-  if (session.metadata?.checkoutKind !== "subscription") return;
-  if (session.payment_status !== "paid") return;
+/** Stripe pode devolver `id` como string ou objeto expandido no webhook. */
+function stripeResourceId(resource: string | { id: string } | null | undefined): string | null {
+  if (resource == null) return null;
+  if (typeof resource === "string") return resource.trim() || null;
+  if (typeof resource === "object" && typeof resource.id === "string") return resource.id.trim() || null;
+  return null;
+}
 
-  const uid = session.metadata?.uid ?? session.client_reference_id ?? "";
-  const plan = parseSubscriptionPlanKey(session.metadata?.subscriptionPlan);
-  const cycle = parseBillingCycle(session.metadata?.billingCycle);
-  const subscriptionId = typeof session.subscription === "string" ? session.subscription : null;
-  const customerId = typeof session.customer === "string" ? session.customer : null;
+function isSubscriptionCheckoutPaid(session: Stripe.Checkout.Session): boolean {
+  if (session.payment_status === "paid" || session.payment_status === "no_payment_required") return true;
+  return false;
+}
 
-  if (!uid.trim() || !plan || !cycle || !subscriptionId || !customerId) {
-    console.warn("[stripe fulfill sub] metadata incompleta", session.id);
-    return;
-  }
+type SubscriptionFulfillmentInput = {
+  uid: string;
+  plan: NonNullable<ReturnType<typeof parseSubscriptionPlanKey>>;
+  cycle: NonNullable<ReturnType<typeof parseBillingCycle>>;
+  subscriptionId: string;
+  customerId: string;
+  idempotencyDocId: string;
+  idempotencyCollection: typeof PROCESSED | typeof PROCESSED_SUBSCRIPTION;
+};
+
+async function applySubscriptionFulfillment(input: SubscriptionFulfillmentInput): Promise<void> {
+  const { uid, plan, cycle, subscriptionId, customerId, idempotencyDocId, idempotencyCollection } = input;
 
   const app = getFirebaseAdminApp();
   if (!app) {
@@ -41,12 +49,12 @@ export async function fulfillStripeSubscriptionIfPaid(session: Stripe.Checkout.S
   }
 
   const db = getFirestore(app);
-  const sessionRef = db.collection(PROCESSED).doc(session.id);
+  const idemRef = db.collection(idempotencyCollection).doc(idempotencyDocId);
 
   let previousSubId: string | null = null;
 
   await db.runTransaction(async (tx) => {
-    const done = await tx.get(sessionRef);
+    const done = await tx.get(idemRef);
     if (done.exists) return;
 
     const userRef = db.collection(USER_SETTINGS).doc(uid.trim());
@@ -79,7 +87,7 @@ export async function fulfillStripeSubscriptionIfPaid(session: Stripe.Checkout.S
       { merge: true },
     );
 
-    tx.set(sessionRef, {
+    tx.set(idemRef, {
       uid: uid.trim(),
       kind: "subscription",
       plan,
@@ -99,4 +107,81 @@ export async function fulfillStripeSubscriptionIfPaid(session: Stripe.Checkout.S
       }
     }
   }
+}
+
+/**
+ * Atualiza plano e IDs Stripe após checkout de assinatura pago.
+ */
+export async function fulfillStripeSubscriptionIfPaid(session: Stripe.Checkout.Session): Promise<void> {
+  if (session.mode !== "subscription") return;
+  if (session.metadata?.checkoutKind !== "subscription") return;
+  if (!isSubscriptionCheckoutPaid(session)) return;
+
+  const uid = session.metadata?.uid ?? session.client_reference_id ?? "";
+  const plan = parseSubscriptionPlanKey(session.metadata?.subscriptionPlan);
+  const cycle = parseBillingCycle(session.metadata?.billingCycle);
+  const subscriptionId = stripeResourceId(session.subscription);
+  const customerId = stripeResourceId(session.customer);
+
+  if (!uid.trim() || !plan || !cycle || !subscriptionId || !customerId) {
+    console.warn("[stripe fulfill sub] metadata incompleta", session.id, {
+      hasUid: Boolean(uid.trim()),
+      plan,
+      cycle,
+      subscriptionId,
+      customerId,
+      payment_status: session.payment_status,
+    });
+    return;
+  }
+
+  await applySubscriptionFulfillment({
+    uid: uid.trim(),
+    plan,
+    cycle,
+    subscriptionId,
+    customerId,
+    idempotencyDocId: session.id,
+    idempotencyCollection: PROCESSED,
+  });
+}
+
+/**
+ * Fallback: alguns webhooks entregam `subscription` expandida na sessão mas o evento
+ * `checkout.session.completed` pode falhar em edge cases; a assinatura carrega os mesmos metadados.
+ */
+export async function fulfillStripeSubscriptionFromStripeSubscription(
+  subscription: Stripe.Subscription,
+): Promise<void> {
+  const meta = subscription.metadata ?? {};
+  if (meta.checkoutKind !== "subscription") return;
+
+  const uid = typeof meta.uid === "string" ? meta.uid : "";
+  const plan = parseSubscriptionPlanKey(meta.subscriptionPlan);
+  const cycle = parseBillingCycle(meta.billingCycle);
+  const subscriptionId = subscription.id;
+  const customerId = stripeResourceId(subscription.customer);
+
+  if (!uid.trim() || !plan || !cycle || !subscriptionId || !customerId) {
+    console.warn("[stripe fulfill sub] subscription metadata incompleta", subscription.id, {
+      hasUid: Boolean(uid.trim()),
+      plan,
+      cycle,
+      customerId,
+    });
+    return;
+  }
+
+  const status = subscription.status;
+  if (status !== "active" && status !== "trialing") return;
+
+  await applySubscriptionFulfillment({
+    uid: uid.trim(),
+    plan,
+    cycle,
+    subscriptionId,
+    customerId,
+    idempotencyDocId: subscription.id,
+    idempotencyCollection: PROCESSED_SUBSCRIPTION,
+  });
 }
