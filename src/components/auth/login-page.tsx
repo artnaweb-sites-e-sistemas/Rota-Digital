@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { auth, isFirebaseAuthConfigured } from "@/lib/firebase";
+import { safeInternalPath } from "@/lib/safe-internal-path";
 import { PublicThemeToggle } from "@/components/public-theme-toggle";
 import Grainient from "@/components/grainient";
 import { cn } from "@/lib/utils";
@@ -51,13 +52,25 @@ function BrandMark({ className }: { className?: string }) {
   );
 }
 
-export function LoginPage({ passwordResetSuccess = false }: { passwordResetSuccess?: boolean } = {}) {
+export function LoginPage({
+  passwordResetSuccess = false,
+  redirectTo = null,
+}: {
+  passwordResetSuccess?: boolean;
+  /** Caminho interno após login (ex.: `/assinatura?plan=pro&cycle=monthly`). */
+  redirectTo?: string | null;
+} = {}) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
+
+  const cadastroHref =
+    safeInternalPath(redirectTo) != null
+      ? `/cadastro?redirect=${encodeURIComponent(safeInternalPath(redirectTo)!)}`
+      : "/cadastro";
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,7 +85,8 @@ export function LoginPage({ passwordResetSuccess = false }: { passwordResetSucce
 
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      router.push("/dashboard");
+      const next = safeInternalPath(redirectTo);
+      router.push(next ?? "/dashboard");
     } catch (err: unknown) {
       const message =
         typeof err === "object" &&
@@ -321,7 +335,7 @@ export function LoginPage({ passwordResetSuccess = false }: { passwordResetSucce
             <p className="mt-9 text-center text-sm text-muted-foreground">
               Não tem uma conta?{" "}
               <Link
-                href="/cadastro"
+                href={cadastroHref}
                 className="font-semibold text-foreground underline-offset-4 hover:underline"
               >
                 Cadastre-se

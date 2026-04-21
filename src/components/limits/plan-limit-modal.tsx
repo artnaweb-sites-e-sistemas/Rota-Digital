@@ -126,6 +126,7 @@ type Props = {
 
 export function PlanLimitModal({ state, onClose, getIdToken }: Props) {
   const [checkoutBusyId, setCheckoutBusyId] = useState<string | null>(null);
+  const [subscribeBusy, setSubscribeBusy] = useState<"pro" | "agency" | null>(null);
   const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
 
   const open = state != null;
@@ -185,6 +186,46 @@ export function PlanLimitModal({ state, onClose, getIdToken }: Props) {
       }
     } finally {
       setCheckoutBusyId(null);
+    }
+  };
+
+  const billingCycleParam = billingCycle === "monthly" ? "monthly" : "yearly";
+
+  const handleSubscribePlan = async (planKey: "pro" | "agency") => {
+    setSubscribeBusy(planKey);
+    try {
+      const idToken = (await getIdToken?.()) ?? null;
+      if (!idToken) {
+        window.location.href = `/cadastro?redirect=${encodeURIComponent(
+          `/assinatura?plan=${planKey}&cycle=${billingCycleParam}`,
+        )}`;
+        return;
+      }
+      const res = await fetch("/api/stripe/subscription/checkout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ plan: planKey, billingCycle: billingCycleParam }),
+      });
+      const payload = (await res.json().catch(() => ({}))) as {
+        url?: string;
+        error?: string;
+        skipCheckout?: boolean;
+        redirect?: string;
+      };
+      if (res.ok && payload.skipCheckout === true) {
+        window.location.href =
+          typeof payload.redirect === "string" ? payload.redirect : "/dashboard";
+        return;
+      }
+      if (res.ok && typeof payload.url === "string" && payload.url.startsWith("http")) {
+        window.location.href = payload.url;
+        return;
+      }
+    } finally {
+      setSubscribeBusy(null);
     }
   };
 
@@ -267,7 +308,9 @@ export function PlanLimitModal({ state, onClose, getIdToken }: Props) {
                     "50 prospecções de leads.",
                     "Logo e capa personalizadas",
                   ]}
-                  href="/#planos"
+                  href={`/assinatura?plan=pro&cycle=${billingCycleParam}`}
+                  onAssinar={() => void handleSubscribePlan("pro")}
+                  assinarBusy={subscribeBusy === "pro"}
                 />
                 <PlanUpgradeCard
                   title="Plano Agency"
@@ -282,7 +325,9 @@ export function PlanLimitModal({ state, onClose, getIdToken }: Props) {
                     "100 prospecções de leads",
                     "Link público + marca própria",
                   ]}
-                  href="/#planos"
+                  href={`/assinatura?plan=agency&cycle=${billingCycleParam}`}
+                  onAssinar={() => void handleSubscribePlan("agency")}
+                  assinarBusy={subscribeBusy === "agency"}
                 />
               </div>
             </div>
@@ -345,13 +390,21 @@ export function PlanLimitModal({ state, onClose, getIdToken }: Props) {
                   público e sua marca.
                 </p>
               </div>
-              <a
-                href="/#planos"
-                className={cn(buttonVariants({ variant: "cta", size: "lg" }), "gap-2")}
+              <Button
+                type="button"
+                variant="cta"
+                size="lg"
+                className="gap-2"
+                disabled={subscribeBusy === "agency"}
+                onClick={() => void handleSubscribePlan("agency")}
               >
-                Assinar Agency
-                <ArrowUpRight className="size-4" aria-hidden />
-              </a>
+                {subscribeBusy === "agency" ? (
+                  <Loader2 className="size-4 animate-spin shrink-0" aria-hidden />
+                ) : (
+                  <ArrowUpRight className="size-4" aria-hidden />
+                )}
+                {subscribeBusy === "agency" ? "A abrir…" : "Assinar Agency"}
+              </Button>
             </div>
           ) : null}
 
@@ -516,6 +569,8 @@ function PlanUpgradeCard({
   bullets,
   href,
   emphasize,
+  onAssinar,
+  assinarBusy,
 }: {
   title: string;
   price: string;
@@ -523,8 +578,11 @@ function PlanUpgradeCard({
   showAnnualBillingNote?: boolean;
   showQuotaRenewalNote?: boolean;
   bullets: string[];
+  /** Fallback com JS desligado ou acessibilidade. */
   href: string;
   emphasize?: boolean;
+  onAssinar?: () => void | Promise<void>;
+  assinarBusy?: boolean;
 }) {
   return (
     <div
@@ -556,16 +614,32 @@ function PlanUpgradeCard({
       {showQuotaRenewalNote ? (
         <p className="mt-3 text-[10px] leading-relaxed text-zinc-500">{QUOTA_RENEWAL_NOTE}</p>
       ) : null}
-      <a
-        href={href}
-        className={cn(
-          buttonVariants({ variant: emphasize ? "cta" : "outline", size: "sm" }),
-          "w-full",
-          showQuotaRenewalNote ? "mt-3" : "mt-4",
-        )}
-      >
-        Assinar
-      </a>
+      {onAssinar ? (
+        <Button
+          type="button"
+          variant={emphasize ? "cta" : "outline"}
+          size="sm"
+          className={cn("w-full", showQuotaRenewalNote ? "mt-3" : "mt-4")}
+          disabled={assinarBusy}
+          onClick={() => void onAssinar()}
+        >
+          {assinarBusy ? (
+            <Loader2 className="size-4 animate-spin shrink-0" aria-hidden />
+          ) : null}
+          {assinarBusy ? "A abrir…" : "Assinar"}
+        </Button>
+      ) : (
+        <a
+          href={href}
+          className={cn(
+            buttonVariants({ variant: emphasize ? "cta" : "outline", size: "sm" }),
+            "w-full",
+            showQuotaRenewalNote ? "mt-3" : "mt-4",
+          )}
+        >
+          Assinar
+        </a>
+      )}
     </div>
   );
 }

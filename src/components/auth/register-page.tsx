@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { auth, isFirebaseAuthConfigured } from "@/lib/firebase";
+import { safeInternalPath } from "@/lib/safe-internal-path";
 import { PublicThemeToggle } from "@/components/public-theme-toggle";
 import Grainient from "@/components/grainient";
 import { cn } from "@/lib/utils";
@@ -71,7 +72,12 @@ function firebaseSignupErrorMessage(err: unknown): string {
   return "Não foi possível criar a conta. Tente novamente.";
 }
 
-export function RegisterPage() {
+export function RegisterPage({
+  redirectTo = null,
+}: {
+  /** Caminho interno após cadastro (ex.: `/assinatura?plan=pro&cycle=monthly`). */
+  redirectTo?: string | null;
+} = {}) {
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -81,6 +87,11 @@ export function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
+
+  const loginHref =
+    safeInternalPath(redirectTo) != null
+      ? `/login?redirect=${encodeURIComponent(safeInternalPath(redirectTo)!)}`
+      : "/login";
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,7 +120,8 @@ export function RegisterPage() {
       if (name) {
         await updateProfile(cred.user, { displayName: name });
       }
-      router.push("/dashboard");
+      const next = safeInternalPath(redirectTo);
+      router.push(next ?? "/dashboard");
     } catch (err: unknown) {
       setError(firebaseSignupErrorMessage(err));
     } finally {
@@ -373,10 +385,7 @@ export function RegisterPage() {
 
                 <p className="mt-9 text-center text-sm text-muted-foreground">
                   Já tem uma conta?{" "}
-                  <Link
-                    href="/login"
-                    className="font-semibold text-foreground underline-offset-4 hover:underline"
-                  >
+                  <Link href={loginHref} className="font-semibold text-foreground underline-offset-4 hover:underline">
                     Entrar
                   </Link>
                 </p>

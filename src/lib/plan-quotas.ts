@@ -103,6 +103,18 @@ export function resolveQuotaLimit(
       return { plan, limit: Math.floor(storedRaw), isUnlimited: false };
     }
   }
+  if (resource === "rotas" && baseline < UNLIMITED_QUOTA) {
+    const bonus = userSettings?.rotasQuotaBonus;
+    if (typeof bonus === "number" && Number.isFinite(bonus) && bonus > 0) {
+      return { plan, limit: Math.floor(baseline + bonus), isUnlimited: false };
+    }
+  }
+  if (resource === "propostas" && baseline < UNLIMITED_QUOTA) {
+    const bonus = userSettings?.propostasQuotaBonus;
+    if (typeof bonus === "number" && Number.isFinite(bonus) && bonus > 0) {
+      return { plan, limit: Math.floor(baseline + bonus), isUnlimited: false };
+    }
+  }
   return { plan, limit: baseline, isUnlimited: baseline >= UNLIMITED_QUOTA };
 }
 

@@ -353,6 +353,54 @@ export function LandingPage() {
     [resolvedTheme],
   );
 
+  const pricingPlans = useMemo((): LandingPricingPlan[] => {
+    const cycle = billingCycle === "monthly" ? "monthly" : "yearly";
+    return [
+      {
+        name: "Starter",
+        price: "0",
+        description: "Grátis, para conhecer a plataforma e validar o funil.",
+        features: [
+          "2 diagnósticos (Rota Digital) com IA.",
+          "30 prospecções de leads.",
+          "2 gerações de propostas",
+          { before: "Link Público", red: "sem a sua marca" },
+        ],
+        buttonText: "Começar Grátis",
+        ctaHref: "/cadastro",
+        isFeatured: false,
+      },
+      {
+        name: "Pro",
+        price: billingCycle === "monthly" ? "127" : "97",
+        description: "Diagnósticos diários e prospecção consistente para sua agência crescer.",
+        features: [
+          "20 diagnósticos (Rota Digital) com IA.",
+          "50 prospecções de leads.",
+          "30 gerações de propostas",
+          { before: "Link Público", gold: "com a sua marca" },
+        ],
+        buttonText: "Assinar Pro",
+        ctaHref: `/assinatura?plan=pro&cycle=${cycle}`,
+        isFeatured: true,
+      },
+      {
+        name: "Agency",
+        price: billingCycle === "monthly" ? "347" : "267",
+        description: "Volume máximo para agências com alta demanda de prospecção.",
+        features: [
+          "50 diagnósticos (Rota Digital) com IA.",
+          "100 prospecções de leads.",
+          "Propostas ilimitadas",
+          { before: "Link Público", gold: "com a sua marca" },
+        ],
+        buttonText: "Assinar Agency",
+        ctaHref: `/assinatura?plan=agency&cycle=${cycle}`,
+        isFeatured: false,
+      },
+    ];
+  }, [billingCycle]);
+
   return (
     <div className="relative min-h-svh bg-background text-foreground selection:bg-primary/30">
       {/* Background: light mode uses warm tones, dark mode uses dark grain */}
@@ -954,52 +1002,7 @@ export function LandingPage() {
             </div>
 
             <div className="mt-12 grid gap-8 md:grid-cols-3">
-              {(
-                [
-                {
-                  name: "Starter",
-                  price: "0",
-                  description: "Grátis, para conhecer a plataforma e validar o funil.",
-                  features: [
-                    "2 diagnósticos (Rota Digital) com IA.",
-                    "30 prospecções de leads.",
-                    "2 gerações de propostas",
-                    { before: "Link Público", red: "sem a sua marca" },
-                  ] satisfies LandingPlanFeature[],
-                  buttonText: "Começar Grátis",
-                  ctaHref: "/cadastro",
-                  isFeatured: false,
-                },
-                {
-                  name: "Pro",
-                  price: billingCycle === "monthly" ? "127" : "97",
-                  description: "Diagnósticos diários e prospecção consistente para sua agência crescer.",
-                  features: [
-                    "20 diagnósticos (Rota Digital) com IA.",
-                    "50 prospecções de leads.",
-                    "30 gerações de propostas",
-                    { before: "Link Público", gold: "com a sua marca" },
-                  ] satisfies LandingPlanFeature[],
-                  buttonText: "Assinar Pro",
-                  ctaHref: "/login",
-                  isFeatured: true,
-                },
-                {
-                  name: "Agency",
-                  price: billingCycle === "monthly" ? "347" : "267",
-                  description: "Volume máximo para agências com alta demanda de prospecção.",
-                  features: [
-                    "50 diagnósticos (Rota Digital) com IA.",
-                    "100 prospecções de leads.",
-                    "Propostas ilimitadas",
-                    { before: "Link Público", gold: "com a sua marca" },
-                  ] satisfies LandingPlanFeature[],
-                  buttonText: "Assinar Agency",
-                  ctaHref: "/login",
-                  isFeatured: false,
-                },
-                ] as LandingPricingPlan[]
-              ).map((plan, i) => (
+              {pricingPlans.map((plan, i) => (
                 <motion.div
                   key={plan.name}
                   initial={{ opacity: 0, y: 20 }}
