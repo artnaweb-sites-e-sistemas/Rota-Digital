@@ -11,7 +11,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { auth, isFirebaseAuthConfigured } from "@/lib/firebase";
 import { safeInternalPath } from "@/lib/safe-internal-path";
-import { PublicThemeToggle } from "@/components/public-theme-toggle";
 import Grainient from "@/components/grainient";
 import { cn } from "@/lib/utils";
 
@@ -173,22 +172,6 @@ export function LoginPage({
             >
               <ArrowLeft className="size-[1.125rem]" strokeWidth={2} aria-hidden />
             </Link>
-          </div>
-          <div className="absolute top-4 right-4 z-20 sm:top-5 sm:right-5">
-            <PublicThemeToggle
-              id="login-theme-toggle"
-              className={cn(
-                "h-11 min-h-11 w-11 rounded-full shadow-none",
-                "bg-background",
-                "[&_svg]:!text-brand",
-                "transition-[background-color,border-color,box-shadow,color] duration-150",
-                "hover:bg-muted/80",
-                "focus-visible:ring-2 focus-visible:ring-ring/45 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                "dark:bg-zinc-950 dark:shadow-[0_1px_0_rgba(255,255,255,0.04)_inset]",
-                "dark:[&_svg]:!text-zinc-100",
-                "dark:hover:border-white/18 dark:hover:bg-zinc-900",
-              )}
-            />
           </div>
 
           <div className="flex min-h-0 flex-1 flex-col justify-center">
