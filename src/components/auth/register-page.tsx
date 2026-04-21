@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
-import { ArrowLeft, Eye, EyeOff, Heart, Loader2, Shield, UserPlus } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Heart, Loader2, ShieldCheck, UserPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -156,7 +156,7 @@ export function RegisterPage() {
 
             <div className="relative z-10 flex flex-col gap-5 sm:gap-6">
               <span className="text-[1.05rem] font-semibold tracking-tight text-[#8e7d4d]">Rota Digital</span>
-              <h1 className="pr-2 text-4xl font-bold leading-[1.12] tracking-tight text-[#8e7d4d] sm:text-5xl lg:text-[2.75rem] xl:text-6xl">
+              <h1 className="font-heading pr-2 text-3xl font-black uppercase leading-[1.1] tracking-tight text-zinc-900 dark:text-zinc-900 sm:text-4xl lg:text-[2.35rem] xl:text-[2.9rem]">
                 Crie sua conta
               </h1>
             </div>
@@ -164,7 +164,7 @@ export function RegisterPage() {
             <div className="relative z-10 rounded-2xl border border-zinc-900/6 bg-[#fff9ec]/32 px-4 py-3.5 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.34),0_12px_44px_-14px_rgba(0,0,0,0.15)] backdrop-blur-xl backdrop-saturate-140">
               <div className="flex gap-3">
                 <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#6f5a2f]/12">
-                  <Shield className="size-[1.15rem] text-[#6f5a2f]" strokeWidth={2} aria-hidden />
+                  <ShieldCheck className="size-[1.15rem] text-[#6f5a2f]" strokeWidth={2} aria-hidden />
                 </div>
                 <div className="min-w-0 space-y-0.5">
                   <p className="text-sm font-semibold text-[#6f5a2f]">Plataforma 100% segura</p>
