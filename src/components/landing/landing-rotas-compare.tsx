@@ -58,12 +58,6 @@ export function LandingRotasCompare({
     setFromClientX(e.clientX);
   };
 
-  const onTrackPointerDown = (e: React.PointerEvent) => {
-    if ((e.target as HTMLElement).closest("button")) return;
-    setDragging(true);
-    setFromClientX(e.clientX);
-  };
-
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "ArrowLeft") setPct((p) => Math.max(0, p - 2));
     if (e.key === "ArrowRight") setPct((p) => Math.min(100, p + 2));
@@ -72,17 +66,20 @@ export function LandingRotasCompare({
   return (
     <div
       role="presentation"
-      onPointerDown={onTrackPointerDown}
       className={cn(
-        "relative w-full cursor-ew-resize select-none",
+        "relative w-full select-none",
         /* 16/9 em vez de 16/10: caixa mais baixa (~mesma largura, ~10% menos altura), alinhado a mockups 16:9. */
-        "aspect-video touch-none",
+        "aspect-video",
         className,
       )}
     >
+      {/*
+        pointer-events-none no track: arraste só no handle (botão + faixa vertical).
+        Sem isto, o pointerdown na área da imagem iniciava o arraste.
+      */}
       <div
         ref={trackRef}
-        className="absolute inset-0 overflow-hidden rounded-t-xl rounded-b-none"
+        className="pointer-events-none absolute inset-0 overflow-hidden rounded-t-xl rounded-b-none"
       >
         {/* object-cover + top: preenche o retângulo e corta a parte de baixo; as duas camadas alinhadas. */}
         <Image
@@ -103,7 +100,7 @@ export function LandingRotasCompare({
           priority={false}
         />
 
-        {/* Área de arraste alta; só removemos a div de 1px que “vazava” nas faixas vazias do object-contain. */}
+        {/* Faixa vertical (handle + linha): único sítio que inicia arraste; `pointer-events-auto` vence o `none` do pai. */}
         <button
           type="button"
           aria-label="Arrastar para comparar modo claro e escuro"
@@ -111,7 +108,7 @@ export function LandingRotasCompare({
           aria-valuemax={100}
           aria-valuenow={Math.round(pct)}
           role="slider"
-          className="absolute top-0 bottom-0 z-10 flex w-10 -translate-x-1/2 cursor-ew-resize touch-none items-center justify-center border-0 bg-transparent p-0 outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          className="pointer-events-auto absolute top-0 bottom-0 z-10 flex w-10 -translate-x-1/2 cursor-ew-resize touch-none items-center justify-center border-0 bg-transparent p-0 outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           style={{ left: `${pct}%` }}
           onPointerDown={onPointerDown}
           onKeyDown={onKeyDown}

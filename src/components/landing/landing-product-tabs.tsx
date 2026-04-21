@@ -15,7 +15,7 @@ const TABS = [
     id: "leads",
     label: "Prospecção",
     icon: Users,
-    videoSrc: PRODUCT_PANEL_VIDEO_SRC,
+    videoSrc: "/videos/landing/leads-dark2.webm",
     title: "Controle total do seu funil",
     description: "Veja os leads em um só lugar e saiba exatamente com quem falar e o que fazer em seguida.",
     bullets: [
@@ -41,7 +41,7 @@ const TABS = [
     id: "proposta",
     label: "Proposta",
     icon: FileText,
-    videoSrc: PRODUCT_PANEL_VIDEO_SRC,
+    videoSrc: "/videos/landing/propsota-dark2.webm",
     title: "Propostas com mais poder de fechamento",
     description: "Monte propostas mais claras e profissionais, com base no que o cliente realmente precisa.",
     bullets: [
@@ -211,10 +211,43 @@ export function LandingProductTabs() {
                 </ul>
               </div>
 
-              <div className="relative h-full min-h-[12rem] overflow-hidden rounded-br-xl leading-none lg:min-h-0 -mr-[calc(1.5rem+1px)] -mb-4 sm:-mr-[calc(2.5rem+1px)] sm:-mb-6">
+              <div
+                className={cn(
+                  "relative rounded-br-xl leading-none",
+                  /* Mobile: corta canto arredondado; desktop: sem clip (vídeo inteiro + bleed) */
+                  "max-lg:overflow-hidden lg:overflow-visible",
+                  /* Mobile / tablet: bleed à direita (exceto Proposta — ver abaixo) */
+                  panel.id !== "proposta" &&
+                    "max-lg:-mr-6 sm:max-lg:-mr-10 max-lg:ml-0 max-lg:w-[calc(100%+1.5rem)] sm:max-lg:w-[calc(100%+2.5rem)]",
+                  /* Proposta (só max-lg): sem margem negativa; respiro em baixo e à direita */
+                  panel.id === "proposta" &&
+                    "max-lg:mx-0 max-lg:w-full max-lg:mb-6 max-lg:pr-0 sm:max-lg:mb-8 sm:max-lg:pr-2",
+                  /**
+                   * Desktop: o *wrapper* compensa px-10 + contentInset (1px) para encostar à borda;
+                   * o <video> fica só com max-height + tamanho intrínseco — não “amplia” o vídeo.
+                   */
+                  "lg:mx-0 lg:flex lg:h-full lg:min-h-0 lg:min-w-0 lg:items-end lg:justify-end",
+                  "lg:w-[calc(100%+2.5rem+1px)] lg:max-w-none lg:-mr-[calc(2.5rem+1px)]",
+                  /* Proposta: `margin` não aparece com grid + `h-full`; `padding-bottom` cria o vazio em baixo do vídeo. */
+                  panel.id === "proposta" ? "lg:pb-14" : "lg:-mb-6",
+                )}
+              >
                 <video
                   key={panel.videoSrc}
-                  className="absolute bottom-[-6px] right-0 z-0 block h-auto w-full max-w-none sm:bottom-[-10px]"
+                  className={cn(
+                    "z-0 block max-w-none",
+                    /* Mobile: fluxo natural, inteiro, à direita */
+                    "max-lg:relative max-lg:h-auto max-lg:object-contain max-lg:object-right",
+                    panel.id === "proposta"
+                      ? "max-lg:w-[calc(100%+12px)] max-lg:max-w-none max-lg:-mr-3 max-lg:max-h-[min(400px,85vh)]"
+                      : "max-lg:w-full",
+                    /* Desktop: frame completo (intrínseco + limite de altura), alinhado à direita do wrapper */
+                    "lg:h-auto lg:w-auto lg:max-w-none lg:shrink-0",
+                    panel.id === "proposta"
+                      ? "lg:max-h-[min(300px,calc(100vh-12rem))]"
+                      : "lg:max-h-[min(340px,calc(100vh-12rem))]",
+                    "lg:object-contain lg:object-right",
+                  )}
                   src={panel.videoSrc}
                   muted
                   loop
