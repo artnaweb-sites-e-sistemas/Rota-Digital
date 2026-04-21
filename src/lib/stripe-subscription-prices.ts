@@ -12,13 +12,13 @@ export function subscriptionLineAmountCents(
 ): { unitAmount: number; interval: "month" | "year"; label: string } {
   if (cycle === "monthly") {
     if (plan === "pro") {
-      return { unitAmount: 127 * 100, interval: "month", label: "Plano Pro (mensal)" };
+      return { unitAmount: 1 * 100, interval: "month", label: "Plano Pro (mensal)" };
     }
     return { unitAmount: 347 * 100, interval: "month", label: "Plano Agency (mensal)" };
   }
   if (plan === "pro") {
     return {
-      unitAmount: 97 * 12 * 100,
+      unitAmount: 1 * 100,
       interval: "year",
       label: "Plano Pro (anual)",
     };
@@ -36,9 +36,9 @@ export function subscriptionMonthlyEquivalentCents(
   cycle: StripeSubscriptionBillingCycle,
 ): number {
   if (cycle === "monthly") {
-    return plan === "pro" ? 12_700 : 34_700;
+    return plan === "pro" ? 100 : 34_700;
   }
-  return plan === "pro" ? 9_700 : 26_700;
+  return plan === "pro" ? 100 : 26_700;
 }
 
 /** Limite mensal de leads conforme plano (igual ao admin PATCH). */

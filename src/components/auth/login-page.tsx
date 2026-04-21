@@ -165,7 +165,7 @@ export function LoginPage({
               className={cn(
                 "inline-flex size-9 items-center justify-center rounded-lg text-[#8e7d4d]",
                 "transition-colors duration-150",
-                "hover:bg-transparent hover:text-white",
+                "hover:bg-transparent hover:text-zinc-950 dark:hover:text-zinc-100",
                 "focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none",
               )}
               aria-label="Voltar para o início"

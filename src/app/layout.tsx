@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
 import { ThemeProvider } from "@/components/theme-provider";
 import { UserThemeSync } from "@/components/user-theme-sync";
+import { Analytics } from "@vercel/analytics/next";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -37,6 +38,7 @@ export default function RootLayout({
           <AuthProvider>
             <UserThemeSync />
             {children}
+            <Analytics />
           </AuthProvider>
         </ThemeProvider>
       </body>
