@@ -155,6 +155,17 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const asUnknown = invoice as unknown as {
       charge?: string | { id?: string } | null;
       payment_intent?: string | { latest_charge?: string | { id?: string } | null } | null;
+      payments?: {
+        data?: Array<{
+          payment?: {
+            payment_intent?:
+              | string
+              | { id?: string; latest_charge?: string | { id?: string } | null }
+              | null;
+            charge?: string | { id?: string } | null;
+          } | null;
+        }>;
+      } | null;
     };
     if (typeof asUnknown.charge === "string") chargeId = asUnknown.charge;
     else if (asUnknown.charge && typeof asUnknown.charge === "object" && asUnknown.charge.id)
@@ -175,6 +186,52 @@ export async function POST(request: NextRequest, context: RouteContext) {
           else if (lc && typeof lc === "object" && lc.id) chargeId = lc.id;
         } catch {
           /** ignore: falha a resolver PI mas segue sem charge */
+        }
+      }
+    }
+
+    /** API 2025+: o Charge sai em `invoice.payments.data[].payment.payment_intent.latest_charge`. */
+    if (!chargeId) {
+      const entries = asUnknown.payments?.data ?? [];
+      for (const entry of entries) {
+        const payment = entry?.payment;
+        if (!payment) continue;
+        if (typeof payment.charge === "string") {
+          chargeId = payment.charge;
+          break;
+        }
+        if (payment.charge && typeof payment.charge === "object" && payment.charge.id) {
+          chargeId = payment.charge.id;
+          break;
+        }
+        const pp = payment.payment_intent;
+        if (pp && typeof pp === "object") {
+          const lc = pp.latest_charge;
+          if (typeof lc === "string") {
+            chargeId = lc;
+            break;
+          }
+          if (lc && typeof lc === "object" && lc.id) {
+            chargeId = lc.id;
+            break;
+          }
+        }
+        if (typeof pp === "string") {
+          try {
+            const piObj = await stripe.paymentIntents.retrieve(pp);
+            const lc = (piObj as unknown as { latest_charge?: string | { id?: string } | null })
+              .latest_charge;
+            if (typeof lc === "string") {
+              chargeId = lc;
+              break;
+            }
+            if (lc && typeof lc === "object" && lc.id) {
+              chargeId = lc.id;
+              break;
+            }
+          } catch {
+            /** ignore: continua a próxima entry */
+          }
         }
       }
     }

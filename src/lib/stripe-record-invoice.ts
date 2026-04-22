@@ -2,6 +2,7 @@ import { FieldValue, getFirestore, type Firestore } from "firebase-admin/firesto
 import type Stripe from "stripe";
 
 import { getFirebaseAdminApp } from "@/lib/firebase-admin-app";
+import { getStripe } from "@/lib/stripe-server";
 import type { StoredStripeInvoice, StoredStripeInvoiceLine, StoredStripeInvoiceLineKind } from "@/types/stripe-invoice";
 
 const USER_SETTINGS = "userSettings";
@@ -153,6 +154,118 @@ function mapLines(invoice: Stripe.Invoice): StoredStripeInvoiceLine[] {
   }));
 }
 
+/**
+ * Extrai `chargeId` + `paymentIntentId` de uma fatura Stripe, cobrindo várias versões da API.
+ * - `invoice.charge` (API ≤ 2024)
+ * - `invoice.payment_intent` expandido (via `latest_charge`)
+ * - `invoice.payments.data[].payment.payment_intent` expandido (API 2025+)
+ */
+function extractPaymentIds(
+  invoice: Stripe.Invoice,
+): { chargeId: string | null; paymentIntentId: string | null } {
+  const asUnknown = invoice as unknown as {
+    charge?: string | { id?: string } | null;
+    payment_intent?:
+      | string
+      | {
+          id?: string;
+          latest_charge?: string | { id?: string } | null;
+        }
+      | null;
+    payments?: {
+      data?: Array<{
+        payment?:
+          | {
+              payment_intent?:
+                | string
+                | {
+                    id?: string;
+                    latest_charge?: string | { id?: string } | null;
+                  }
+                | null;
+              charge?: string | { id?: string } | null;
+            }
+          | null;
+      }>;
+    } | null;
+  };
+
+  let chargeId: string | null = null;
+  let paymentIntentId: string | null = null;
+
+  if (typeof asUnknown.charge === "string") chargeId = asUnknown.charge;
+  else if (asUnknown.charge && typeof asUnknown.charge === "object" && asUnknown.charge.id)
+    chargeId = asUnknown.charge.id;
+
+  const pi = asUnknown.payment_intent;
+  if (typeof pi === "string") paymentIntentId = pi;
+  else if (pi && typeof pi === "object") {
+    if (typeof pi.id === "string") paymentIntentId = pi.id;
+    if (!chargeId) {
+      const lc = pi.latest_charge;
+      if (typeof lc === "string") chargeId = lc;
+      else if (lc && typeof lc === "object" && typeof lc.id === "string") chargeId = lc.id;
+    }
+  }
+
+  const paymentsData = asUnknown.payments?.data ?? [];
+  for (const entry of paymentsData) {
+    const payment = entry?.payment;
+    if (!payment) continue;
+    if (!chargeId) {
+      if (typeof payment.charge === "string") chargeId = payment.charge;
+      else if (payment.charge && typeof payment.charge === "object" && typeof payment.charge.id === "string")
+        chargeId = payment.charge.id;
+    }
+    const pp = payment.payment_intent;
+    if (!paymentIntentId) {
+      if (typeof pp === "string") paymentIntentId = pp;
+      else if (pp && typeof pp === "object" && typeof pp.id === "string") paymentIntentId = pp.id;
+    }
+    if (!chargeId && pp && typeof pp === "object") {
+      const lc = pp.latest_charge;
+      if (typeof lc === "string") chargeId = lc;
+      else if (lc && typeof lc === "object" && typeof lc.id === "string") chargeId = lc.id;
+    }
+    if (chargeId && paymentIntentId) break;
+  }
+
+  return { chargeId: chargeId?.trim() || null, paymentIntentId: paymentIntentId?.trim() || null };
+}
+
+/**
+ * Escolhe o melhor `[periodStart, periodEnd]` para exibição:
+ * 1. Quando `invoice.period_start === invoice.period_end` (fatura de criação de assinatura),
+ *    a API cola ambos no momento do pagamento. Nesse caso preferimos a linha de subscrição
+ *    com o intervalo mais longo — tipicamente "hoje → próxima renovação".
+ * 2. Caso contrário, usa `invoice.period_start` / `invoice.period_end`.
+ */
+function bestInvoicePeriodMs(
+  invoice: Stripe.Invoice,
+  lines: StoredStripeInvoiceLine[],
+): { periodStartMs: number | null; periodEndMs: number | null } {
+  const invStart = secondsToMs(invoice.period_start);
+  const invEnd = secondsToMs(invoice.period_end);
+  const degenerate = invStart != null && invEnd != null && invEnd - invStart < 24 * 60 * 60 * 1000;
+
+  if (!degenerate) {
+    return { periodStartMs: invStart, periodEndMs: invEnd };
+  }
+
+  let best: { startMs: number; endMs: number } | null = null;
+  for (const l of lines) {
+    if (l.kind !== "subscription") continue;
+    if (l.periodStartMs == null || l.periodEndMs == null) continue;
+    const span = l.periodEndMs - l.periodStartMs;
+    if (span <= 0) continue;
+    if (!best || span > best.endMs - best.startMs) {
+      best = { startMs: l.periodStartMs, endMs: l.periodEndMs };
+    }
+  }
+  if (best) return { periodStartMs: best.startMs, periodEndMs: best.endMs };
+  return { periodStartMs: invStart, periodEndMs: invEnd };
+}
+
 /** Normaliza `Stripe.Invoice` → documento Firestore. */
 function buildStoredInvoice(
   invoice: Stripe.Invoice,
@@ -160,6 +273,9 @@ function buildStoredInvoice(
   rawEventId: string | null,
   failureMessage: string | null,
 ): Omit<StoredStripeInvoice, "webhookReceivedAt"> {
+  const lines = mapLines(invoice);
+  const { periodStartMs, periodEndMs } = bestInvoicePeriodMs(invoice, lines);
+  const { chargeId, paymentIntentId } = extractPaymentIds(invoice);
   return {
     uid,
     stripeInvoiceId: invoice.id ?? "",
@@ -175,8 +291,8 @@ function buildStoredInvoice(
     number: invoice.number ?? null,
     hostedInvoiceUrl: invoice.hosted_invoice_url ?? null,
     invoicePdf: invoice.invoice_pdf ?? null,
-    periodStartMs: secondsToMs(invoice.period_start),
-    periodEndMs: secondsToMs(invoice.period_end),
+    periodStartMs,
+    periodEndMs,
     paidAtMs:
       invoice.status === "paid"
         ? secondsToMs(
@@ -186,8 +302,10 @@ function buildStoredInvoice(
         : null,
     createdAtMs: secondsToMs(invoice.created) ?? Date.now(),
     failureMessage,
-    lines: mapLines(invoice),
+    lines,
     rawEventId,
+    stripeChargeId: chargeId,
+    stripePaymentIntentId: paymentIntentId,
   };
 }
 
@@ -215,9 +333,30 @@ export async function recordStripeInvoicePaid(
   }
 
   const db = getFirestore(app);
-  const uid = await resolveUidForInvoice(db, invoice);
+
+  /**
+   * Stripe envia a maior parte das relações como `id` (não expandidas) no payload do webhook.
+   * Se faltarem `chargeId`/`paymentIntentId`, refetch com expansões para que o refund admin
+   * possa localizar o pagamento sem depender de `stripe.invoices.retrieve` mais tarde.
+   */
+  let hydrated = invoice;
+  const probe = extractPaymentIds(invoice);
+  if (!probe.chargeId && invoice.id) {
+    const stripe = getStripe();
+    if (stripe) {
+      try {
+        hydrated = await stripe.invoices.retrieve(invoice.id, {
+          expand: ["payment_intent", "payments.data.payment.payment_intent", "charge"],
+        });
+      } catch (e) {
+        console.warn("[stripe record invoice] expand falhou", invoice.id, e);
+      }
+    }
+  }
+
+  const uid = await resolveUidForInvoice(db, hydrated);
   const invRef = db.collection(INVOICES).doc(invoice.id);
-  const stored = buildStoredInvoice(invoice, uid, rawEventId, null);
+  const stored = buildStoredInvoice(hydrated, uid, rawEventId, null);
   const amountPaid = stored.amountPaidCents;
   const monthKey = monthKeyUtcFromMs(stored.paidAtMs ?? stored.createdAtMs);
   const hasSubscription = Boolean(stored.stripeSubscriptionId);

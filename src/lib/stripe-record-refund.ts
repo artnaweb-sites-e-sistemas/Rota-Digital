@@ -197,6 +197,25 @@ export async function recordStripeChargeRefunded(
       if (addOnCents > 0) {
         userPatch[`addOnPaidByMonthCents.${monthKey}`] = FieldValue.increment(-addOnCents);
       }
+
+      /**
+       * Reverte os bónus de quota associados ao add-on quando o refund cobre a fatura toda.
+       * Refunds parciais não revertem a quota (decisão consciente: a unidade do pack é
+       * atómica — "meio pacote" não faz sentido). O `addOnMetadata` só existe em faturas
+       * sintéticas gravadas por `fulfillStripeAddOnIfPaid`.
+       */
+      const meta = stored.addOnMetadata;
+      const becameFullyRefunded = refundStatus === "refunded";
+      if (becameFullyRefunded && meta && meta.units > 0) {
+        if (meta.kind === "lead_capture") {
+          userPatch.leadCaptureMonthlyLimit = FieldValue.increment(-meta.units);
+        } else if (meta.kind === "rotas") {
+          userPatch.rotasQuotaBonus = FieldValue.increment(-meta.units);
+        } else if (meta.kind === "propostas") {
+          userPatch.propostasQuotaBonus = FieldValue.increment(-meta.units);
+        }
+      }
+
       tx.set(userRef, userPatch, { merge: true });
     }
   });

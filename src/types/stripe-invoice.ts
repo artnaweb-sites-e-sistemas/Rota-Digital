@@ -76,4 +76,15 @@ export type StoredStripeInvoice = {
   stripePaymentIntentId?: string | null;
   /** Se este registo foi criado a partir de uma Checkout Session (add-on avulso). */
   stripeCheckoutSessionId?: string | null;
+  /**
+   * Metadados do pacote add-on associado (apenas compras avulsas via Checkout Session).
+   * Guardamos `kind` + `packId` + unidades creditadas para permitir reverter o bónus de quota
+   * quando o admin estorna a fatura.
+   */
+  addOnMetadata?: {
+    kind: "lead_capture" | "rotas" | "propostas";
+    packId: string;
+    /** Quantas unidades foram creditadas pelo pack (leads, rotas ou propostas). */
+    units: number;
+  } | null;
 };

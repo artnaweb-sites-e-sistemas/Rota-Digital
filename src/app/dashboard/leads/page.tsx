@@ -1992,7 +1992,8 @@ function LeadsPageContent() {
                   <>Plano {capturePlanLabel} · sem limite mensal · até {LEAD_CAPTURE_MAX_PER_RUN} por busca.</>
                 ) : (
                   <>
-                    Plano {capturePlanLabel} · usados no mês: {googlePlacesUsedThisMonth} de {monthlyLeadLimit} ·
+                    Plano {capturePlanLabel} · usados no mês: {googlePlacesUsedThisMonth} de{" "}
+                    <span className="font-semibold tabular-nums text-brand">{monthlyLeadLimit}</span> ·
                     disponível nesta busca:{" "}
                     <span className="font-semibold text-zinc-200">{allowedSliderMax}</span>
                   </>

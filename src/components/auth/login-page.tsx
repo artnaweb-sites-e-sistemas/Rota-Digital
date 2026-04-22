@@ -83,13 +83,19 @@ export function LoginPage({
       const next = safeInternalPath(redirectTo);
       router.push(next ?? "/dashboard");
     } catch (err: unknown) {
-      const message =
-        typeof err === "object" &&
-        err !== null &&
-        "code" in err &&
-        (err as { code?: string }).code === "auth/invalid-api-key"
-          ? "Chave da API Firebase invalida. Revise NEXT_PUBLIC_FIREBASE_API_KEY na Vercel."
-          : "Falha no login. Verifique suas credenciais.";
+      const code =
+        typeof err === "object" && err !== null && "code" in err
+          ? (err as { code?: string }).code ?? null
+          : null;
+      let message: string;
+      if (code === "auth/invalid-api-key") {
+        message = "Chave da API Firebase invalida. Revise NEXT_PUBLIC_FIREBASE_API_KEY na Vercel.";
+      } else if (code === "auth/user-disabled") {
+        message =
+          "Esta conta foi desativada. Se acreditas que se trata de um erro, entra em contacto com o suporte.";
+      } else {
+        message = "Falha no login. Verifique suas credenciais.";
+      }
       setError(message);
     } finally {
       setIsSubmitting(false);

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { Firestore, Query } from "firebase-admin/firestore";
 
 import { canonicalPlanLabelFromKey, fetchAdminUserDetail, normalizedPlanKey } from "@/lib/admin-users-metrics";
 import { isGeneralAdminEmail } from "@/lib/general-admin";
@@ -151,4 +152,125 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: "Utilizador não encontrado após atualização." }, { status: 404 });
   }
   return NextResponse.json(detail);
+}
+
+const DELETE_BATCH_SIZE = 400;
+const DELETE_MAX_BATCHES = 50;
+
+/**
+ * Apaga em lotes todos os documentos que correspondem a uma query, até esgotar ou atingir um tecto.
+ * Devolve o número de documentos removidos.
+ */
+async function deleteQueryInBatches(db: Firestore, query: Query): Promise<number> {
+  let totalDeleted = 0;
+  for (let i = 0; i < DELETE_MAX_BATCHES; i++) {
+    const snap = await query.limit(DELETE_BATCH_SIZE).get();
+    if (snap.empty) break;
+    const batch = db.batch();
+    snap.docs.forEach((doc) => batch.delete(doc.ref));
+    await batch.commit();
+    totalDeleted += snap.size;
+    if (snap.size < DELETE_BATCH_SIZE) break;
+  }
+  return totalDeleted;
+}
+
+/**
+ * Apaga permanentemente o utilizador:
+ * - Firestore: userSettings, reports, proposals, leads, stripeInvoices, stripeCheckoutSessions.
+ * - Firebase Auth: o próprio user record.
+ *
+ * Só pode ser chamado quando a conta está desativada (proteção contra cliques acidentais).
+ * O email do utilizador fica livre para voltar a registar-se do zero.
+ *
+ * Atenção: operação irreversível. As faturas Stripe persistem na Stripe para auditoria —
+ * o que apagamos aqui é apenas a cópia interna usada pelo painel admin.
+ */
+export async function DELETE(request: NextRequest, context: RouteContext) {
+  const gate = await requireGeneralAdminApi(request);
+  if (!gate.ok) return gate.response;
+
+  const { uid } = await context.params;
+  const trimmed = uid?.trim() ?? "";
+  if (!trimmed) {
+    return NextResponse.json({ error: "UID inválido." }, { status: 400 });
+  }
+
+  /** Bloqueia auto-exclusão e exclusão do admin geral. */
+  let targetEmail: string | null = null;
+  try {
+    const rec = await gate.ctx.auth.getUser(trimmed);
+    targetEmail = rec.email ?? null;
+    if (!rec.disabled) {
+      return NextResponse.json(
+        {
+          error:
+            "A conta precisa de estar desativada antes de ser excluída. Clica primeiro em 'Desativar conta'.",
+        },
+        { status: 409 },
+      );
+    }
+  } catch {
+    return NextResponse.json({ error: "Utilizador não encontrado." }, { status: 404 });
+  }
+
+  if (isGeneralAdminEmail(targetEmail)) {
+    return NextResponse.json(
+      { error: "Não é permitido excluir a conta do administrador geral." },
+      { status: 403 },
+    );
+  }
+
+  const db = gate.ctx.db;
+  const removed = {
+    reports: 0,
+    proposals: 0,
+    leads: 0,
+    stripeInvoices: 0,
+    stripeCheckoutSessions: 0,
+  };
+
+  try {
+    removed.reports = await deleteQueryInBatches(
+      db,
+      db.collection("reports").where("userId", "==", trimmed),
+    );
+    removed.proposals = await deleteQueryInBatches(
+      db,
+      db.collection("proposals").where("userId", "==", trimmed),
+    );
+    removed.leads = await deleteQueryInBatches(
+      db,
+      db.collection("leads").where("userId", "==", trimmed),
+    );
+    removed.stripeInvoices = await deleteQueryInBatches(
+      db,
+      db.collection("stripeInvoices").where("uid", "==", trimmed),
+    );
+    removed.stripeCheckoutSessions = await deleteQueryInBatches(
+      db,
+      db.collection("stripeCheckoutSessions").where("uid", "==", trimmed),
+    );
+    await db.collection("userSettings").doc(trimmed).delete();
+  } catch (e) {
+    console.error("[admin-users DELETE] firestore", e);
+    const msg = e instanceof Error ? e.message : "Falha ao apagar dados no Firestore.";
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+
+  try {
+    await gate.ctx.auth.deleteUser(trimmed);
+  } catch (e) {
+    console.error("[admin-users DELETE] auth", e);
+    const msg = e instanceof Error ? e.message : "Falha ao apagar o utilizador no Firebase Auth.";
+    return NextResponse.json(
+      {
+        error: `Dados apagados no Firestore, mas falhou remover do Firebase Auth: ${msg}`,
+        firestoreRemoved: removed,
+      },
+      { status: 500 },
+    );
+  }
+
+  return NextResponse.json({ ok: true, uid: trimmed, firestoreRemoved: removed });
 }

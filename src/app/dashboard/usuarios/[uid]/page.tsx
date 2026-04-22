@@ -403,6 +403,11 @@ export default function UsuarioAdminDetailPage() {
   const [refundBusy, setRefundBusy] = useState(false);
   const [refundError, setRefundError] = useState<string | null>(null);
 
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
   useEffect(() => {
     if (authLoading) return;
     if (!user) return;
@@ -647,6 +652,36 @@ export default function UsuarioAdminDetailPage() {
       setLoadError("Erro de rede ao atualizar conta.");
     } finally {
       setToggleBusy(false);
+    }
+  };
+
+  const onDeleteAccount = async () => {
+    if (!user || !detail) return;
+    if (!detail.disabled) return;
+    setDeleteBusy(true);
+    setDeleteError(null);
+    try {
+      const idToken = await user.getIdToken();
+      const res = await fetch(`/api/admin-users/${encodeURIComponent(uid)}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${idToken}`,
+        },
+      });
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setDeleteError(
+          typeof body.error === "string"
+            ? body.error
+            : "Falha ao excluir a conta.",
+        );
+        return;
+      }
+      router.replace("/dashboard/usuarios");
+    } catch {
+      setDeleteError("Erro de rede ao excluir a conta.");
+    } finally {
+      setDeleteBusy(false);
     }
   };
 
@@ -932,6 +967,22 @@ export default function UsuarioAdminDetailPage() {
                 >
                   {detail.disabled ? "Ativar conta" : "Desativar conta"}
                 </Button>
+                {detail.disabled ? (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    className="gap-2"
+                    disabled={deleteBusy}
+                    onClick={() => {
+                      setDeleteDialogOpen(true);
+                      setDeleteConfirmText("");
+                      setDeleteError(null);
+                    }}
+                  >
+                    Excluir conta
+                  </Button>
+                ) : null}
                 <Button
                   type="button"
                   variant="secondary"
@@ -1437,6 +1488,89 @@ export default function UsuarioAdminDetailPage() {
                   <RotateCcw className="size-3" aria-hidden />
                   Estornar
                 </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={deleteDialogOpen}
+        onOpenChange={(open) => {
+          if (deleteBusy) return;
+          setDeleteDialogOpen(open);
+          if (!open) {
+            setDeleteConfirmText("");
+            setDeleteError(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md" showCloseButton>
+          <DialogHeader>
+            <DialogTitle>Excluir esta conta permanentemente?</DialogTitle>
+            <DialogDescription className="space-y-2">
+              <span className="block">
+                Esta ação é <strong>irreversível</strong>. Serão apagados todos os dados do
+                utilizador em Firestore (relatórios, propostas, leads, faturas sincronizadas) e o
+                registo no Firebase Authentication.
+              </span>
+              <span className="block">
+                O e-mail{" "}
+                <span className="font-medium text-foreground">
+                  {detail?.email?.trim() || detail?.uid}
+                </span>{" "}
+                ficará livre para voltar a registar-se do zero.
+              </span>
+              <span className="block text-xs text-muted-foreground">
+                As faturas geradas na Stripe continuam preservadas no painel Stripe para auditoria.
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="delete-confirm" className="text-xs font-medium text-muted-foreground">
+              Para confirmar, escreve <code className="text-foreground">EXCLUIR</code>
+            </Label>
+            <Input
+              id="delete-confirm"
+              autoComplete="off"
+              autoCorrect="off"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              disabled={deleteBusy}
+            />
+          </div>
+          {deleteError ? (
+            <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              {deleteError}
+            </p>
+          ) : null}
+          <DialogFooter className="flex flex-col-reverse gap-2 border-0 bg-transparent p-0 sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={deleteBusy}
+              onClick={() => setDeleteDialogOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              className="gap-2"
+              disabled={
+                deleteBusy || deleteConfirmText.trim().toUpperCase() !== "EXCLUIR" || !detail
+              }
+              onClick={() => void onDeleteAccount()}
+            >
+              {deleteBusy ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" aria-hidden />
+                  A excluir…
+                </>
+              ) : (
+                "Excluir definitivamente"
               )}
             </Button>
           </DialogFooter>

@@ -29,6 +29,19 @@ function expectedAmountCentsForPack(kind: StripeAddOnKind, packId: string): numb
   return pack ? Math.round(pack.price * 100) : null;
 }
 
+function packUnitsForKind(kind: StripeAddOnKind, packId: string): number {
+  if (kind === "lead_capture") {
+    const pack = LEAD_CAPTURE_ADD_ON_PACKS.find((p) => p.id === packId);
+    return pack ? pack.leads : 0;
+  }
+  if (kind === "rotas") {
+    const pack = ROTAS_ADD_ON_PACKS.find((p) => p.id === packId);
+    return pack ? pack.rotas : 0;
+  }
+  const pack = PROPOSALS_ADD_ON_PACKS.find((p) => p.id === packId);
+  return pack ? pack.proposals : 0;
+}
+
 function packDescription(kind: StripeAddOnKind, packId: string): string {
   if (kind === "lead_capture") {
     const pack = LEAD_CAPTURE_ADD_ON_PACKS.find((p) => p.id === packId);
@@ -215,6 +228,11 @@ export async function fulfillStripeAddOnIfPaid(session: Stripe.Checkout.Session)
       stripeChargeId: chargeId,
       stripePaymentIntentId: paymentIntentId,
       stripeCheckoutSessionId: session.id,
+      addOnMetadata: {
+        kind,
+        packId,
+        units: packUnitsForKind(kind, packId),
+      },
     };
     tx.set(invoiceRef, invoiceDoc, { merge: true });
 
