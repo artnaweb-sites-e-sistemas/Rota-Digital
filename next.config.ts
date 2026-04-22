@@ -25,6 +25,7 @@ const nextConfig: NextConfig = {
       { pathname: "/api/image-proxy" },
       { pathname: "/api/instagram-profile-snapshot" },
       { pathname: "/videos/landing/**" },
+      { pathname: "/assets/logo/**" },
     ],
   },
 };

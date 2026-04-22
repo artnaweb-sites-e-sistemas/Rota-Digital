@@ -4,8 +4,8 @@ import { Loader2 } from "lucide-react";
 import { RedefinirSenhaForm } from "./redefinir-senha-form";
 
 export const metadata = {
-  title: "Redefinir palavra-passe | Rota Digital",
-  description: "Defina uma nova palavra-passe para a sua conta Rota Digital.",
+  title: "Redefinir palavra-passe | RouteLAB",
+  description: "Defina uma nova palavra-passe para a sua conta RouteLAB.",
 };
 
 function RedefinirSenhaFallback() {

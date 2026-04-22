@@ -61,7 +61,7 @@ export async function generateMetadata({
     openGraph: {
       title,
       description,
-      siteName: "Rota Digital",
+      siteName: "RouteLAB",
       locale: "pt_BR",
       type: "website",
       images: image ? [{ url: image, alt: merged.lead.company }] : undefined,

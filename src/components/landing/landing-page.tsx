@@ -169,10 +169,22 @@ function LandingHeaderNav({
     <>
       <div className="flex h-16 w-full min-w-0 max-w-full items-center justify-between gap-2 px-3 sm:gap-3 sm:px-4">
         <Link href="/" className="flex min-w-0 shrink items-center gap-2 font-bold tracking-tight transition-transform hover:scale-105 sm:gap-2.5">
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/70 text-primary-foreground shadow-lg shadow-primary/20 sm:size-9">
-            <Compass className="size-4 sm:size-5" aria-hidden />
-          </span>
-          <span className="truncate text-base sm:text-lg">Rota Digital</span>
+          <Image
+            src="/assets/logo/logo-dark.png"
+            alt="Rota Digital"
+            width={220}
+            height={62}
+            className="h-auto w-[7.5rem] dark:hidden sm:w-[8.5rem]"
+            priority
+          />
+          <Image
+            src="/assets/logo/logo-white.png"
+            alt="Rota Digital"
+            width={220}
+            height={62}
+            className="hidden h-auto w-[7.5rem] dark:block sm:w-[8.5rem]"
+            priority
+          />
         </Link>
         <nav className="hidden min-w-0 items-center gap-0 md:flex" aria-label="Navegação Principal">
           {NAV_LINKS.map((item) => (
@@ -1246,7 +1258,31 @@ export function LandingPage() {
           </div>
         </div>
         <div className="mx-auto mt-5 grid max-w-7xl gap-3 text-center text-sm text-muted-foreground sm:grid-cols-3 sm:items-center sm:gap-4 sm:text-left">
-          <p>Copyright © {new Date().getFullYear()} Rota Digital.</p>
+          <p className="inline-flex max-w-full flex-wrap items-center justify-center gap-0 sm:justify-start text-sm text-muted-foreground">
+            <span className="shrink-0 leading-[1.4]">Copyright © {new Date().getFullYear()}</span>
+            <span
+              className="ml-1.5 inline-flex h-3 min-w-0 -translate-y-px items-center"
+              aria-label="Rota Digital"
+            >
+              <Image
+                src="/assets/logo/logo-dark.png"
+                alt=""
+                width={200}
+                height={56}
+                className="h-3 w-auto max-w-[4.75rem] object-contain object-left dark:hidden"
+              />
+              <Image
+                src="/assets/logo/logo-white.png"
+                alt=""
+                width={200}
+                height={56}
+                className="hidden h-3 w-auto max-w-[4.75rem] object-contain object-left dark:block"
+              />
+            </span>
+            <span className="shrink-0 pl-0.5 leading-[1.4]" aria-hidden>
+              .
+            </span>
+          </p>
           <p className="text-center">
             Desenvolvido com <span className="text-red-500">❤</span> por:{" "}
             <span className="font-semibold text-foreground">Artnaweb</span>

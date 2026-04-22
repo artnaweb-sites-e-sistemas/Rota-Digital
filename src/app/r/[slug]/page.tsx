@@ -43,7 +43,7 @@ export async function generateMetadata({
   if (!raw) notFound();
 
   const company = raw.leadCompany?.trim() || "Empresa";
-  const title = `Rota Digital - ${company}`;
+  const title = `RouteLAB - ${company}`;
   const description = buildReportShareDescription(raw);
   const origin = getSiteOrigin();
   const canonical = buildPublicReportCanonicalUrl(slug, origin);
@@ -55,7 +55,7 @@ export async function generateMetadata({
     openGraph: {
       title,
       description,
-      siteName: "Rota Digital",
+      siteName: "RouteLAB",
       locale: "pt_BR",
       type: "website",
       url: canonical,

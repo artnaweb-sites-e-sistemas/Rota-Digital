@@ -22,8 +22,12 @@ import { normalizeRecurringPlansForSave } from "@/lib/proposal-plan-coerce";
 import { normalizeInstallmentCount } from "@/lib/proposal-plan-installments";
 import {
   DEFAULT_COMPANY_ABOUT_NAME,
+  resolveCompanyAboutNameForDisplay,
   resolveCompanyAboutNameForSave,
+  resolveCompanyAboutSummaryForDisplay,
   resolveCompanyAboutSummaryForSave,
+  resolveCompanyPrimaryImageForDisplay,
+  resolveCompanySecondaryImageForDisplay,
 } from "@/lib/company-about-defaults";
 import { getUserCompanyAboutSettings, saveUserCompanyAboutSettings } from "@/lib/user-settings";
 import {
@@ -237,7 +241,8 @@ export function CompanyAboutSettingsForm() {
           data.defaultRecurringPlans.length > 0 ? data.defaultRecurringPlans : [createEmptyProposalPlan()];
         setForm({
           ...data,
-          companyName: data.companyName.trim() || DEFAULT_COMPANY_ABOUT_NAME,
+          companyName: resolveCompanyAboutNameForDisplay(data.companyName.trim() || DEFAULT_COMPANY_ABOUT_NAME),
+          companySummary: resolveCompanyAboutSummaryForDisplay(data.companySummary),
           companyPhone: onlyDigitsPhone(data.companyPhone ?? "").slice(0, 15),
           whatsApp: data.whatsApp?.trim()
             ? normalizeWhatsappDigitsForStorage(onlyDigitsPhone(data.whatsApp))
@@ -477,7 +482,7 @@ export function CompanyAboutSettingsForm() {
                     id="company-about-summary"
                     value={form.companySummary}
                     onChange={(e) => setForm((prev) => ({ ...prev, companySummary: e.target.value }))}
-                    placeholder="O que a agência faz e para quem. Se deixar vazio, guardamos um resumo de apoio sobre a Rota Digital (dois parágrafos) para usar nas propostas."
+                    placeholder="O que a agência faz, para quem trabalha e como a RouteLAB se posiciona. Se deixar vazio, usamos a copy institucional padrão da marca nas propostas."
                     className="min-h-40 resize-y"
                     disabled={brandingLocked}
                     readOnly={brandingLocked}
@@ -602,7 +607,7 @@ export function CompanyAboutSettingsForm() {
                   variant="logo"
                   title="Logo da agência"
                   description="Identidade visual principal da agência"
-                  imageUrl={form.primaryImageUrl}
+                  imageUrl={resolveCompanyPrimaryImageForDisplay(form.primaryImageUrl)}
                   busy={uploadingSlot === "primary"}
                   onPickFile={(file) => void handleImageUpload("primary", file)}
                 />
@@ -610,7 +615,7 @@ export function CompanyAboutSettingsForm() {
                   variant="cover"
                   title="Capa"
                   description="Opcional. Imagem de capa ou destaque visual na proposta."
-                  imageUrl={form.secondaryImageUrl}
+                  imageUrl={resolveCompanySecondaryImageForDisplay(form.secondaryImageUrl)}
                   busy={uploadingSlot === "secondary"}
                   onPickFile={(file) => void handleImageUpload("secondary", file)}
                 />

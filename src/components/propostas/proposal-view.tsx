@@ -33,6 +33,13 @@ import type { LucideIcon } from "lucide-react";
 import { PlanPriceHero } from "@/components/propostas/plan-installment-summary";
 import { DeliverablesFormatHint } from "@/components/propostas/deliverables-format-hint";
 import { PlanPaymentMethodsChips, PlanPaymentMethodsPicker, normalizePlanPaymentMethods, sortPaymentMethods } from "@/components/propostas/plan-payment-methods";
+import {
+  DEFAULT_COMPANY_ABOUT_NAME,
+  resolveCompanyAboutNameForDisplay,
+  resolveCompanyAboutSummaryForDisplay,
+  resolveCompanyPrimaryImageForDisplay,
+  resolveCompanySecondaryImageForDisplay,
+} from "@/lib/company-about-defaults";
 import type { Lead } from "@/types/lead";
 import type { Proposal, ProposalAgencySnapshot, ProposalLeadSnapshot, ProposalPlan } from "@/types/proposal";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1673,12 +1680,14 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
   const spotCount = proposal.spotPlans.length;
   const recurringCount = proposal.recurringPlans.length;
 
-  const snapAgencyName = proposal.agencySnapshot.companyName.trim() || "Rota Digital";
-  const snapAgencySummary = proposal.agencySnapshot.companySummary.trim();
+  const snapAgencyName = resolveCompanyAboutNameForDisplay(
+    proposal.agencySnapshot.companyName?.trim() || DEFAULT_COMPANY_ABOUT_NAME,
+  );
+  const snapAgencySummary = resolveCompanyAboutSummaryForDisplay(proposal.agencySnapshot.companySummary?.trim());
 
   const displayAgencyName = useMemo(() => {
     if (!isDashboard) return snapAgencyName;
-    const live = companyAboutLive?.companyName?.trim();
+    const live = resolveCompanyAboutNameForDisplay(companyAboutLive?.companyName?.trim());
     return live || snapAgencyName;
   }, [isDashboard, companyAboutLive?.companyName, snapAgencyName]);
 
@@ -1695,16 +1704,19 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
   /** Ordem: override só desta proposta → imagens atuais em Configurações → snapshot da proposta. */
   const displayAgencyImage = useMemo(() => {
     const proposalOnly = proposal.evidences?.agencyImageUrl?.trim();
-    if (proposalOnly) return proposalOnly;
-    if (isDashboard) {
+    let out = "";
+    if (proposalOnly) out = proposalOnly;
+    else if (isDashboard) {
       const p = companyAboutLive?.primaryImageUrl?.trim();
       const s = companyAboutLive?.secondaryImageUrl?.trim();
-      if (p) return p;
-      if (s) return s;
+      if (p) out = p;
+      else if (s) out = s;
     }
-    return (
-      proposal.agencySnapshot.primaryImageUrl?.trim() || proposal.agencySnapshot.secondaryImageUrl?.trim() || ""
-    );
+    if (!out) {
+      out =
+        proposal.agencySnapshot.primaryImageUrl?.trim() || proposal.agencySnapshot.secondaryImageUrl?.trim() || "";
+    }
+    return resolveCompanyPrimaryImageForDisplay(out);
   }, [
     isDashboard,
     proposal.evidences?.agencyImageUrl,
@@ -1716,19 +1728,34 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
 
   /** Só logo (Configurações → primária ou snapshot); sem override da miniatura da proposta. */
   const displayAgencyLogoForBadge = useMemo(() => {
+    let out = "";
     if (isDashboard) {
       const live = companyAboutLive?.primaryImageUrl?.trim();
-      if (live) return live;
+      if (live) out = live;
     }
-    return proposal.agencySnapshot.primaryImageUrl?.trim() || "";
+    if (!out) out = proposal.agencySnapshot.primaryImageUrl?.trim() || "";
+    return resolveCompanyPrimaryImageForDisplay(out);
   }, [isDashboard, companyAboutLive?.primaryImageUrl, proposal.agencySnapshot.primaryImageUrl]);
 
-  /** Capa só desta proposta: override em evidências → snapshot; sem misturar Configurações globais. */
+  /**
+   * Capa: override desta proposta → capa viva em Configurações (dashboard) → snapshot → asset Rota padrão.
+   */
   const displayAgencyCoverUrl = useMemo(() => {
     const proposalCover = proposal.evidences?.agencyCoverUrl?.trim();
     if (proposalCover) return proposalCover;
-    return proposal.agencySnapshot.secondaryImageUrl?.trim() || "";
-  }, [proposal.evidences?.agencyCoverUrl, proposal.agencySnapshot.secondaryImageUrl]);
+    let out = "";
+    if (isDashboard) {
+      const live = companyAboutLive?.secondaryImageUrl?.trim();
+      if (live) out = live;
+    }
+    if (!out) out = proposal.agencySnapshot.secondaryImageUrl?.trim() || "";
+    return resolveCompanySecondaryImageForDisplay(out);
+  }, [
+    isDashboard,
+    proposal.evidences?.agencyCoverUrl,
+    companyAboutLive?.secondaryImageUrl,
+    proposal.agencySnapshot.secondaryImageUrl,
+  ]);
 
   const companyOverviewText =
     proposal.companyProfile.executiveSummary.trim() || proposal.companyProfile.companyProfile.trim();
@@ -2146,7 +2173,7 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
             <div className="flex min-w-0 items-start justify-between gap-x-3 gap-y-2 max-lg:items-center">
               <div className="flex min-w-0 flex-wrap items-center gap-2">
                 <Badge variant="outline" className="rounded-full border-brand/20 bg-brand/10 px-3 py-1 text-xs font-semibold text-brand">
-                  Rota Digital
+                  RouteLAB
                 </Badge>
               </div>
               <div className="no-print z-30 flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center sm:justify-end sm:gap-5 lg:absolute lg:right-7 lg:top-5 xl:right-8 xl:top-7">
@@ -2361,7 +2388,7 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
         <Card
           className={cn(
             "min-w-0 overflow-hidden border-border bg-card shadow-xl dark:border-white/5 dark:bg-white/[0.02]",
-            displayAgencyCoverUrl || isDashboard ? "gap-0 pt-0" : null,
+            "gap-0 pt-0",
           )}
         >
           <input
@@ -2376,67 +2403,42 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
               event.currentTarget.value = "";
             }}
           />
-          {displayAgencyCoverUrl ? (
-            <div className="relative aspect-[2.1/1] w-full min-h-[6.5rem] max-h-[11rem] sm:min-h-[7.5rem] sm:max-h-[12rem]">
-              <Image
-                src={displayAgencyCoverUrl}
-                alt={`Capa institucional — ${displayAgencyName}`}
-                fill
-                className="object-cover"
-                sizes="(max-width: 1280px) 100vw, 520px"
-              />
-              <div
-                className="pointer-events-none absolute inset-0 bg-gradient-to-t from-card/40 to-transparent"
-                aria-hidden
-              />
-              {isDashboard ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={openAgencyCoverPicker}
-                  disabled={uploadingSlot === "cover"}
-                  className="absolute bottom-3 right-3 z-[8] size-9 rounded-md border border-border/80 bg-background/95 text-muted-foreground shadow-md backdrop-blur-sm hover:bg-muted hover:text-foreground sm:bottom-4 sm:right-4"
-                  aria-label="Trocar capa desta proposta"
-                >
-                  {uploadingSlot === "cover" ? (
-                    <Loader2 className="size-4 animate-spin" aria-hidden />
-                  ) : (
-                    <ImagePlus className="size-4" aria-hidden />
-                  )}
-                </Button>
-              ) : null}
-            </div>
-          ) : isDashboard ? (
-            <div className="relative flex min-h-[6.5rem] flex-col items-center justify-center gap-2 border-b border-dashed border-border/80 bg-muted/20 px-4 py-6 sm:min-h-[7.5rem]">
-              <p className="text-center text-xs text-muted-foreground">Capa só desta proposta (não altera Configurações)</p>
+          <div className="relative aspect-[2.1/1] w-full min-h-[6.5rem] max-h-[11rem] sm:min-h-[7.5rem] sm:max-h-[12rem]">
+            <Image
+              src={displayAgencyCoverUrl}
+              alt={`Capa institucional — ${displayAgencyName}`}
+              fill
+              className="object-cover object-center"
+              sizes="(max-width: 1280px) 100vw, 520px"
+            />
+            <div
+              className="pointer-events-none absolute inset-0 bg-gradient-to-t from-card/40 to-transparent"
+              aria-hidden
+            />
+            {isDashboard ? (
               <Button
                 type="button"
-                variant="outline"
-                size="sm"
-                className="gap-2"
+                variant="ghost"
+                size="icon"
                 onClick={openAgencyCoverPicker}
                 disabled={uploadingSlot === "cover"}
+                className="absolute bottom-3 right-3 z-[8] size-9 rounded-md border border-border/80 bg-background/95 text-muted-foreground shadow-md backdrop-blur-sm hover:bg-muted hover:text-foreground sm:bottom-4 sm:right-4"
+                aria-label="Trocar capa desta proposta"
               >
                 {uploadingSlot === "cover" ? (
-                  <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                  <Loader2 className="size-4 animate-spin" aria-hidden />
                 ) : (
-                  <ImagePlus className="size-3.5" aria-hidden />
+                  <ImagePlus className="size-4" aria-hidden />
                 )}
-                Adicionar capa
               </Button>
-            </div>
-          ) : null}
+            ) : null}
+          </div>
           <CardHeader
-            className={cn(
-              "border-b border-border pb-5 dark:border-white/5",
-              /* Com imagem de capa: respiro habitual. Sem capa no dashboard: placeholder acima — mais padding para não colar ao tracejado. Público sem capa: primeiro bloco do cartão. */
-              displayAgencyCoverUrl ? "pt-5" : isDashboard ? "pt-7 sm:pt-8" : "pt-6",
-            )}
+            className={cn("border-b border-border pb-5 pt-5 dark:border-white/5")}
           >
             <CardTitle className="text-xl font-bold text-foreground">Sobre a {displayAgencyName}</CardTitle>
             <CardDescription className="mt-2 text-sm leading-relaxed text-muted-foreground">
-              Conheca, em poucas linhas, quem conduz este projeto ao seu lado.
+              Conheca, em poucas linhas, a visão, a abordagem e o contexto de quem conduz este projeto ao seu lado.
               {isDashboard ? (
                 <span className="mt-2 block text-xs text-muted-foreground/90">
                   O texto e os contactos nesta coluna podem ser ajustados só para esta proposta. Alterações globais da agência ficam em Configurações.
@@ -2448,26 +2450,21 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
             <div className="flex items-center gap-3">
               <div
                 className={cn(
-                  "relative inline-flex h-12 w-12 shrink-0 overflow-hidden border border-brand/20 bg-brand/10 text-brand",
+                  "relative inline-flex h-12 w-12 shrink-0 overflow-hidden border border-brand/20 bg-brand/10 text-brand p-1.5",
                   RR.logoMark,
-                  displayAgencyLogoForBadge ? "p-1.5" : "items-center justify-center",
                 )}
               >
-                {displayAgencyLogoForBadge ? (
-                  <Image
-                    src={displayAgencyLogoForBadge}
-                    alt={`Logo ${displayAgencyName}`}
-                    fill
-                    className="object-contain"
-                    sizes="48px"
-                  />
-                ) : (
-                  <Building2 className="size-5 shrink-0" aria-hidden />
-                )}
+                <Image
+                  src={displayAgencyLogoForBadge}
+                  alt={`Logo ${displayAgencyName}`}
+                  fill
+                  className="object-contain"
+                  sizes="48px"
+                />
               </div>
               <div>
                 <p className="text-base font-bold text-foreground">{displayAgencyName}</p>
-                <p className="text-sm text-muted-foreground">Apresentação institucional</p>
+                <p className="text-sm text-muted-foreground">Visão e posicionamento do projeto</p>
               </div>
             </div>
 

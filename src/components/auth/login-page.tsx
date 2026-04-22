@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { ArrowLeft, Eye, EyeOff, Heart, Loader2, LogIn, ShieldCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -12,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { auth, isFirebaseAuthConfigured } from "@/lib/firebase";
 import { safeInternalPath } from "@/lib/safe-internal-path";
 import Grainient from "@/components/grainient";
+import { AuthAsideHeading } from "@/components/auth/auth-aside-heading";
 import { cn } from "@/lib/utils";
 
 function GoogleGlyph({ className }: { className?: string }) {
@@ -34,20 +36,6 @@ function GoogleGlyph({ className }: { className?: string }) {
         d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
       />
     </svg>
-  );
-}
-
-function BrandMark({ className }: { className?: string }) {
-  return (
-    <div
-      className={cn(
-        "flex size-11 items-center justify-center rounded-xl border border-white/15 bg-white/5",
-        className
-      )}
-      aria-hidden
-    >
-      <span className="size-3 rounded-full bg-white" />
-    </div>
   );
 }
 
@@ -138,10 +126,15 @@ export function LoginPage({
           <div className="pointer-events-none absolute inset-0 z-[1] rounded-3xl bg-gradient-to-b from-[#f2e2ba]/64 via-[#e8cf96]/42 to-[#d9b973]/48" />
 
           <div className="relative z-10 flex flex-col gap-5 sm:gap-6">
-            <span className="text-[1.05rem] font-semibold tracking-tight text-[#8e7d4d]">Rota Digital</span>
-            <h1 className="font-heading pr-2 text-3xl font-black uppercase leading-[1.1] tracking-tight text-zinc-900 dark:text-zinc-900 sm:text-4xl lg:text-[2.35rem] xl:text-[2.9rem]">
-              Bem-vindo de volta!
-            </h1>
+            <Image
+              src="/assets/logo/logo-dark.png"
+              alt="Rota Digital"
+              width={220}
+              height={62}
+              className="h-auto w-[10.5rem]"
+              priority
+            />
+            <AuthAsideHeading>Bem-vindo de volta!</AuthAsideHeading>
           </div>
 
           <div className="relative z-10 rounded-2xl border border-zinc-900/6 bg-[#fff9ec]/32 px-4 py-3.5 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.34),0_12px_44px_-14px_rgba(0,0,0,0.15)] backdrop-blur-xl backdrop-saturate-140">
@@ -163,7 +156,7 @@ export function LoginPage({
             <Link
               href="/"
               className={cn(
-                "inline-flex size-9 items-center justify-center rounded-lg text-[#8e7d4d]",
+                "inline-flex size-9 items-center justify-center rounded-lg text-[#8e7d4d] dark:text-[#d8c383]",
                 "transition-colors duration-150",
                 "hover:bg-transparent hover:text-zinc-950 dark:hover:text-zinc-100",
                 "focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none",
@@ -178,10 +171,16 @@ export function LoginPage({
           <div className="mx-auto w-full max-w-[420px]">
             {/* Cabeçalho mobile: mesma identidade da faixa */}
             <div className="mb-10 flex items-center justify-center gap-3 lg:hidden">
-              <div className="flex size-11 items-center justify-center rounded-xl bg-[#121217]">
-                <BrandMark className="size-10 border-0 bg-transparent" />
+              <div className="rounded-md bg-[#121217] px-2 py-1.5">
+                <Image
+                  src="/assets/logo/logo-white.png"
+                  alt="Rota Digital"
+                  width={220}
+                  height={62}
+                  className="h-auto w-[8.5rem]"
+                  priority
+                />
               </div>
-              <span className="text-lg font-semibold tracking-tight text-foreground">Rota Digital</span>
             </div>
 
             <header className="mb-8 space-y-2 text-center lg:text-left">
@@ -333,9 +332,28 @@ export function LoginPage({
               <div className="pointer-events-none absolute left-1/2 top-full h-2 w-[42%] -translate-x-1/2 bg-gradient-to-b from-zinc-400/8 to-transparent blur-sm dark:from-white/7" />
             </div>
             <div className="mt-5 flex w-full flex-col items-center gap-2 text-center sm:grid sm:grid-cols-[1fr_auto_1fr] sm:items-center sm:gap-x-4 sm:gap-y-0 sm:text-left">
-              <span className="w-full sm:w-auto sm:justify-self-start sm:text-left">
-                Copyright © {new Date().getFullYear()} Rota Digital.
-              </span>
+              <p className="inline-flex max-w-full flex-wrap items-center justify-center gap-0 text-sm text-muted-foreground sm:justify-self-start sm:justify-start">
+                <span className="shrink-0 leading-[1.4]">Copyright © {new Date().getFullYear()}</span>
+                <span className="ml-1.5 inline-flex h-3 min-w-0 -translate-y-px items-center" aria-label="RouteLAB">
+                  <Image
+                    src="/assets/logo/logo-dark.png"
+                    alt=""
+                    width={200}
+                    height={56}
+                    className="h-3 w-auto max-w-[4.75rem] object-contain object-left dark:hidden"
+                  />
+                  <Image
+                    src="/assets/logo/logo-white.png"
+                    alt=""
+                    width={200}
+                    height={56}
+                    className="hidden h-3 w-auto max-w-[4.75rem] object-contain object-left dark:block"
+                  />
+                </span>
+                <span className="shrink-0 pl-0.5 leading-[1.4]" aria-hidden>
+                  .
+                </span>
+              </p>
               <span className="flex w-full flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5 sm:w-auto sm:justify-self-center">
                 <span>Desenvolvido com</span>
                 <span className="inline-flex items-center gap-1">

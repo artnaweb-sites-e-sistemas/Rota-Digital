@@ -18,8 +18,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Rota Digital",
-  description: "Gerenciamento de Leads e Rotas",
+  title: "RouteLAB",
+  description: "Gestão de leads, diagnósticos e propostas.",
 };
 
 export default function RootLayout({

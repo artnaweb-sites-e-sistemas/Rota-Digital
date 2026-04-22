@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import {
   Bot,
   ChevronLeft,
@@ -30,6 +31,10 @@ import {
 import { useRouter, usePathname } from "next/navigation";
 import { signOut } from "firebase/auth";
 import type { UserCompanyAboutSettings } from "@/types/user-settings";
+import {
+  resolveCompanyAboutNameForDisplay,
+  resolveCompanyPrimaryImageForDisplay,
+} from "@/lib/company-about-defaults";
 import { cn } from "@/lib/utils";
 import { QuotaGateProvider } from "@/components/limits/quota-gate-context";
 
@@ -125,8 +130,8 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   /** Mesma regra que `/api/admin-users` e `/dashboard/usuarios`: só este e-mail vê o divisor e o link. */
   const canAccessUsuariosAdmin = isGeneralAdminEmail(user.email);
 
-  const agencyName = companyAbout?.companyName?.trim() || "Rota Digital";
-  const agencyLogoUrl = companyAbout?.primaryImageUrl?.trim() || "";
+  const agencyName = resolveCompanyAboutNameForDisplay(companyAbout?.companyName?.trim());
+  const agencyLogoUrl = resolveCompanyPrimaryImageForDisplay(companyAbout?.primaryImageUrl);
 
   const handleLogout = async () => {
     if (!auth) {
@@ -151,7 +156,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       {/* Sidebar principal — largura no wrapper para o botão “aba” ficar metade fora */}
       <div
         className={cn(
-          "relative flex min-h-0 max-h-full shrink-0 flex-col transition-[width] duration-200 ease-out",
+          "relative flex min-h-0 max-h-full shrink-0 flex-col overflow-visible transition-[width] duration-200 ease-out",
           mainCollapsed ? "w-[4.5rem]" : "w-64",
         )}
       >
@@ -168,13 +173,43 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               )}
             >
               {!mainCollapsed ? (
-                <div className="flex min-w-0 flex-1 items-center pr-1">
-                  <span className="truncate font-heading text-lg font-bold tracking-tight text-foreground dark:text-white">
-                    Rota Digital
-                  </span>
+                <div className="flex min-w-0 flex-1 items-center pl-3.5 pr-1">
+                  <Image
+                    src="/assets/logo/logo-dark.png"
+                    alt="Rota Digital"
+                    width={220}
+                    height={62}
+                    className="h-auto w-[8.75rem] dark:hidden"
+                    priority
+                  />
+                  <Image
+                    src="/assets/logo/logo-white.png"
+                    alt="Rota Digital"
+                    width={220}
+                    height={62}
+                    className="hidden h-auto w-[8.75rem] dark:block"
+                    priority
+                  />
                 </div>
               ) : (
-                <span className="sr-only">Rota Digital</span>
+                <div className="flex size-10 items-center justify-center rounded-md bg-sidebar-accent/50 dark:bg-white/[0.04]">
+                  <Image
+                    src="/assets/logo/favicon-dark.png"
+                    alt="Rota Digital"
+                    width={32}
+                    height={32}
+                    className="h-7 w-7 dark:hidden"
+                    priority
+                  />
+                  <Image
+                    src="/assets/logo/favicon-white.png"
+                    alt="Rota Digital"
+                    width={32}
+                    height={32}
+                    className="hidden h-7 w-7 dark:block"
+                    priority
+                  />
+                </div>
               )}
             </div>
 
@@ -267,16 +302,12 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                   "dark:border-white/12 dark:bg-white/[0.06]",
                 )}
               >
-                {agencyLogoUrl ? (
-                  <img
-                    src={agencyLogoUrl}
-                    alt=""
-                    className="size-full object-contain object-center p-1"
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <Building2 className="size-[1.125rem] text-muted-foreground dark:text-zinc-400" aria-hidden />
-                )}
+                <img
+                  src={agencyLogoUrl}
+                  alt=""
+                  className="size-full min-h-full min-w-full object-cover object-center"
+                  referrerPolicy="no-referrer"
+                />
               </div>
             </div>
           ) : (
@@ -288,16 +319,12 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                     "dark:border-white/12 dark:bg-zinc-800/80",
                   )}
                 >
-                  {agencyLogoUrl ? (
-                    <img
-                      src={agencyLogoUrl}
-                      alt=""
-                      className="size-full object-contain object-center p-1.5"
-                      referrerPolicy="no-referrer"
-                    />
-                  ) : (
-                    <Building2 className="size-7 text-muted-foreground dark:text-zinc-400" aria-hidden />
-                  )}
+                  <img
+                    src={agencyLogoUrl}
+                    alt=""
+                    className="size-full min-h-full min-w-full object-cover object-center"
+                    referrerPolicy="no-referrer"
+                  />
                 </div>
                 <div className="min-w-0 flex-1 space-y-2">
                   <div className="space-y-0.5">
@@ -360,6 +387,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           aria-label={mainCollapsed ? "Expandir menu lateral" : "Recolher menu lateral (só ícones)"}
           title={mainCollapsed ? "Expandir menu" : "Recolher para ícones"}
           className={cn(
+            /* Sempre ancorado na borda direita do wrapper da sidebar: quando a largura muda, o botão acompanha. */
             "absolute right-0 top-10 z-20 flex h-10 w-[1.375rem] -translate-y-1/2 translate-x-1/2 items-center justify-center",
             "rounded-l-md rounded-r-lg border border-black/10 bg-brand text-brand-foreground shadow-md",
             "transition-[filter,box-shadow] hover:brightness-[0.92] active:brightness-[0.86]",
