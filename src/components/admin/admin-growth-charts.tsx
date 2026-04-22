@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { UserPlus, Wallet } from "lucide-react";
+import { BadgeDollarSign, UserPlus, Wallet } from "lucide-react";
 
 import { PlatformStatAreaChart } from "@/components/admin/platform-stat-area-chart";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
+import type { AdminRevenueSeriesResponse } from "@/types/admin-revenue-series";
 import type { AdminSignupSeriesResponse } from "@/types/admin-signup-series";
 import type { PlatformSeriesGranularity } from "@/types/platform-series";
 
@@ -119,6 +120,13 @@ function yMaxReais(points: AdminSignupSeriesResponse["points"]): number {
   return Math.ceil(m * 100 * 1.12) / 100;
 }
 
+function yMaxRevenuePoints(points: AdminRevenueSeriesResponse["points"]): number {
+  let m = 0;
+  for (const p of points) m = Math.max(m, p.totalCents / 100);
+  if (m === 0) return 1;
+  return Math.ceil(m * 100 * 1.12) / 100;
+}
+
 type AdminGrowthChartsProps = {
   queryString: string;
   disabled?: boolean;
@@ -130,6 +138,9 @@ export function AdminGrowthCharts({ queryString, disabled, className }: AdminGro
   const [data, setData] = useState<AdminSignupSeriesResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [revenueData, setRevenueData] = useState<AdminRevenueSeriesResponse | null>(null);
+  const [revenueLoading, setRevenueLoading] = useState(false);
+  const [revenueError, setRevenueError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user || disabled) return;
@@ -173,6 +184,56 @@ export function AdminGrowthCharts({ queryString, disabled, className }: AdminGro
     };
   }, [user, queryString, disabled]);
 
+  useEffect(() => {
+    if (!user || disabled) return;
+    let cancelled = false;
+    void (async () => {
+      setRevenueLoading(true);
+      setRevenueError(null);
+      try {
+        const idToken = await user.getIdToken();
+        const res = await fetch(`/api/admin-revenue-series?${queryString}`, {
+          headers: { Authorization: `Bearer ${idToken}` },
+        });
+        const body = (await res.json().catch(() => ({}))) as AdminRevenueSeriesResponse & { error?: string };
+        if (!res.ok) {
+          if (!cancelled) {
+            setRevenueData(null);
+            setRevenueError(
+              typeof body.error === "string" ? body.error : "Não foi possível carregar receita paga.",
+            );
+          }
+          return;
+        }
+        if (!cancelled) {
+          setRevenueError(null);
+          setRevenueData({
+            granularity: body.granularity,
+            year: body.year,
+            month: body.month,
+            points: Array.isArray(body.points) ? body.points : [],
+            totals: body.totals ?? {
+              totalCents: 0,
+              subscriptionCents: 0,
+              addOnCents: 0,
+              invoicesCount: 0,
+            },
+          });
+        }
+      } catch {
+        if (!cancelled) {
+          setRevenueData(null);
+          setRevenueError("Erro de rede ao carregar receita paga.");
+        }
+      } finally {
+        if (!cancelled) setRevenueLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, queryString, disabled]);
+
   const totals = useMemo(() => {
     if (!data?.points?.length) return { signups: 0, reais: 0 };
     let signups = 0;
@@ -183,6 +244,29 @@ export function AdminGrowthCharts({ queryString, disabled, className }: AdminGro
     }
     return { signups, reais: cents / 100 };
   }, [data]);
+
+  const paidRevenueChartData = useMemo(() => {
+    if (!revenueData?.points) return [];
+    return revenueData.points.map((p, i) => ({
+      day: p.label,
+      value: p.totalCents / 100,
+      dateLabel: pointDateLabel(revenueData.granularity, revenueData.year, revenueData.month, p, i),
+    }));
+  }, [revenueData]);
+  const paidRevenueTotalReais = useMemo(
+    () => (revenueData?.totals?.totalCents ?? 0) / 100,
+    [revenueData],
+  );
+  const paidRevenueSubscriptionReais = useMemo(
+    () => (revenueData?.totals?.subscriptionCents ?? 0) / 100,
+    [revenueData],
+  );
+  const paidRevenueAddOnReais = useMemo(
+    () => (revenueData?.totals?.addOnCents ?? 0) / 100,
+    [revenueData],
+  );
+  const paidRevenueInvoicesCount = revenueData?.totals?.invoicesCount ?? 0;
+  const yPaidRevenue = revenueData ? yMaxRevenuePoints(revenueData.points) : 1;
 
   const signupsChartData = useMemo(() => {
     if (!data?.points) return [];
@@ -237,9 +321,10 @@ export function AdminGrowthCharts({ queryString, disabled, className }: AdminGro
   const sub = periodSubtitle(data);
   const signupsAria = `Novos utilizadores: ${formatInt(totals.signups)} no período. ${sub}`;
   const revenueAria = `Receita de referência: ${formatBrl(totals.reais)} no período. ${sub}`;
+  const paidRevenueAria = `Receita paga (Stripe): ${formatBrl(paidRevenueTotalReais)} no período. ${sub}`;
 
   return (
-    <div className={cn("grid gap-6 md:grid-cols-2", className)}>
+    <div className={cn("grid gap-6 md:grid-cols-2 xl:grid-cols-3", className)}>
       <Card
         className={cn(
           "relative overflow-hidden rounded-t-2xl rounded-b-none border-sidebar-border/80 bg-card/80 shadow-sm ring-1 ring-foreground/[0.06] backdrop-blur-sm dark:border-white/10 dark:bg-zinc-950/45 dark:ring-white/[0.06]",
@@ -325,7 +410,7 @@ export function AdminGrowthCharts({ queryString, disabled, className }: AdminGro
             Soma de <span className="font-medium text-foreground/80">planPriceCents</span> /{" "}
             <span className="font-medium text-foreground/80">subscriptionPriceCents</span> em{" "}
             <span className="font-medium text-foreground/80">userSettings</span> só das contas criadas em cada
-            intervalo. Pagamentos reais e planos comerciais: configurar depois.
+            intervalo. Indicativo — para cash-in real, vê “Receita paga (Stripe)”.
           </p>
           <div className="rounded-t-xl rounded-b-none border border-border/50 bg-muted/30 px-1 pt-2 pb-0 dark:border-white/[0.06] dark:bg-zinc-900/40">
             {revenueChartData.length ? (
@@ -344,6 +429,93 @@ export function AdminGrowthCharts({ queryString, disabled, className }: AdminGro
             ) : (
               <div className="flex h-[200px] items-center justify-center text-xs text-muted-foreground">
                 Sem pontos no período.
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card
+        className={cn(
+          "relative overflow-hidden rounded-t-2xl rounded-b-none border-sidebar-border/80 bg-card/80 shadow-sm ring-1 ring-foreground/[0.06] backdrop-blur-sm dark:border-white/10 dark:bg-zinc-950/45 dark:ring-white/[0.06]",
+          "before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-sidebar-primary/35 before:to-transparent dark:before:via-white/15",
+          (loading || revenueLoading) && "opacity-[0.92]",
+        )}
+      >
+        <CardHeader className="relative z-[1] flex flex-row items-start gap-3 space-y-0 rounded-t-none border-b border-border/60 pb-3 dark:border-white/[0.07]">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300">
+            <BadgeDollarSign className="size-5" aria-hidden />
+          </div>
+          <div className="min-w-0 flex-1 space-y-1">
+            <CardTitle className="font-heading text-base font-semibold leading-snug tracking-tight text-foreground dark:text-zinc-50">
+              Receita paga (Stripe)
+            </CardTitle>
+            {sub ? (
+              <CardDescription className="text-xs leading-relaxed text-muted-foreground dark:text-zinc-500">
+                {sub}
+              </CardDescription>
+            ) : null}
+          </div>
+          <div className="flex shrink-0 flex-col items-end gap-0.5 text-right">
+            <span className="font-heading text-2xl font-bold tabular-nums tracking-tight text-right text-foreground dark:text-white sm:text-3xl">
+              {formatBrl(paidRevenueTotalReais)}
+            </span>
+            <span className="text-[11px] font-medium uppercase leading-tight tracking-wider text-muted-foreground dark:text-zinc-500">
+              Cash-in Stripe
+            </span>
+          </div>
+        </CardHeader>
+        <CardContent className="relative z-[1] space-y-2 pt-3">
+          <p className="text-[11px] leading-snug text-muted-foreground">
+            Soma real de <span className="font-medium text-foreground/80">invoice.amount_paid</span> de
+            faturas Stripe com <span className="font-medium text-foreground/80">status=paid</span> em{" "}
+            <span className="font-medium text-foreground/80">paidAtMs</span> (UTC). Inclui renovações e
+            add-ons confirmados.
+          </p>
+          {revenueError ? (
+            <p className="rounded-md border border-destructive/30 bg-destructive/5 px-2 py-1.5 text-[11px] text-destructive">
+              {revenueError}
+            </p>
+          ) : null}
+          {!revenueError && (paidRevenueTotalReais > 0 || paidRevenueInvoicesCount > 0) ? (
+            <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+              <span>
+                Assinaturas:{" "}
+                <span className="font-medium tabular-nums text-foreground/80">
+                  {formatBrl(paidRevenueSubscriptionReais)}
+                </span>
+              </span>
+              <span>
+                Pacotes:{" "}
+                <span className="font-medium tabular-nums text-foreground/80">
+                  {formatBrl(paidRevenueAddOnReais)}
+                </span>
+              </span>
+              <span>
+                Faturas:{" "}
+                <span className="font-medium tabular-nums text-foreground/80">
+                  {paidRevenueInvoicesCount.toLocaleString("pt-BR")}
+                </span>
+              </span>
+            </div>
+          ) : null}
+          <div className="rounded-t-xl rounded-b-none border border-border/50 bg-muted/30 px-1 pt-2 pb-0 dark:border-white/[0.06] dark:bg-zinc-900/40">
+            {paidRevenueChartData.length ? (
+              <PlatformStatAreaChart
+                data={paidRevenueChartData}
+                color={GROWTH_CHART_SERIES_COLOR}
+                yMax={yPaidRevenue}
+                ariaLabel={paidRevenueAria}
+                valueLabel="Recebido"
+                yAllowDecimals
+                yTickFormatter={(v) =>
+                  v.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: v >= 100 ? 0 : 2 })
+                }
+                tooltipValueFormatter={(v) => formatBrl(v)}
+              />
+            ) : (
+              <div className="flex h-[200px] items-center justify-center text-xs text-muted-foreground">
+                Sem faturas pagas no período.
               </div>
             )}
           </div>

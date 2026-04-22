@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 
 import { AdminGrowthCharts } from "@/components/admin/admin-growth-charts";
+import { AdminPaymentAlertsBanner } from "@/components/admin/admin-payment-alerts-banner";
 import { PlatformVolumeCharts } from "@/components/admin/platform-volume-charts";
 import {
   PlatformPeriodSelector,
@@ -557,6 +558,7 @@ export default function UsuariosAdminPage() {
             className="shrink-0 sm:justify-end"
           />
         </div>
+        <AdminPaymentAlertsBanner />
         <AdminGrowthCharts queryString={seriesQueryString} />
         <PlatformVolumeCharts
           stats={platformStats}

@@ -5,6 +5,57 @@ export type StripeSubscriptionPlanKey = "pro" | "agency";
 
 export type StripeSubscriptionBillingCycle = "monthly" | "yearly";
 
+const PRO_MONTHLY_DEFAULT_CENTS = 12_700;
+const PRO_YEARLY_DEFAULT_CENTS = 9_700;
+
+/**
+ * Preço mínimo padrão Pro (BRL) — evita mágic numbers noutros ficheiros.
+ * Override: `STRIPE_PRO_MONTHLY_UNIT_AMOUNT_CENTS` (e opcional `NEXT_PUBLIC_…` no cliente).
+ */
+export function proPlanReferenceMonthlyCentsForUi(): number {
+  return readProMonthlyOverrideCents() ?? PRO_MONTHLY_DEFAULT_CENTS;
+}
+
+/**
+ * Só no servidor: checkout, webhook, API admin. Defina p.ex. `10` = R$ 0,10.
+ * **Nota:** em produção a Stripe costuma exigir mínimo maior em BRL (p. ex. R$ 0,50) — 10 cvs pode falhar.
+ */
+function readProMonthlyOverrideCentsForServer(): number | null {
+  if (typeof process === "undefined") return null;
+  const raw = process.env.STRIPE_PRO_MONTHLY_UNIT_AMOUNT_CENTS?.trim();
+  if (!raw) return null;
+  const n = Number.parseInt(raw, 10);
+  if (!Number.isFinite(n) || n < 1) return null;
+  return n;
+}
+
+/**
+ * Lê o mesmo que o servidor, mas no browser só existe `NEXT_PUBLIC_STRIPE_PRO_MONTHLY_UNIT_AMOUNT_CENTS`
+ * (para alinhar textos/labels ao valor de teste).
+ */
+function readProMonthlyOverrideCents(): number | null {
+  if (typeof process === "undefined") return null;
+  const raw =
+    process.env.NEXT_PUBLIC_STRIPE_PRO_MONTHLY_UNIT_AMOUNT_CENTS?.trim() ||
+    process.env.STRIPE_PRO_MONTHLY_UNIT_AMOUNT_CENTS?.trim();
+  if (!raw) return null;
+  const n = Number.parseInt(raw, 10);
+  if (!Number.isFinite(n) || n < 1) return null;
+  return n;
+}
+
+/**
+ * Pro anual: override opcional (soma total cobrada no intervalo, em centavos BRL), para testar checkout anual.
+ */
+function readProYearlyOverrideCentsForServer(): number | null {
+  if (typeof process === "undefined") return null;
+  const raw = process.env.STRIPE_PRO_YEARLY_UNIT_AMOUNT_CENTS?.trim();
+  if (!raw) return null;
+  const n = Number.parseInt(raw, 10);
+  if (!Number.isFinite(n) || n < 1) return null;
+  return n;
+}
+
 /** Valores alinhados à landing e ao modal de limites (BRL → centavos). */
 export function subscriptionLineAmountCents(
   plan: StripeSubscriptionPlanKey,
@@ -12,13 +63,25 @@ export function subscriptionLineAmountCents(
 ): { unitAmount: number; interval: "month" | "year"; label: string } {
   if (cycle === "monthly") {
     if (plan === "pro") {
-      return { unitAmount: 1 * 100, interval: "month", label: "Plano Pro (mensal)" };
+      const o = readProMonthlyOverrideCentsForServer();
+      if (o != null) {
+        return { unitAmount: o, interval: "month", label: "Plano Pro (mensal)" };
+      }
+      return { unitAmount: 127 * 100, interval: "month", label: "Plano Pro (mensal)" };
     }
     return { unitAmount: 347 * 100, interval: "month", label: "Plano Agency (mensal)" };
   }
   if (plan === "pro") {
+    const o = readProYearlyOverrideCentsForServer();
+    if (o != null) {
+      return {
+        unitAmount: o,
+        interval: "year",
+        label: "Plano Pro (anual)",
+      };
+    }
     return {
-      unitAmount: 1 * 100,
+      unitAmount: 97 * 12 * 100,
       interval: "year",
       label: "Plano Pro (anual)",
     };
@@ -35,10 +98,20 @@ export function subscriptionMonthlyEquivalentCents(
   plan: StripeSubscriptionPlanKey,
   cycle: StripeSubscriptionBillingCycle,
 ): number {
-  if (cycle === "monthly") {
-    return plan === "pro" ? 100 : 34_700;
+  if (plan === "pro" && cycle === "monthly") {
+    return readProMonthlyOverrideCentsForServer() ?? PRO_MONTHLY_DEFAULT_CENTS;
   }
-  return plan === "pro" ? 100 : 26_700;
+  if (plan === "pro" && cycle === "yearly") {
+    const y = readProYearlyOverrideCentsForServer();
+    if (y != null) {
+      return Math.max(1, Math.round(y / 12));
+    }
+    return PRO_YEARLY_DEFAULT_CENTS;
+  }
+  if (cycle === "monthly") {
+    return 34_700;
+  }
+  return 26_700;
 }
 
 /** Limite mensal de leads conforme plano (igual ao admin PATCH). */

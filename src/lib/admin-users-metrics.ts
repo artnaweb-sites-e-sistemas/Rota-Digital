@@ -3,7 +3,7 @@ import type { Firestore } from "firebase-admin/firestore";
 
 import { readCycleUsage } from "@/lib/cycle-usage";
 import { resolveCycleStartMs } from "@/lib/plan-quotas";
-import type { AdminListedUser } from "@/types/admin-user-list";
+import type { AdminListedUser, AdminUserSubscriptionStatus } from "@/types/admin-user-list";
 
 const USER_SETTINGS_COLLECTION = "userSettings";
 const CHUNK = 8;
@@ -92,6 +92,56 @@ function pickFirstCents(data: Record<string, unknown>, keys: string[]): number |
   return null;
 }
 
+/** Converte `subscriptionCycleAnchorAt` (número ms ou Timestamp) para milissegundos. */
+function subscriptionCycleAnchorAtMsFromSettings(data: Record<string, unknown> | undefined): number | null {
+  if (!data) return null;
+  const raw = data.subscriptionCycleAnchorAt;
+  if (typeof raw === "number" && Number.isFinite(raw)) return Math.round(raw);
+  if (raw && typeof raw === "object" && "toMillis" in raw && typeof (raw as { toMillis: () => number }).toMillis === "function") {
+    try {
+      const ms = (raw as { toMillis: () => number }).toMillis();
+      return Number.isFinite(ms) ? ms : null;
+    } catch {
+      return null;
+    }
+  }
+  if (raw && typeof raw === "object" && "seconds" in raw) {
+    const s = (raw as { seconds: number }).seconds;
+    if (typeof s === "number" && Number.isFinite(s)) return Math.round(s * 1000);
+  }
+  return null;
+}
+
+const VALID_SUBSCRIPTION_STATUSES: ReadonlySet<AdminUserSubscriptionStatus> = new Set([
+  "none",
+  "active",
+  "trialing",
+  "past_due",
+  "unpaid",
+  "canceled",
+  "incomplete",
+  "incomplete_expired",
+]);
+
+function subscriptionStatusFromSettings(
+  data: Record<string, unknown> | undefined,
+): AdminUserSubscriptionStatus {
+  if (!data) return "none";
+  const raw = typeof data.subscriptionStatus === "string" ? data.subscriptionStatus.trim() : "";
+  if (!raw) return "none";
+  return VALID_SUBSCRIPTION_STATUSES.has(raw as AdminUserSubscriptionStatus)
+    ? (raw as AdminUserSubscriptionStatus)
+    : "none";
+}
+
+function pickMs(data: Record<string, unknown>, keys: string[]): number | null {
+  for (const k of keys) {
+    const v = data[k];
+    if (typeof v === "number" && Number.isFinite(v)) return Math.round(v);
+  }
+  return null;
+}
+
 export function authRecordToAdminListedUserBase(u: UserRecord): AdminListedUser {
   return {
     uid: u.uid,
@@ -143,6 +193,26 @@ async function enrichOne(
     base.planPriceCents = pickFirstCents(settingsData, ["subscriptionPriceCents", "planPriceCents"]);
     base.lifetimePaidCents = pickFirstCents(settingsData, ["lifetimePaidCents", "totalPaidCents"]);
     base.addOnPaidByMonthCents = addOnPaidByMonthFromSettings(settingsData);
+    base.subscriptionPaidByMonthCents = asCentsMap(settingsData.subscriptionPaidByMonthCents);
+    base.subscriptionCycleAnchorAtMs = subscriptionCycleAnchorAtMsFromSettings(settingsData);
+    base.subscriptionStatus = subscriptionStatusFromSettings(settingsData);
+    base.subscriptionStatusUpdatedAtMs = pickMs(settingsData, ["subscriptionStatusUpdatedAtMs"]);
+    base.subscriptionCurrentPeriodEndMs = pickMs(settingsData, ["subscriptionCurrentPeriodEndMs"]);
+    base.autoSuspended = settingsData.autoSuspended === true;
+    base.autoSuspendedAtMs = pickMs(settingsData, ["autoSuspendedAtMs"]);
+    base.autoSuspendedReason =
+      typeof settingsData.autoSuspendedReason === "string"
+        ? settingsData.autoSuspendedReason
+        : null;
+    base.lastPaymentFailureAtMs = pickMs(settingsData, ["lastPaymentFailureAtMs"]);
+    base.lastPaymentFailureMessage =
+      typeof settingsData.lastPaymentFailureMessage === "string"
+        ? settingsData.lastPaymentFailureMessage
+        : null;
+    base.stripeCustomerId =
+      typeof settingsData.stripeCustomerId === "string" && settingsData.stripeCustomerId.trim()
+        ? settingsData.stripeCustomerId.trim()
+        : null;
   }
   return base;
 }

@@ -3,7 +3,17 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Check, Copy, Link2, Loader2, RefreshCw, Sparkles } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  Check,
+  Copy,
+  ExternalLink,
+  Link2,
+  Loader2,
+  RefreshCw,
+  Sparkles,
+} from "lucide-react";
 
 import { PlatformVolumeCharts } from "@/components/admin/platform-volume-charts";
 import {
@@ -13,9 +23,10 @@ import {
 } from "@/components/admin/platform-period-selector";
 import { useAuth } from "@/lib/auth-context";
 import { isGeneralAdminEmail } from "@/lib/general-admin";
-import type { AdminListedUser } from "@/types/admin-user-list";
+import type { AdminListedUser, AdminUserSubscriptionStatus } from "@/types/admin-user-list";
 import type { PlatformSeriesResponse } from "@/types/platform-series";
 import type { PlatformStats } from "@/types/platform-stats";
+import type { StoredStripeInvoice } from "@/types/stripe-invoice";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,6 +47,7 @@ import {
   PLATFORM_CHART_COLOR_REPORTS,
 } from "@/lib/platform-chart-colors";
 import { planBadgeVisualClasses } from "@/lib/billing-plan-label";
+import { proPlanReferenceMonthlyCentsForUi } from "@/lib/stripe-subscription-prices";
 import { cn } from "@/lib/utils";
 
 function formatDatePt(iso: string | null): string {
@@ -60,6 +72,280 @@ function splitDateTimePt(value: string): { date: string; time: string | null } {
 function formatBrlFromCents(cents: number | null | undefined): string {
   if (cents == null || !Number.isFinite(cents)) return "—";
   return (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function formatMsDateTimePt(ms: number | null | undefined): string {
+  if (ms == null || !Number.isFinite(ms)) return "—";
+  try {
+    return new Date(ms).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+  } catch {
+    return "—";
+  }
+}
+
+function formatMsDatePt(ms: number | null | undefined): string {
+  if (ms == null || !Number.isFinite(ms)) return "—";
+  try {
+    return new Date(ms).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+  } catch {
+    return "—";
+  }
+}
+
+type AccountStatusAppearance = {
+  label: string;
+  variant: "default" | "outline" | "destructive" | "secondary";
+  className: string;
+  icon?: "alert" | null;
+  sub: string | null;
+};
+
+function mapAutoSuspendedReasonPt(reason: string | null | undefined): string {
+  switch (reason) {
+    case "subscription_unpaid":
+      return "assinatura não paga";
+    case "subscription_canceled":
+      return "assinatura cancelada";
+    case "subscription_incomplete_expired":
+      return "assinatura expirou antes do 1.º pagamento";
+    default:
+      return "pagamento em falta";
+  }
+}
+
+function subscriptionStatusLabelPt(status: AdminUserSubscriptionStatus | undefined): string {
+  switch (status) {
+    case "active":
+      return "Assinatura ativa";
+    case "trialing":
+      return "Em período de teste";
+    case "past_due":
+      return "Pagamento em atraso";
+    case "unpaid":
+      return "Assinatura não paga";
+    case "canceled":
+      return "Assinatura cancelada";
+    case "incomplete":
+      return "Pagamento incompleto";
+    case "incomplete_expired":
+      return "Pagamento expirado";
+    case "none":
+    default:
+      return "Sem assinatura Stripe";
+  }
+}
+
+function computeAccountStatus(detail: AdminListedUser | null): AccountStatusAppearance {
+  if (!detail) {
+    return { label: "—", variant: "outline", className: "", sub: null };
+  }
+  const status = detail.subscriptionStatus;
+  const autoSuspended = detail.autoSuspended === true;
+
+  if (autoSuspended) {
+    return {
+      label: "Suspensa (pagamento)",
+      variant: "destructive",
+      className: "",
+      icon: "alert",
+      sub: `Auto-suspensa · ${mapAutoSuspendedReasonPt(detail.autoSuspendedReason)} · ${formatMsDatePt(detail.autoSuspendedAtMs ?? null)}`,
+    };
+  }
+  if (detail.disabled) {
+    return {
+      label: "Conta desativada",
+      variant: "destructive",
+      className: "",
+      sub: "Desativada manualmente pelo admin",
+    };
+  }
+  if (status === "past_due") {
+    return {
+      label: "Pagamento em atraso",
+      variant: "outline",
+      className:
+        "border-amber-500/50 bg-amber-500/10 text-amber-800 dark:border-amber-400/40 dark:bg-amber-400/10 dark:text-amber-200",
+      icon: "alert",
+      sub: detail.lastPaymentFailureAtMs
+        ? `Última falha: ${formatMsDateTimePt(detail.lastPaymentFailureAtMs)}`
+        : "Stripe a tentar cobrar novamente",
+    };
+  }
+  if (status === "canceled" || status === "unpaid" || status === "incomplete_expired") {
+    return {
+      label: subscriptionStatusLabelPt(status),
+      variant: "destructive",
+      className: "",
+      sub: null,
+    };
+  }
+  return {
+    label: "Conta ativa",
+    variant: "outline",
+    className:
+      "border-emerald-500/40 bg-emerald-500/10 text-emerald-800 dark:border-emerald-500/35 dark:bg-emerald-500/15 dark:text-emerald-300",
+    sub: status && status !== "none" ? subscriptionStatusLabelPt(status) : null,
+  };
+}
+
+function sumAddOnCentsForPeriod(
+  map: Record<string, number> | undefined,
+  year: PlatformPeriodYear,
+  month: PlatformPeriodMonth,
+): number {
+  if (!map) return 0;
+  if (typeof year === "number" && typeof month === "number") {
+    const k = `${year}-${String(month).padStart(2, "0")}`;
+    return map[k] ?? 0;
+  }
+  if (typeof year === "number" && month === "all") {
+    const p = `${year}-`;
+    return Object.entries(map)
+      .filter(([key]) => key.startsWith(p))
+      .reduce((s, [, v]) => s + (typeof v === "number" && Number.isFinite(v) ? v : 0), 0);
+  }
+  if (year === "all" && typeof month === "number") {
+    const m = String(month).padStart(2, "0");
+    return Object.entries(map)
+      .filter(([key]) => key.length >= 7 && key.endsWith(`-${m}`))
+      .reduce((s, [, v]) => s + (typeof v === "number" && Number.isFinite(v) ? v : 0), 0);
+  }
+  return Object.values(map).reduce(
+    (s, v) => s + (typeof v === "number" && Number.isFinite(v) ? v : 0),
+    0,
+  );
+}
+
+function calendarMonthStartUtcMs(year: number, month1to12: number): number {
+  return Date.UTC(year, month1to12 - 1, 1, 0, 0, 0, 0);
+}
+
+function firstSubscriptionBillableMonthStartUtcMs(anchorMs: number): number {
+  const d = new Date(anchorMs);
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1, 0, 0, 0, 0);
+}
+
+/**
+ * Mês de calendário (UTC) que ainda não “fechou” para referência: não cobrou / pode cancelar antes.
+ * Alinha com a mesma base UTC que a âncora e os filtros.
+ */
+function isStrictlyFutureCalendarMonthUTC(year: number, month1to12: number): boolean {
+  const n = new Date();
+  const cy = n.getUTCFullYear();
+  const cm = n.getUTCMonth() + 1;
+  if (year !== cy) return year > cy;
+  return month1to12 > cm;
+}
+
+/** Plano com mensalidade de referência (Pro/Agency). */
+function isPaidPlanWithSubscriptionReference(plan: BillingPlan): boolean {
+  return plan === "Pro" || plan === "Agency";
+}
+
+/**
+ * Quantos “meses de referência do plano” contar (valor mensal snapshot × N).
+ * Se `subscriptionAnchorMs` existir, meses **anteriores** à primeira cobrança contam 0
+ * (não mostra o preço atual como se tivesse sido pago naquele mês).
+ * **Meses de calendário futuros (após o mês UTC atual) contam 0** — não exibe mensalidade como se já tivesse sido paga.
+ * Sem âncora (plano ajustado manualmente / legado), um mês passado/corrente continua 1; meses futuros, 0.
+ */
+function getPlanReferencePeriodMonthCount(
+  addOnByMonth: Record<string, number> | undefined,
+  year: PlatformPeriodYear,
+  month: PlatformPeriodMonth,
+  subscriptionAnchorMs: number | null | undefined,
+  effectivePlan: BillingPlan,
+): number {
+  if (!isPaidPlanWithSubscriptionReference(effectivePlan)) {
+    return 0;
+  }
+
+  const trustAllMonths = subscriptionAnchorMs == null;
+
+  if (typeof year === "number" && typeof month === "number") {
+    if (isStrictlyFutureCalendarMonthUTC(year, month)) return 0;
+    if (trustAllMonths) return 1;
+    if (calendarMonthStartUtcMs(year, month) < firstSubscriptionBillableMonthStartUtcMs(subscriptionAnchorMs!)) {
+      return 0;
+    }
+    return 1;
+  }
+  if (typeof year === "number" && month === "all") {
+    if (trustAllMonths) {
+      let c = 0;
+      for (let m = 1; m <= 12; m++) {
+        if (!isStrictlyFutureCalendarMonthUTC(year, m)) c++;
+      }
+      return c;
+    }
+    const first = firstSubscriptionBillableMonthStartUtcMs(subscriptionAnchorMs!);
+    let c = 0;
+    for (let m = 1; m <= 12; m++) {
+      if (isStrictlyFutureCalendarMonthUTC(year, m)) continue;
+      if (calendarMonthStartUtcMs(year, m) >= first) c++;
+    }
+    return c;
+  }
+  if (year === "all" && typeof month === "number") {
+    const mStr = String(month).padStart(2, "0");
+    const keys = addOnByMonth ? Object.keys(addOnByMonth).filter((k) => k.endsWith(`-${mStr}`)) : [];
+    const yearSet = new Set(
+      keys
+        .map((k) => parseInt(k.split("-")[0]!, 10))
+        .filter((n) => Number.isFinite(n)),
+    );
+    if (yearSet.size === 0 && !trustAllMonths && subscriptionAnchorMs) {
+      const y0 = new Date(subscriptionAnchorMs).getUTCFullYear();
+      const yEnd = new Date().getUTCFullYear();
+      for (let y = y0; y <= yEnd; y++) {
+        yearSet.add(y);
+      }
+    }
+    if (trustAllMonths) {
+      let c = 0;
+      for (const y of yearSet) {
+        if (!isStrictlyFutureCalendarMonthUTC(y, month)) c++;
+      }
+      return c;
+    }
+    const first = firstSubscriptionBillableMonthStartUtcMs(subscriptionAnchorMs!);
+    let c = 0;
+    for (const y of yearSet) {
+      if (isStrictlyFutureCalendarMonthUTC(y, month)) continue;
+      if (calendarMonthStartUtcMs(y, month) >= first) c++;
+    }
+    return c;
+  }
+  if (trustAllMonths) return 12;
+  if (!subscriptionAnchorMs) return 12;
+  const first = firstSubscriptionBillableMonthStartUtcMs(subscriptionAnchorMs);
+  let c = 0;
+  for (const k of Object.keys(addOnByMonth ?? {})) {
+    const [ys, ms] = k.split("-");
+    const y = parseInt(ys!, 10);
+    const mo = parseInt(ms!, 10);
+    if (!Number.isFinite(y) || !Number.isFinite(mo)) continue;
+    if (isStrictlyFutureCalendarMonthUTC(y, mo)) continue;
+    if (calendarMonthStartUtcMs(y, mo) >= first) c++;
+  }
+  return c;
+}
+
+function formatBillingPeriodLabel(year: PlatformPeriodYear, month: PlatformPeriodMonth): string {
+  if (typeof year === "number" && typeof month === "number") {
+    const raw = new Date(2000, month - 1, 1).toLocaleDateString("pt-BR", { month: "long" });
+    const mLabel = raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : String(month);
+    return `${mLabel} de ${year}`;
+  }
+  if (typeof year === "number" && month === "all") {
+    return `Ano ${year} (soma dos 12 meses)`;
+  }
+  if (year === "all" && typeof month === "number") {
+    const raw = new Date(2000, month - 1, 1).toLocaleDateString("pt-BR", { month: "long" });
+    const mLabel = raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : String(month);
+    return `${mLabel} — todos os anos`;
+  }
+  return "Todo o período (soma geral)";
 }
 
 type BillingPlan = "Starter" | "Pro" | "Agency" | "Master";
@@ -87,7 +373,7 @@ const PROPOSALS_MONTHLY_LIMIT_BY_PLAN: Record<BillingPlan, number | null> = {
 
 const PLAN_MONTHLY_PRICE_CENTS_BY_PLAN: Record<BillingPlan, number> = {
   Starter: 0,
-  Pro: 12_700,
+  Pro: proPlanReferenceMonthlyCentsForUi(),
   Agency: 34_700,
   Master: 0,
 };
@@ -179,22 +465,64 @@ export default function UsuarioAdminDetailPage() {
   }, [detail, platformSeries]);
   const effectivePlan = useMemo(() => normalizedPlanLabel(detail?.plan), [detail?.plan]);
   const canAssignMasterPlan = useMemo(() => isGeneralAdminEmail(detail?.email), [detail?.email]);
-  const selectedMonthKey = useMemo(() => {
-    if (typeof periodYear !== "number" || typeof periodMonth !== "number") return null;
-    const month = String(periodMonth).padStart(2, "0");
-    return `${periodYear}-${month}`;
-  }, [periodMonth, periodYear]);
-  const addOnPaidInSelectedMonthCents = useMemo(() => {
-    if (!detail?.addOnPaidByMonthCents || !selectedMonthKey) return 0;
-    return detail.addOnPaidByMonthCents[selectedMonthKey] ?? 0;
-  }, [detail?.addOnPaidByMonthCents, selectedMonthKey]);
-  const displayedPlanMonthlyCents = useMemo(
+  const planMonthlyReferenceCents = useMemo(
     () => detail?.planPriceCents ?? PLAN_MONTHLY_PRICE_CENTS_BY_PLAN[effectivePlan],
     [detail?.planPriceCents, effectivePlan],
   );
+  const billingPeriodLabel = useMemo(
+    () => formatBillingPeriodLabel(periodYear, periodMonth),
+    [periodYear, periodMonth],
+  );
+  /** Só exibe o subtítulo de período (ex.: "Abril de 2026") quando o filtro ≠ mês/ano calendário atuais. */
+  const showBillingPeriodSubtext = useMemo(() => {
+    if (periodYear === "all" || periodMonth === "all") return true;
+    if (typeof periodYear !== "number" || typeof periodMonth !== "number") return true;
+    const n = new Date();
+    return periodYear !== n.getFullYear() || periodMonth !== n.getMonth() + 1;
+  }, [periodYear, periodMonth]);
+  const isSelectedSingleFutureCalendarMonth = useMemo(() => {
+    if (typeof periodYear !== "number" || typeof periodMonth !== "number") return false;
+    return isStrictlyFutureCalendarMonthUTC(periodYear, periodMonth);
+  }, [periodYear, periodMonth]);
+  const planReferencePeriodMonthCount = useMemo(
+    () =>
+      getPlanReferencePeriodMonthCount(
+        detail?.addOnPaidByMonthCents,
+        periodYear,
+        periodMonth,
+        detail?.subscriptionCycleAnchorAtMs ?? null,
+        effectivePlan,
+      ),
+    [detail?.addOnPaidByMonthCents, detail?.subscriptionCycleAnchorAtMs, effectivePlan, periodYear, periodMonth],
+  );
+  const planReferenceForPeriodCents = useMemo(
+    () => planMonthlyReferenceCents * planReferencePeriodMonthCount,
+    [planMonthlyReferenceCents, planReferencePeriodMonthCount],
+  );
+  const addOnPaidInSelectedPeriodCents = useMemo(
+    () => sumAddOnCentsForPeriod(detail?.addOnPaidByMonthCents, periodYear, periodMonth),
+    [detail?.addOnPaidByMonthCents, periodYear, periodMonth],
+  );
+  /** Renovações de plano pagas (Stripe) — real, vindo do webhook `invoice.paid`. */
+  const subscriptionPaidInSelectedPeriodCents = useMemo(
+    () => sumAddOnCentsForPeriod(detail?.subscriptionPaidByMonthCents, periodYear, periodMonth),
+    [detail?.subscriptionPaidByMonthCents, periodYear, periodMonth],
+  );
+  const stripeRealPaidInSelectedPeriodCents = useMemo(
+    () => subscriptionPaidInSelectedPeriodCents + addOnPaidInSelectedPeriodCents,
+    [subscriptionPaidInSelectedPeriodCents, addOnPaidInSelectedPeriodCents],
+  );
   const totalPaidInSelectedPeriodCents = useMemo(() => {
-    return Math.max(0, displayedPlanMonthlyCents + addOnPaidInSelectedMonthCents);
-  }, [addOnPaidInSelectedMonthCents, displayedPlanMonthlyCents]);
+    return Math.max(0, planReferenceForPeriodCents + addOnPaidInSelectedPeriodCents);
+  }, [addOnPaidInSelectedPeriodCents, planReferenceForPeriodCents]);
+
+  const accountStatus = useMemo(() => computeAccountStatus(detail), [detail]);
+
+  const [invoices, setInvoices] = useState<StoredStripeInvoice[] | null>(null);
+  const [invoicesLoading, setInvoicesLoading] = useState(false);
+  const [invoicesError, setInvoicesError] = useState<string | null>(null);
+  const [stripePortalBusy, setStripePortalBusy] = useState(false);
+  const [stripePortalError, setStripePortalError] = useState<string | null>(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -232,6 +560,72 @@ export default function UsuarioAdminDetailPage() {
     if (authLoading || !user || !isGeneralAdmin || !uid) return;
     void loadDetail();
   }, [authLoading, user, isGeneralAdmin, uid, loadDetail]);
+
+  const openStripePortal = useCallback(async () => {
+    if (!user || !uid) return;
+    setStripePortalBusy(true);
+    setStripePortalError(null);
+    try {
+      const idToken = await user.getIdToken();
+      const res = await fetch(`/api/admin-users/${encodeURIComponent(uid)}/stripe-portal`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+      const body = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
+      if (!res.ok || !body.url) {
+        setStripePortalError(
+          typeof body.error === "string" ? body.error : "Não foi possível abrir o portal Stripe.",
+        );
+        return;
+      }
+      window.open(body.url, "_blank", "noopener,noreferrer");
+    } catch {
+      setStripePortalError("Erro de rede ao abrir o portal Stripe.");
+    } finally {
+      setStripePortalBusy(false);
+    }
+  }, [user, uid]);
+
+  useEffect(() => {
+    if (authLoading || !user || !isGeneralAdmin || !uid) return;
+    let cancelled = false;
+    void (async () => {
+      setInvoicesLoading(true);
+      setInvoicesError(null);
+      try {
+        const idToken = await user.getIdToken();
+        const res = await fetch(`/api/admin-users/${encodeURIComponent(uid)}/invoices?limit=50`, {
+          headers: { Authorization: `Bearer ${idToken}` },
+        });
+        const body = (await res.json().catch(() => ({}))) as {
+          invoices?: StoredStripeInvoice[];
+          error?: string;
+        };
+        if (!res.ok) {
+          if (!cancelled) {
+            setInvoices(null);
+            setInvoicesError(
+              typeof body.error === "string" ? body.error : "Não foi possível carregar faturas.",
+            );
+          }
+          return;
+        }
+        if (!cancelled) {
+          setInvoices(Array.isArray(body.invoices) ? body.invoices : []);
+        }
+      } catch {
+        if (!cancelled) {
+          setInvoices(null);
+          setInvoicesError("Erro de rede ao carregar faturas.");
+        }
+      } finally {
+        if (!cancelled) setInvoicesLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, user, isGeneralAdmin, uid]);
 
   useEffect(() => {
     if (authLoading || !user || !isGeneralAdmin || !userSeriesUrl) return;
@@ -455,27 +849,92 @@ export default function UsuarioAdminDetailPage() {
           <span>A carregar utilizador…</span>
         </div>
       ) : detail ? (
-        <div className="grid gap-6 lg:grid-cols-2">
-          <Card className="border-sidebar-border/80 dark:border-white/10">
-            <CardHeader>
-              <CardTitle className="font-heading text-lg">Conta</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-muted-foreground">E-mail</span>
-                <span className="min-w-0 break-all font-medium">{detail.email ?? "—"}</span>
-              </div>
+        <div className="grid items-stretch gap-6 lg:grid-cols-2">
+          <Card className="h-full min-h-0 min-w-0 border-sidebar-border/80 dark:border-white/10">
+            <CardHeader className="gap-2">
               <Badge
-                variant={detail.disabled ? "destructive" : "outline"}
+                variant={accountStatus.variant}
                 className={cn(
-                  "text-xs font-medium",
-                  !detail.disabled &&
-                    "border-emerald-500/40 bg-emerald-500/10 text-emerald-800 dark:border-emerald-500/35 dark:bg-emerald-500/15 dark:text-emerald-300",
+                  "w-fit self-start text-xs font-medium",
+                  accountStatus.className,
                 )}
               >
-                {detail.disabled ? "Conta desativada" : "Conta ativa"}
+                {accountStatus.icon === "alert" ? (
+                  <AlertTriangle className="mr-1 size-3" aria-hidden />
+                ) : null}
+                {accountStatus.label}
               </Badge>
-              <dl className="grid gap-2 border-t border-border pt-3 text-xs dark:border-white/10 sm:text-sm">
+              {accountStatus.sub ? (
+                <p className="text-xs text-muted-foreground">{accountStatus.sub}</p>
+              ) : null}
+              {detail.autoSuspended ? (
+                <p className="flex items-start gap-1.5 rounded-md border border-destructive/30 bg-destructive/5 px-2 py-1.5 text-xs text-destructive">
+                  <AlertTriangle className="mt-0.5 size-3 shrink-0" aria-hidden />
+                  <span>
+                    Suspensão automática aplicada pelo webhook Stripe. Clique em{" "}
+                    <span className="font-semibold">Ativar conta</span> para sobrepor manualmente.
+                  </span>
+                </p>
+              ) : null}
+              {!detail.autoSuspended && detail.subscriptionStatus === "past_due" ? (
+                <p className="flex items-start gap-1.5 rounded-md border border-amber-500/35 bg-amber-500/10 px-2 py-1.5 text-xs text-amber-900 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200">
+                  <AlertTriangle className="mt-0.5 size-3 shrink-0" aria-hidden />
+                  <span>
+                    Última cobrança falhou
+                    {detail.lastPaymentFailureAtMs
+                      ? ` em ${formatMsDateTimePt(detail.lastPaymentFailureAtMs)}`
+                      : ""}
+                    . Stripe a tentar de novo — se desistir, a conta será suspensa automaticamente.
+                  </span>
+                </p>
+              ) : null}
+            </CardHeader>
+            <CardContent className="flex min-h-0 flex-1 flex-col gap-0 text-sm">
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col justify-center">
+                <div className="space-y-4 border-t border-border pt-5 dark:border-white/10">
+                <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-sm">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <span className="text-muted-foreground">E-mail</span>
+                    <span className="min-w-0 break-all font-medium">{detail.email ?? "—"}</span>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span className="text-muted-foreground">Plano</span>
+                    <Badge
+                      variant="outline"
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => {
+                        let next = normalizedPlanLabel(detail.plan);
+                        if (next === "Master" && !canAssignMasterPlan) next = "Pro";
+                        setPlanDraft(next);
+                        setPlanError(null);
+                        setPlanDialogOpen(true);
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          let next = normalizedPlanLabel(detail.plan);
+                          if (next === "Master" && !canAssignMasterPlan) next = "Pro";
+                          setPlanDraft(next);
+                          setPlanError(null);
+                          setPlanDialogOpen(true);
+                        }
+                      }}
+                      className={cn("cursor-pointer font-semibold", planBadgeVisualClasses(effectivePlan))}
+                      title="Clique para alterar o plano"
+                    >
+                      {effectivePlan === "Master" ? (
+                        <span className="inline-flex items-center gap-1">
+                          <Sparkles className="size-3 opacity-90" aria-hidden />
+                          Plano Master
+                        </span>
+                      ) : (
+                        effectivePlan
+                      )}
+                    </Badge>
+                  </div>
+                </div>
+                <dl className="grid gap-2.5 text-xs sm:text-sm">
                 <div className="flex justify-between gap-4">
                   <dt className="text-muted-foreground">Criado</dt>
                   <dd className="tabular-nums">
@@ -510,8 +969,10 @@ export default function UsuarioAdminDetailPage() {
                     </button>
                   </dd>
                 </div>
-              </dl>
-              <div className="flex flex-wrap gap-2 border-t border-border pt-4 dark:border-white/10">
+                </dl>
+                </div>
+              </div>
+              <div className="flex shrink-0 flex-wrap gap-2 border-t border-border pt-4 dark:border-white/10">
                 <Button
                   type="button"
                   variant={detail.disabled ? "outline" : "destructive"}
@@ -536,76 +997,162 @@ export default function UsuarioAdminDetailPage() {
                 >
                   Redefinir senha
                 </Button>
+                {detail.stripeCustomerId ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={stripePortalBusy}
+                    onClick={() => {
+                      void openStripePortal();
+                    }}
+                  >
+                    {stripePortalBusy ? (
+                      <>
+                        <Loader2 className="mr-1 size-3 animate-spin" aria-hidden />
+                        A abrir…
+                      </>
+                    ) : (
+                      <>
+                        Portal Stripe
+                        <ExternalLink className="ml-1 size-3" aria-hidden />
+                      </>
+                    )}
+                  </Button>
+                ) : null}
               </div>
+              {stripePortalError ? (
+                <p className="text-xs text-destructive">{stripePortalError}</p>
+              ) : null}
             </CardContent>
           </Card>
 
-          <Card className="border-sidebar-border/80 dark:border-white/10">
+          <Card className="h-full min-h-0 min-w-0 border-sidebar-border/80 dark:border-white/10">
             <CardHeader>
               <CardTitle className="font-heading text-lg">Plano e utilização</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 text-sm">
-              <div className="flex items-center gap-2">
-                <span className="text-muted-foreground">Plano</span>
-                <Badge
-                  variant="outline"
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => {
-                    let next = normalizedPlanLabel(detail.plan);
-                    if (next === "Master" && !canAssignMasterPlan) next = "Pro";
-                    setPlanDraft(next);
-                    setPlanError(null);
-                    setPlanDialogOpen(true);
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      let next = normalizedPlanLabel(detail.plan);
-                      if (next === "Master" && !canAssignMasterPlan) next = "Pro";
-                      setPlanDraft(next);
-                      setPlanError(null);
-                      setPlanDialogOpen(true);
-                    }
-                  }}
-                  className={cn("cursor-pointer font-semibold", planBadgeVisualClasses(effectivePlan))}
-                  title="Clique para alterar o plano"
-                >
-                  {effectivePlan === "Master" ? (
-                    <span className="inline-flex items-center gap-1">
-                      <Sparkles className="size-3 opacity-90" aria-hidden />
-                      Plano Master
-                    </span>
-                  ) : (
-                    effectivePlan
-                  )}
-                </Badge>
-              </div>
               <dl className="grid gap-3">
-                <div className="flex justify-between gap-4">
-                  <dt className="text-muted-foreground">Valor do plano (mensal / referência)</dt>
-                  <dd className="text-sm font-medium tabular-nums text-muted-foreground/85">
-                    {formatBrlFromCents(displayedPlanMonthlyCents)}
+                <div className="flex w-full min-w-0 items-end gap-1.5">
+                  <dt className="min-w-0 text-muted-foreground">
+                    <span className="block">Valor do plano (referência no período)</span>
+                    {showBillingPeriodSubtext ? (
+                      <span className="text-xs text-muted-foreground/70">
+                        {billingPeriodLabel}
+                        {planReferencePeriodMonthCount === 0
+                          ? effectivePlan === "Starter"
+                            ? " · Plano sem mensalidade (referência)"
+                            : isSelectedSingleFutureCalendarMonth
+                              ? " · Mês calendário futuro (cobrança ainda não aplicável)"
+                              : detail?.subscriptionCycleAnchorAtMs != null
+                                ? " · Período anterior à 1.ª cobrança (sem referência de plano)"
+                                : " · —"
+                          : planReferencePeriodMonthCount > 1
+                            ? ` · ${planReferencePeriodMonthCount}× valor mensal atual`
+                            : " · 1 mês (valor mensal atual)"}
+                      </span>
+                    ) : null}
+                  </dt>
+                  <span
+                    className="min-w-2 flex-1 self-end border-b-2 border-dotted border-foreground/20 -translate-y-1.5"
+                    aria-hidden
+                  />
+                  <dd className="shrink-0 text-sm font-medium tabular-nums text-muted-foreground/85">
+                    {formatBrlFromCents(planReferenceForPeriodCents)}
                   </dd>
                 </div>
-                <div className="flex justify-between gap-4">
-                  <dt className="text-muted-foreground">Add-on pago no período</dt>
-                  <dd className="text-sm font-medium tabular-nums text-muted-foreground/85">
-                    {formatBrlFromCents(addOnPaidInSelectedMonthCents)}
+                <div className="flex w-full min-w-0 items-end gap-1.5">
+                  <dt className="min-w-0 text-muted-foreground">
+                    <span className="block">Pacotes adicionais</span>
+                    {showBillingPeriodSubtext ? (
+                      <span className="text-xs text-muted-foreground/70">{billingPeriodLabel}</span>
+                    ) : null}
+                  </dt>
+                  <span
+                    className="min-w-2 flex-1 self-end border-b-2 border-dotted border-foreground/20 -translate-y-1.5"
+                    aria-hidden
+                  />
+                  <dd className="shrink-0 text-sm font-medium tabular-nums text-muted-foreground/85">
+                    {formatBrlFromCents(addOnPaidInSelectedPeriodCents)}
                   </dd>
                 </div>
-                <div className="flex justify-between gap-4">
-                  <dt className="text-muted-foreground">Total pago no mês</dt>
-                  <dd className="font-semibold tabular-nums text-foreground">
+                <div className="flex w-full min-w-0 items-end gap-1.5">
+                  <dt className="min-w-0 text-muted-foreground">
+                    <span className="block">Total</span>
+                    {showBillingPeriodSubtext ? (
+                      <span className="text-xs text-muted-foreground/70">{billingPeriodLabel}</span>
+                    ) : null}
+                  </dt>
+                  <span
+                    className="min-w-2 flex-1 self-end border-b-2 border-dotted border-foreground/20 -translate-y-1.5"
+                    aria-hidden
+                  />
+                  <dd className="shrink-0 font-semibold tabular-nums text-foreground">
                     {formatBrlFromCents(totalPaidInSelectedPeriodCents)}
                   </dd>
                 </div>
               </dl>
+              <dl className="grid gap-2.5 border-t border-border pt-3 dark:border-white/10">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground/70">
+                  Pago real (Stripe) · {billingPeriodLabel}
+                </p>
+                <div className="flex w-full min-w-0 items-end gap-1.5">
+                  <dt className="min-w-0 text-muted-foreground">Renovações de plano</dt>
+                  <span
+                    className="min-w-2 flex-1 self-end border-b-2 border-dotted border-foreground/20 -translate-y-1.5"
+                    aria-hidden
+                  />
+                  <dd className="shrink-0 text-sm font-medium tabular-nums text-foreground/85">
+                    {formatBrlFromCents(subscriptionPaidInSelectedPeriodCents)}
+                  </dd>
+                </div>
+                <div className="flex w-full min-w-0 items-end gap-1.5">
+                  <dt className="min-w-0 text-muted-foreground">Pacotes adicionais</dt>
+                  <span
+                    className="min-w-2 flex-1 self-end border-b-2 border-dotted border-foreground/20 -translate-y-1.5"
+                    aria-hidden
+                  />
+                  <dd className="shrink-0 text-sm font-medium tabular-nums text-foreground/85">
+                    {formatBrlFromCents(addOnPaidInSelectedPeriodCents)}
+                  </dd>
+                </div>
+                <div className="flex w-full min-w-0 items-end gap-1.5">
+                  <dt className="min-w-0 text-foreground">Cash-in Stripe</dt>
+                  <span
+                    className="min-w-2 flex-1 self-end border-b-2 border-dotted border-foreground/20 -translate-y-1.5"
+                    aria-hidden
+                  />
+                  <dd className="shrink-0 font-semibold tabular-nums text-emerald-700 dark:text-emerald-300">
+                    {formatBrlFromCents(stripeRealPaidInSelectedPeriodCents)}
+                  </dd>
+                </div>
+                {detail.subscriptionCurrentPeriodEndMs ? (
+                  <div className="flex w-full min-w-0 items-end gap-1.5 pt-1 text-xs text-muted-foreground">
+                    <dt className="min-w-0">Próxima renovação</dt>
+                    <span
+                      className="min-w-2 flex-1 self-end border-b border-dotted border-foreground/20 -translate-y-1"
+                      aria-hidden
+                    />
+                    <dd className="shrink-0 tabular-nums">
+                      {formatMsDatePt(detail.subscriptionCurrentPeriodEndMs)}
+                    </dd>
+                  </div>
+                ) : null}
+              </dl>
               <dl className="grid gap-2 border-t border-border pt-3 dark:border-white/10">
-                <div className="flex justify-between gap-4">
-                  <dt className="text-muted-foreground">Leads gerados</dt>
-                  <dd className="text-base font-medium tabular-nums">
-                    <span style={{ color: PLATFORM_CHART_COLOR_LEADS }}>
+                <div className="flex w-full min-w-0 items-end gap-1.5">
+                  <dt
+                    className="shrink-0 font-medium"
+                    style={{ color: PLATFORM_CHART_COLOR_LEADS }}
+                  >
+                    Leads gerados
+                  </dt>
+                  <span
+                    className="min-w-2 flex-1 self-end border-b-2 border-dotted border-foreground/20 -translate-y-1.5"
+                    aria-hidden
+                  />
+                  <dd className="shrink-0 text-base font-medium tabular-nums">
+                    <span className="text-foreground">
                       {selectedUsage.leads.toLocaleString("pt-BR")}
                     </span>
                     <span className="px-0.5 text-xs text-muted-foreground/75">/</span>
@@ -624,10 +1171,19 @@ export default function UsuarioAdminDetailPage() {
                     </span>
                   </dd>
                 </div>
-                <div className="flex justify-between gap-4">
-                  <dt className="text-muted-foreground">Rotas digitais</dt>
-                  <dd className="text-base font-medium tabular-nums">
-                    <span style={{ color: PLATFORM_CHART_COLOR_REPORTS }}>
+                <div className="flex w-full min-w-0 items-end gap-1.5">
+                  <dt
+                    className="shrink-0 font-medium"
+                    style={{ color: PLATFORM_CHART_COLOR_REPORTS }}
+                  >
+                    Rotas digitais
+                  </dt>
+                  <span
+                    className="min-w-2 flex-1 self-end border-b-2 border-dotted border-foreground/20 -translate-y-1.5"
+                    aria-hidden
+                  />
+                  <dd className="shrink-0 text-base font-medium tabular-nums">
+                    <span className="text-foreground">
                       {selectedUsage.reports.toLocaleString("pt-BR")}
                     </span>
                     <span className="px-0.5 text-xs text-muted-foreground/75">/</span>
@@ -646,10 +1202,19 @@ export default function UsuarioAdminDetailPage() {
                     </span>
                   </dd>
                 </div>
-                <div className="flex justify-between gap-4">
-                  <dt className="text-muted-foreground">Propostas</dt>
-                  <dd className="text-base font-medium tabular-nums">
-                    <span style={{ color: PLATFORM_CHART_COLOR_PROPOSALS }}>
+                <div className="flex w-full min-w-0 items-end gap-1.5">
+                  <dt
+                    className="shrink-0 font-medium"
+                    style={{ color: PLATFORM_CHART_COLOR_PROPOSALS }}
+                  >
+                    Propostas
+                  </dt>
+                  <span
+                    className="min-w-2 flex-1 self-end border-b-2 border-dotted border-foreground/20 -translate-y-1.5"
+                    aria-hidden
+                  />
+                  <dd className="shrink-0 text-base font-medium tabular-nums">
+                    <span className="text-foreground">
                       {selectedUsage.proposals.toLocaleString("pt-BR")}
                     </span>
                     <span className="px-0.5 text-xs text-muted-foreground/75">/</span>
@@ -672,6 +1237,150 @@ export default function UsuarioAdminDetailPage() {
             </CardContent>
           </Card>
         </div>
+      ) : null}
+
+      {detail ? (
+        <Card className="border-sidebar-border/80 dark:border-white/10">
+          <CardHeader className="flex flex-row items-start justify-between gap-3">
+            <div className="space-y-1">
+              <CardTitle className="font-heading text-lg">Faturas (Stripe)</CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Histórico real de cobranças processadas pelo webhook Stripe. Ordenadas por data de criação, mais recentes primeiro.
+              </p>
+            </div>
+            {invoicesLoading ? (
+              <Loader2 className="size-4 animate-spin text-muted-foreground" aria-hidden />
+            ) : null}
+          </CardHeader>
+          <CardContent>
+            {invoicesError ? (
+              <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+                {invoicesError}
+              </p>
+            ) : invoices == null ? (
+              <p className="text-xs text-muted-foreground">A carregar faturas…</p>
+            ) : invoices.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                Sem faturas registadas para este utilizador. Cobranças futuras aparecem aqui automaticamente via webhook Stripe.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[640px] border-collapse text-sm">
+                  <thead>
+                    <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground dark:border-white/10">
+                      <th className="py-2 pr-3 font-medium">Data</th>
+                      <th className="py-2 pr-3 font-medium">Motivo</th>
+                      <th className="py-2 pr-3 font-medium">Período</th>
+                      <th className="py-2 pr-3 font-medium">Status</th>
+                      <th className="py-2 pr-3 text-right font-medium">Valor</th>
+                      <th className="py-2 text-right font-medium">PDF</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {invoices.map((inv) => {
+                      const paidOrCreatedMs = inv.paidAtMs ?? inv.createdAtMs;
+                      const amountShownCents =
+                        inv.status === "paid" ? inv.amountPaidCents : inv.amountDueCents;
+                      const statusLabel =
+                        inv.status === "paid"
+                          ? "Paga"
+                          : inv.status === "open"
+                            ? "Em aberto"
+                            : inv.status === "void"
+                              ? "Anulada"
+                              : inv.status === "uncollectible"
+                                ? "Incobrável"
+                                : inv.status === "draft"
+                                  ? "Rascunho"
+                                  : inv.status || "—";
+                      const billingReasonLabel =
+                        inv.billingReason === "subscription_create"
+                          ? "Criação de assinatura"
+                          : inv.billingReason === "subscription_cycle"
+                            ? "Renovação mensal/anual"
+                            : inv.billingReason === "subscription_update"
+                              ? "Atualização de plano"
+                              : inv.billingReason === "manual"
+                                ? "Cobrança manual"
+                                : inv.billingReason === "subscription"
+                                  ? "Assinatura"
+                                  : inv.billingReason ?? "—";
+                      return (
+                        <tr
+                          key={inv.stripeInvoiceId}
+                          className="border-b border-border/60 align-top last:border-b-0 dark:border-white/[0.07]"
+                        >
+                          <td className="py-2 pr-3 tabular-nums">
+                            {formatMsDatePt(paidOrCreatedMs)}
+                            {inv.paidAtMs && inv.paidAtMs !== inv.createdAtMs ? (
+                              <span className="block text-[10px] text-muted-foreground/70">
+                                paga {formatMsDatePt(inv.paidAtMs)}
+                              </span>
+                            ) : null}
+                          </td>
+                          <td className="py-2 pr-3 text-xs text-muted-foreground">
+                            {billingReasonLabel}
+                            {inv.number ? (
+                              <span className="block font-mono text-[10px] text-muted-foreground/60">
+                                {inv.number}
+                              </span>
+                            ) : null}
+                          </td>
+                          <td className="py-2 pr-3 text-xs text-muted-foreground tabular-nums">
+                            {inv.periodStartMs && inv.periodEndMs
+                              ? `${formatMsDatePt(inv.periodStartMs)} → ${formatMsDatePt(inv.periodEndMs)}`
+                              : "—"}
+                          </td>
+                          <td className="py-2 pr-3">
+                            <Badge
+                              variant={
+                                inv.status === "paid"
+                                  ? "outline"
+                                  : inv.status === "open" || inv.status === "uncollectible"
+                                    ? "destructive"
+                                    : "secondary"
+                              }
+                              className={cn(
+                                "text-[10px] font-medium",
+                                inv.status === "paid" &&
+                                  "border-emerald-500/40 bg-emerald-500/10 text-emerald-800 dark:border-emerald-500/35 dark:bg-emerald-500/15 dark:text-emerald-300",
+                              )}
+                            >
+                              {statusLabel}
+                            </Badge>
+                            {inv.failureMessage ? (
+                              <span className="mt-1 block text-[10px] text-destructive">
+                                {inv.failureMessage}
+                              </span>
+                            ) : null}
+                          </td>
+                          <td className="py-2 pr-3 text-right font-medium tabular-nums">
+                            {formatBrlFromCents(amountShownCents)}
+                          </td>
+                          <td className="py-2 text-right">
+                            {inv.hostedInvoiceUrl || inv.invoicePdf ? (
+                              <a
+                                href={inv.hostedInvoiceUrl ?? inv.invoicePdf ?? "#"}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-xs text-sidebar-primary hover:underline dark:text-zinc-200"
+                              >
+                                Abrir
+                                <ExternalLink className="size-3" aria-hidden />
+                              </a>
+                            ) : (
+                              <span className="text-xs text-muted-foreground/60">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       ) : null}
 
       <Dialog open={toggleDialogOpen} onOpenChange={setToggleDialogOpen}>

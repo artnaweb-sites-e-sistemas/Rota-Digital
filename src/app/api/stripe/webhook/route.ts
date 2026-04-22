@@ -6,7 +6,12 @@ import {
   fulfillStripeSubscriptionFromStripeSubscription,
   fulfillStripeSubscriptionIfPaid,
 } from "@/lib/stripe-fulfill-subscription";
+import {
+  recordStripeInvoicePaid,
+  recordStripeInvoicePaymentFailed,
+} from "@/lib/stripe-record-invoice";
 import { getStripe } from "@/lib/stripe-server";
+import { syncStripeSubscriptionState } from "@/lib/stripe-sync-subscription";
 
 export const runtime = "nodejs";
 
@@ -34,21 +39,47 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    if (event.type === "checkout.session.completed") {
-      const session = event.data.object as Stripe.Checkout.Session;
-      await fulfillStripeAddOnIfPaid(session);
-      await fulfillStripeSubscriptionIfPaid(session);
-    } else if (event.type === "checkout.session.async_payment_succeeded") {
-      const session = event.data.object as Stripe.Checkout.Session;
-      await fulfillStripeAddOnIfPaid(session);
-      await fulfillStripeSubscriptionIfPaid(session);
-    } else if (event.type === "customer.subscription.created") {
-      const subscription = event.data.object as Stripe.Subscription;
-      await fulfillStripeSubscriptionFromStripeSubscription(subscription);
+    switch (event.type) {
+      case "checkout.session.completed":
+      case "checkout.session.async_payment_succeeded": {
+        const session = event.data.object as Stripe.Checkout.Session;
+        await fulfillStripeAddOnIfPaid(session);
+        await fulfillStripeSubscriptionIfPaid(session);
+        break;
+      }
+      case "customer.subscription.created": {
+        const subscription = event.data.object as Stripe.Subscription;
+        await fulfillStripeSubscriptionFromStripeSubscription(subscription);
+        /**
+         * Também sincroniza status inicial — cobre cenários em que `created` já vem `active`
+         * (sem `checkout.session.completed` a preceder em webhooks async).
+         */
+        await syncStripeSubscriptionState(subscription);
+        break;
+      }
+      case "customer.subscription.updated":
+      case "customer.subscription.deleted": {
+        const subscription = event.data.object as Stripe.Subscription;
+        await syncStripeSubscriptionState(subscription);
+        break;
+      }
+      case "invoice.paid":
+      case "invoice.payment_succeeded": {
+        const invoice = event.data.object as Stripe.Invoice;
+        await recordStripeInvoicePaid(invoice, event.id ?? null);
+        break;
+      }
+      case "invoice.payment_failed": {
+        const invoice = event.data.object as Stripe.Invoice;
+        await recordStripeInvoicePaymentFailed(invoice, event.id ?? null);
+        break;
+      }
+      default:
+        break;
     }
   } catch (e) {
-    console.error("[stripe webhook] fulfill", e);
-    return NextResponse.json({ error: "Falha ao aplicar pagamento." }, { status: 500 });
+    console.error("[stripe webhook] handler", event.type, e);
+    return NextResponse.json({ error: "Falha ao processar evento Stripe." }, { status: 500 });
   }
 
   return NextResponse.json({ received: true });

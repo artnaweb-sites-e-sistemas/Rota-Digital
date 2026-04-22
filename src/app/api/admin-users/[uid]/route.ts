@@ -3,11 +3,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { canonicalPlanLabelFromKey, fetchAdminUserDetail, normalizedPlanKey } from "@/lib/admin-users-metrics";
 import { isGeneralAdminEmail } from "@/lib/general-admin";
 import { requireGeneralAdminApi } from "@/lib/require-general-admin-api";
+import { proPlanReferenceMonthlyCentsForUi } from "@/lib/stripe-subscription-prices";
 
 export const runtime = "nodejs";
 const PLAN_MONTHLY_PRICE_CENTS = {
   starter: 0,
-  pro: 12_700,
+  get pro() {
+    return proPlanReferenceMonthlyCentsForUi();
+  },
   agency: 34_700,
   master: 0,
 } as const;
@@ -75,6 +78,27 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Falha ao atualizar conta.";
       return NextResponse.json({ error: msg }, { status: 400 });
+    }
+    /**
+     * Uma ação manual do admin sobrepõe qualquer suspensão automática:
+     * assim o webhook não vai "reativar" a conta numa próxima sincronização caso o admin a tenha desativado de propósito.
+     * Idem ao contrário: se admin reativa, desligamos a flag de suspensão automática.
+     */
+    try {
+      await gate.ctx.db
+        .collection("userSettings")
+        .doc(uid.trim())
+        .set(
+          {
+            autoSuspended: false,
+            autoSuspendedReason: null,
+            autoSuspendedAtMs: null,
+            adminDisabledAtMs: disabled ? Date.now() : null,
+          },
+          { merge: true },
+        );
+    } catch (e) {
+      console.error("[admin-users PATCH] clear autoSuspended", e);
     }
   }
 
