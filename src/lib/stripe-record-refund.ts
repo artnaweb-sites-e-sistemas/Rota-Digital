@@ -81,20 +81,48 @@ function invoiceIdFromCharge(charge: Stripe.Charge): string | null {
   return stripeResourceId(asUnknown.invoice);
 }
 
+/**
+ * Encontra o documento `stripeInvoices` correspondente a um charge:
+ * 1. Primeiro tenta via `charge.invoice` (cobranças de `Invoice` reais).
+ * 2. Senão, pesquisa por `stripeChargeId == charge.id` (add-ons sintéticos).
+ */
+async function resolveInvoiceDocId(
+  db: Firestore,
+  charge: Stripe.Charge,
+): Promise<string | null> {
+  const direct = invoiceIdFromCharge(charge);
+  if (direct) return direct;
+  const chargeId = typeof charge.id === "string" ? charge.id.trim() : "";
+  if (!chargeId) return null;
+  try {
+    const snap = await db
+      .collection(INVOICES)
+      .where("stripeChargeId", "==", chargeId)
+      .limit(1)
+      .get();
+    if (snap.empty) return null;
+    return snap.docs[0]!.id;
+  } catch (e) {
+    console.warn("[stripe record refund] lookup por stripeChargeId falhou", chargeId, e);
+    return null;
+  }
+}
+
 export async function recordStripeChargeRefunded(
   charge: Stripe.Charge,
   rawEventId: string | null,
 ): Promise<RecordRefundResult> {
-  const invoiceId = invoiceIdFromCharge(charge);
-  if (!invoiceId) {
-    return { processed: false, alreadyProcessed: false, uid: null, deltaCents: 0, invoiceId: null };
-  }
   const app = getFirebaseAdminApp();
   if (!app) {
     console.error("[stripe record refund] Firebase Admin indisponível");
-    return { processed: false, alreadyProcessed: false, uid: null, deltaCents: 0, invoiceId };
+    return { processed: false, alreadyProcessed: false, uid: null, deltaCents: 0, invoiceId: null };
   }
   const db: Firestore = getFirestore(app);
+
+  const invoiceId = await resolveInvoiceDocId(db, charge);
+  if (!invoiceId) {
+    return { processed: false, alreadyProcessed: false, uid: null, deltaCents: 0, invoiceId: null };
+  }
   const invRef = db.collection(INVOICES).doc(invoiceId);
 
   let uidResult: string | null = null;
@@ -156,7 +184,7 @@ export async function recordStripeChargeRefunded(
 
     if (uidResult && deltaCents > 0) {
       const userRef = db.collection(USER_SETTINGS).doc(uidResult);
-      const { subscriptionCents } = splitDeltaByKind(deltaCents, stored);
+      const { subscriptionCents, addOnCents } = splitDeltaByKind(deltaCents, stored);
       const monthKey = monthKeyUtcFromMs(stored.paidAtMs ?? stored.createdAtMs);
       const userPatch: Record<string, unknown> = {
         lifetimePaidCents: FieldValue.increment(-deltaCents),
@@ -165,6 +193,9 @@ export async function recordStripeChargeRefunded(
         userPatch[`subscriptionPaidByMonthCents.${monthKey}`] = FieldValue.increment(
           -subscriptionCents,
         );
+      }
+      if (addOnCents > 0) {
+        userPatch[`addOnPaidByMonthCents.${monthKey}`] = FieldValue.increment(-addOnCents);
       }
       tx.set(userRef, userPatch, { merge: true });
     }

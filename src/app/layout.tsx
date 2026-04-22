@@ -20,6 +20,10 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "RouteLAB",
   description: "Gestão de leads, diagnósticos e propostas.",
+  icons: {
+    icon: [{ url: "/assets/logo/favicon.png", type: "image/png" }],
+    apple: [{ url: "/assets/logo/favicon.png" }],
+  },
 };
 
 export default function RootLayout({

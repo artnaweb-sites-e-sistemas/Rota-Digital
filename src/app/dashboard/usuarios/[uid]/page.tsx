@@ -1194,7 +1194,9 @@ export default function UsuarioAdminDetailPage() {
                                 ? "Cobrança manual"
                                 : inv.billingReason === "subscription"
                                   ? "Assinatura"
-                                  : inv.billingReason ?? "—";
+                                  : inv.billingReason === "add_on"
+                                    ? "Pacote adicional"
+                                    : inv.billingReason ?? "—";
                       return (
                         <tr
                           key={inv.stripeInvoiceId}

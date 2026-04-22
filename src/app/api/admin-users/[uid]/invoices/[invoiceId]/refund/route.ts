@@ -126,43 +126,69 @@ export async function POST(request: NextRequest, context: RouteContext) {
     );
   }
 
-  /** Localiza o Charge associado à fatura: primeiro via `invoice.charge`, depois via PaymentIntent. */
-  let invoice: Stripe.Invoice;
-  try {
-    invoice = await stripe.invoices.retrieve(invoiceId.trim(), {
-      expand: ["charge", "payment_intent", "payments.data.payment.payment_intent"],
-    });
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "Fatura inacessível na Stripe.";
-    return NextResponse.json({ error: stripeErrorToUserMessage(msg) }, { status: 502 });
-  }
+  /**
+   * Localiza o Charge associado:
+   * 1. Se o documento tem `stripeChargeId` gravado (add-on sintético OU fatura enriquecida),
+   *    usa directamente — evita chamar `stripe.invoices.retrieve(cs_...)` que dá 404.
+   * 2. Senão, faz fallback para `stripe.invoices.retrieve` e extrai via `invoice.charge`
+   *    ou `payment_intent.latest_charge`.
+   * 3. Último recurso: `stripePaymentIntentId` gravado + `paymentIntents.retrieve`.
+   */
+  let chargeId: string | null =
+    typeof stored.stripeChargeId === "string" && stored.stripeChargeId.trim()
+      ? stored.stripeChargeId.trim()
+      : null;
 
-  let chargeId: string | null = null;
-  const asUnknown = invoice as unknown as {
-    charge?: string | { id?: string } | null;
-    payment_intent?: string | { latest_charge?: string | { id?: string } | null } | null;
-  };
-  if (typeof asUnknown.charge === "string") chargeId = asUnknown.charge;
-  else if (asUnknown.charge && typeof asUnknown.charge === "object" && asUnknown.charge.id)
-    chargeId = asUnknown.charge.id;
+  const isSyntheticDoc = invoiceId.trim().startsWith("cs_");
 
-  if (!chargeId) {
-    /** API nova (2025) não expõe `invoice.charge`; temos de ir via payment_intent.latest_charge. */
-    const pi = asUnknown.payment_intent;
-    if (pi && typeof pi === "object") {
-      const lc = pi.latest_charge;
-      if (typeof lc === "string") chargeId = lc;
-      else if (lc && typeof lc === "object" && lc.id) chargeId = lc.id;
-    } else if (typeof pi === "string") {
-      try {
-        const piObj = await stripe.paymentIntents.retrieve(pi);
-        const lc = (piObj as unknown as { latest_charge?: string | { id?: string } | null })
-          .latest_charge;
+  if (!chargeId && !isSyntheticDoc) {
+    let invoice: Stripe.Invoice;
+    try {
+      invoice = await stripe.invoices.retrieve(invoiceId.trim(), {
+        expand: ["charge", "payment_intent", "payments.data.payment.payment_intent"],
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Fatura inacessível na Stripe.";
+      return NextResponse.json({ error: stripeErrorToUserMessage(msg) }, { status: 502 });
+    }
+
+    const asUnknown = invoice as unknown as {
+      charge?: string | { id?: string } | null;
+      payment_intent?: string | { latest_charge?: string | { id?: string } | null } | null;
+    };
+    if (typeof asUnknown.charge === "string") chargeId = asUnknown.charge;
+    else if (asUnknown.charge && typeof asUnknown.charge === "object" && asUnknown.charge.id)
+      chargeId = asUnknown.charge.id;
+
+    if (!chargeId) {
+      const pi = asUnknown.payment_intent;
+      if (pi && typeof pi === "object") {
+        const lc = pi.latest_charge;
         if (typeof lc === "string") chargeId = lc;
         else if (lc && typeof lc === "object" && lc.id) chargeId = lc.id;
-      } catch {
-        /** ignore: falha a resolver PI mas segue sem charge */
+      } else if (typeof pi === "string") {
+        try {
+          const piObj = await stripe.paymentIntents.retrieve(pi);
+          const lc = (piObj as unknown as { latest_charge?: string | { id?: string } | null })
+            .latest_charge;
+          if (typeof lc === "string") chargeId = lc;
+          else if (lc && typeof lc === "object" && lc.id) chargeId = lc.id;
+        } catch {
+          /** ignore: falha a resolver PI mas segue sem charge */
+        }
       }
+    }
+  }
+
+  if (!chargeId && typeof stored.stripePaymentIntentId === "string" && stored.stripePaymentIntentId.trim()) {
+    try {
+      const piObj = await stripe.paymentIntents.retrieve(stored.stripePaymentIntentId.trim());
+      const lc = (piObj as unknown as { latest_charge?: string | { id?: string } | null })
+        .latest_charge;
+      if (typeof lc === "string") chargeId = lc;
+      else if (lc && typeof lc === "object" && lc.id) chargeId = lc.id ?? null;
+    } catch {
+      /** ignore: último fallback */
     }
   }
 

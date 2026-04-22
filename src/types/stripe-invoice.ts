@@ -67,4 +67,13 @@ export type StoredStripeInvoice = {
   refundStatus?: StoredStripeInvoiceRefundStatus | null;
   /** Histórico de reembolsos processados — idempotente por `stripeRefundId`. */
   refunds?: StoredStripeInvoiceRefund[];
+  /**
+   * Charge Stripe associado — gravado para permitir estorno de documentos sintéticos
+   * (add-ons comprados via Checkout Session em `mode=payment`, que não geram `Invoice` na Stripe).
+   */
+  stripeChargeId?: string | null;
+  /** PaymentIntent Stripe associado (utilizado como fallback para resolver o charge). */
+  stripePaymentIntentId?: string | null;
+  /** Se este registo foi criado a partir de uma Checkout Session (add-on avulso). */
+  stripeCheckoutSessionId?: string | null;
 };
