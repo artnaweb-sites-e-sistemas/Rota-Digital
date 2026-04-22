@@ -104,13 +104,38 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const auth = getAuth(adminApp);
+    const db = getFirestore(adminApp);
     try {
-      const record = await getAuth(adminApp).createUser({
+      const record = await auth.createUser({
         email,
         password,
         displayName: displayNameRaw || undefined,
         emailVerified: false,
       });
+      try {
+        await db.collection("userSettings").doc(record.uid).set(
+          {
+            plan: "Starter",
+            subscriptionPlan: "Starter",
+            planPriceCents: 0,
+            subscriptionPriceCents: 0,
+            leadCaptureMonthlyLimit: 30,
+            planMasterUnlimited: false,
+            subscriptionCycleAnchorAt: Date.now(),
+          },
+          { merge: true },
+        );
+      } catch (settingsErr) {
+        try {
+          await auth.deleteUser(record.uid);
+        } catch (rollbackErr) {
+          console.error("[admin-users POST] rollback deleteUser after userSettings failure", rollbackErr);
+        }
+        const msg = settingsErr instanceof Error ? settingsErr.message : "Erro ao guardar definições iniciais.";
+        console.error("[admin-users POST] userSettings for new user", settingsErr);
+        return NextResponse.json({ error: msg }, { status: 500 });
+      }
       return NextResponse.json({ uid: record.uid, email: record.email ?? email });
     } catch (e: unknown) {
       const code = typeof e === "object" && e !== null && "code" in e ? String((e as { code: string }).code) : "";

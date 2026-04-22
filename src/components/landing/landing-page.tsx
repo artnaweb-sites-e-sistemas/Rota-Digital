@@ -121,6 +121,21 @@ const NAV_LINKS = [
   { href: "#faq", label: "FAQ" },
 ] as const;
 
+/**
+ * CTA “Acessar Plataforma” (header + hero): preto no tema claro, dourado `brand` no escuro
+ * (sobrepõe o `variant="cta"` por camadas explícitas em `…/dark:…`).
+ */
+const landingAcessarPlataformaCta = cn(
+  "border",
+  "border-zinc-900/90 bg-zinc-950 text-zinc-50",
+  "shadow-lg shadow-black/25",
+  "hover:border-zinc-800 hover:bg-zinc-900 hover:text-zinc-50",
+  "focus-visible:border-zinc-600 focus-visible:ring-2 focus-visible:ring-zinc-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+  "dark:border-brand/25 dark:bg-brand dark:text-brand-foreground dark:shadow-none",
+  "dark:hover:border-brand/35 dark:hover:bg-brand/[0.92] dark:hover:text-brand-foreground",
+  "dark:focus-visible:border-brand/40 dark:focus-visible:ring-brand/40",
+);
+
 /** Scroll suave até ao id (só na landing). O `scroll-behavior` no CSS falha em alguns browsers com esta raiz de scroll. */
 function scrollToLandingSection(hash: string) {
   const id = hash.startsWith("#") ? hash.slice(1) : hash;
@@ -202,7 +217,10 @@ function LandingHeaderNav({
             href="/login"
             variant="cta"
             size="default"
-            className="hidden h-9 min-w-[12.5rem] shrink-0 gap-2 rounded-lg px-5 text-sm font-semibold shadow-lg shadow-primary/15 sm:h-10 sm:min-w-[15rem] sm:px-7 md:flex md:min-w-[16.5rem] md:px-8"
+            className={cn(
+              landingAcessarPlataformaCta,
+              "hidden h-9 min-w-[12.5rem] shrink-0 gap-2 rounded-lg px-5 text-sm font-semibold sm:h-10 sm:min-w-[15rem] sm:px-7 md:flex md:min-w-[16.5rem] md:px-8",
+            )}
           >
             <LogIn className="size-4 shrink-0" aria-hidden />
             <span className="whitespace-nowrap">Acessar Plataforma</span>
@@ -269,7 +287,10 @@ function LandingHeaderMobileNavLinks({
           href="/login"
           variant="cta"
           size="lg"
-          className="box-border min-h-12 w-full min-w-0 max-w-full shrink rounded-xl px-4 py-3.5 text-sm font-bold shadow-lg shadow-primary/15 sm:text-[0.9375rem]"
+          className={cn(
+            landingAcessarPlataformaCta,
+            "box-border min-h-12 w-full min-w-0 max-w-full shrink rounded-xl px-4 py-3.5 text-sm font-bold sm:text-[0.9375rem]",
+          )}
         >
           <LogIn className="size-4 shrink-0" aria-hidden />
           Acessar Plataforma
@@ -544,7 +565,7 @@ export function LandingPage() {
               <p className="mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground sm:text-xl">
                 Centralize sua operação comercial, gere diagnósticos com IA e apresente propostas com mais contexto, valor e poder de fechamento.
               </p>
-              <div className="mt-10 flex flex-wrap items-center gap-4">
+              <div className="mt-10 flex flex-col-reverse items-stretch gap-4 sm:flex-row sm:flex-wrap sm:items-center">
                 <StarBorder
                   speed="6s"
                   thickness={2}
@@ -562,6 +583,18 @@ export function LandingPage() {
                     <ArrowDown className="size-4 text-brand" />
                   </Link>
                 </StarBorder>
+                <LinkButton
+                  href="/login"
+                  variant="cta"
+                  size="default"
+                  className={cn(
+                    landingAcessarPlataformaCta,
+                    "rounded-lg !h-[58px] w-full min-w-0 justify-center !gap-2 !px-6 !py-0 text-base font-semibold !leading-6 sm:w-auto sm:!px-[26px] sm:!py-0",
+                  )}
+                >
+                  <LogIn className="size-4 shrink-0" aria-hidden />
+                  Acessar Plataforma
+                </LinkButton>
               </div>
               <div className="mt-10 flex items-center gap-4 text-sm font-medium text-muted-foreground">
                 <div className="flex -space-x-2">
