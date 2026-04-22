@@ -12,6 +12,7 @@ import {
   Link2,
   Loader2,
   RefreshCw,
+  RotateCcw,
   Sparkles,
 } from "lucide-react";
 
@@ -38,6 +39,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -47,7 +49,6 @@ import {
   PLATFORM_CHART_COLOR_REPORTS,
 } from "@/lib/platform-chart-colors";
 import { planBadgeVisualClasses } from "@/lib/billing-plan-label";
-import { proPlanReferenceMonthlyCentsForUi } from "@/lib/stripe-subscription-prices";
 import { cn } from "@/lib/utils";
 
 function formatDatePt(iso: string | null): string {
@@ -98,6 +99,8 @@ type AccountStatusAppearance = {
   className: string;
   icon?: "alert" | null;
   sub: string | null;
+  /** Quando presente, é mostrado como Badge ao lado do badge principal (sem substituir `sub`). */
+  subBadge?: { label: string; className: string } | null;
 };
 
 function mapAutoSuspendedReasonPt(reason: string | null | undefined): string {
@@ -144,11 +147,12 @@ function computeAccountStatus(detail: AdminListedUser | null): AccountStatusAppe
 
   if (autoSuspended) {
     return {
-      label: "Suspensa (pagamento)",
-      variant: "destructive",
-      className: "",
+      label: "Rebaixada para Starter",
+      variant: "outline",
+      className:
+        "border-amber-500/50 bg-amber-500/10 text-amber-800 dark:border-amber-400/40 dark:bg-amber-400/10 dark:text-amber-200",
       icon: "alert",
-      sub: `Auto-suspensa · ${mapAutoSuspendedReasonPt(detail.autoSuspendedReason)} · ${formatMsDatePt(detail.autoSuspendedAtMs ?? null)}`,
+      sub: `Rebaixamento automático · ${mapAutoSuspendedReasonPt(detail.autoSuspendedReason)} · ${formatMsDatePt(detail.autoSuspendedAtMs ?? null)}`,
     };
   }
   if (detail.disabled) {
@@ -179,12 +183,24 @@ function computeAccountStatus(detail: AdminListedUser | null): AccountStatusAppe
       sub: null,
     };
   }
+  const subscriptionBadgeClassName =
+    status === "trialing"
+      ? "border-amber-500/40 bg-amber-500/10 text-amber-800 dark:border-amber-400/35 dark:bg-amber-400/10 dark:text-amber-200"
+      : "border-sky-500/40 bg-sky-500/10 text-sky-800 dark:border-sky-400/35 dark:bg-sky-400/15 dark:text-sky-200";
+
   return {
     label: "Conta ativa",
     variant: "outline",
     className:
       "border-emerald-500/40 bg-emerald-500/10 text-emerald-800 dark:border-emerald-500/35 dark:bg-emerald-500/15 dark:text-emerald-300",
-    sub: status && status !== "none" ? subscriptionStatusLabelPt(status) : null,
+    sub: null,
+    subBadge:
+      status && status !== "none"
+        ? {
+            label: subscriptionStatusLabelPt(status),
+            className: subscriptionBadgeClassName,
+          }
+        : null,
   };
 }
 
@@ -214,121 +230,6 @@ function sumAddOnCentsForPeriod(
     (s, v) => s + (typeof v === "number" && Number.isFinite(v) ? v : 0),
     0,
   );
-}
-
-function calendarMonthStartUtcMs(year: number, month1to12: number): number {
-  return Date.UTC(year, month1to12 - 1, 1, 0, 0, 0, 0);
-}
-
-function firstSubscriptionBillableMonthStartUtcMs(anchorMs: number): number {
-  const d = new Date(anchorMs);
-  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1, 0, 0, 0, 0);
-}
-
-/**
- * Mês de calendário (UTC) que ainda não “fechou” para referência: não cobrou / pode cancelar antes.
- * Alinha com a mesma base UTC que a âncora e os filtros.
- */
-function isStrictlyFutureCalendarMonthUTC(year: number, month1to12: number): boolean {
-  const n = new Date();
-  const cy = n.getUTCFullYear();
-  const cm = n.getUTCMonth() + 1;
-  if (year !== cy) return year > cy;
-  return month1to12 > cm;
-}
-
-/** Plano com mensalidade de referência (Pro/Agency). */
-function isPaidPlanWithSubscriptionReference(plan: BillingPlan): boolean {
-  return plan === "Pro" || plan === "Agency";
-}
-
-/**
- * Quantos “meses de referência do plano” contar (valor mensal snapshot × N).
- * Se `subscriptionAnchorMs` existir, meses **anteriores** à primeira cobrança contam 0
- * (não mostra o preço atual como se tivesse sido pago naquele mês).
- * **Meses de calendário futuros (após o mês UTC atual) contam 0** — não exibe mensalidade como se já tivesse sido paga.
- * Sem âncora (plano ajustado manualmente / legado), um mês passado/corrente continua 1; meses futuros, 0.
- */
-function getPlanReferencePeriodMonthCount(
-  addOnByMonth: Record<string, number> | undefined,
-  year: PlatformPeriodYear,
-  month: PlatformPeriodMonth,
-  subscriptionAnchorMs: number | null | undefined,
-  effectivePlan: BillingPlan,
-): number {
-  if (!isPaidPlanWithSubscriptionReference(effectivePlan)) {
-    return 0;
-  }
-
-  const trustAllMonths = subscriptionAnchorMs == null;
-
-  if (typeof year === "number" && typeof month === "number") {
-    if (isStrictlyFutureCalendarMonthUTC(year, month)) return 0;
-    if (trustAllMonths) return 1;
-    if (calendarMonthStartUtcMs(year, month) < firstSubscriptionBillableMonthStartUtcMs(subscriptionAnchorMs!)) {
-      return 0;
-    }
-    return 1;
-  }
-  if (typeof year === "number" && month === "all") {
-    if (trustAllMonths) {
-      let c = 0;
-      for (let m = 1; m <= 12; m++) {
-        if (!isStrictlyFutureCalendarMonthUTC(year, m)) c++;
-      }
-      return c;
-    }
-    const first = firstSubscriptionBillableMonthStartUtcMs(subscriptionAnchorMs!);
-    let c = 0;
-    for (let m = 1; m <= 12; m++) {
-      if (isStrictlyFutureCalendarMonthUTC(year, m)) continue;
-      if (calendarMonthStartUtcMs(year, m) >= first) c++;
-    }
-    return c;
-  }
-  if (year === "all" && typeof month === "number") {
-    const mStr = String(month).padStart(2, "0");
-    const keys = addOnByMonth ? Object.keys(addOnByMonth).filter((k) => k.endsWith(`-${mStr}`)) : [];
-    const yearSet = new Set(
-      keys
-        .map((k) => parseInt(k.split("-")[0]!, 10))
-        .filter((n) => Number.isFinite(n)),
-    );
-    if (yearSet.size === 0 && !trustAllMonths && subscriptionAnchorMs) {
-      const y0 = new Date(subscriptionAnchorMs).getUTCFullYear();
-      const yEnd = new Date().getUTCFullYear();
-      for (let y = y0; y <= yEnd; y++) {
-        yearSet.add(y);
-      }
-    }
-    if (trustAllMonths) {
-      let c = 0;
-      for (const y of yearSet) {
-        if (!isStrictlyFutureCalendarMonthUTC(y, month)) c++;
-      }
-      return c;
-    }
-    const first = firstSubscriptionBillableMonthStartUtcMs(subscriptionAnchorMs!);
-    let c = 0;
-    for (const y of yearSet) {
-      if (isStrictlyFutureCalendarMonthUTC(y, month)) continue;
-      if (calendarMonthStartUtcMs(y, month) >= first) c++;
-    }
-    return c;
-  }
-  if (trustAllMonths) return 12;
-  if (!subscriptionAnchorMs) return 12;
-  const first = firstSubscriptionBillableMonthStartUtcMs(subscriptionAnchorMs);
-  let c = 0;
-  for (const k of Object.keys(addOnByMonth ?? {})) {
-    const [ys, ms] = k.split("-");
-    const y = parseInt(ys!, 10);
-    const mo = parseInt(ms!, 10);
-    if (!Number.isFinite(y) || !Number.isFinite(mo)) continue;
-    if (isStrictlyFutureCalendarMonthUTC(y, mo)) continue;
-    if (calendarMonthStartUtcMs(y, mo) >= first) c++;
-  }
-  return c;
 }
 
 function formatBillingPeriodLabel(year: PlatformPeriodYear, month: PlatformPeriodMonth): string {
@@ -369,13 +270,6 @@ const PROPOSALS_MONTHLY_LIMIT_BY_PLAN: Record<BillingPlan, number | null> = {
   Pro: 30,
   Agency: null,
   Master: null,
-};
-
-const PLAN_MONTHLY_PRICE_CENTS_BY_PLAN: Record<BillingPlan, number> = {
-  Starter: 0,
-  Pro: proPlanReferenceMonthlyCentsForUi(),
-  Agency: 34_700,
-  Master: 0,
 };
 
 function normalizedPlanLabel(raw: string | null | undefined): BillingPlan {
@@ -465,39 +359,9 @@ export default function UsuarioAdminDetailPage() {
   }, [detail, platformSeries]);
   const effectivePlan = useMemo(() => normalizedPlanLabel(detail?.plan), [detail?.plan]);
   const canAssignMasterPlan = useMemo(() => isGeneralAdminEmail(detail?.email), [detail?.email]);
-  const planMonthlyReferenceCents = useMemo(
-    () => detail?.planPriceCents ?? PLAN_MONTHLY_PRICE_CENTS_BY_PLAN[effectivePlan],
-    [detail?.planPriceCents, effectivePlan],
-  );
   const billingPeriodLabel = useMemo(
     () => formatBillingPeriodLabel(periodYear, periodMonth),
     [periodYear, periodMonth],
-  );
-  /** Só exibe o subtítulo de período (ex.: "Abril de 2026") quando o filtro ≠ mês/ano calendário atuais. */
-  const showBillingPeriodSubtext = useMemo(() => {
-    if (periodYear === "all" || periodMonth === "all") return true;
-    if (typeof periodYear !== "number" || typeof periodMonth !== "number") return true;
-    const n = new Date();
-    return periodYear !== n.getFullYear() || periodMonth !== n.getMonth() + 1;
-  }, [periodYear, periodMonth]);
-  const isSelectedSingleFutureCalendarMonth = useMemo(() => {
-    if (typeof periodYear !== "number" || typeof periodMonth !== "number") return false;
-    return isStrictlyFutureCalendarMonthUTC(periodYear, periodMonth);
-  }, [periodYear, periodMonth]);
-  const planReferencePeriodMonthCount = useMemo(
-    () =>
-      getPlanReferencePeriodMonthCount(
-        detail?.addOnPaidByMonthCents,
-        periodYear,
-        periodMonth,
-        detail?.subscriptionCycleAnchorAtMs ?? null,
-        effectivePlan,
-      ),
-    [detail?.addOnPaidByMonthCents, detail?.subscriptionCycleAnchorAtMs, effectivePlan, periodYear, periodMonth],
-  );
-  const planReferenceForPeriodCents = useMemo(
-    () => planMonthlyReferenceCents * planReferencePeriodMonthCount,
-    [planMonthlyReferenceCents, planReferencePeriodMonthCount],
   );
   const addOnPaidInSelectedPeriodCents = useMemo(
     () => sumAddOnCentsForPeriod(detail?.addOnPaidByMonthCents, periodYear, periodMonth),
@@ -512,9 +376,6 @@ export default function UsuarioAdminDetailPage() {
     () => subscriptionPaidInSelectedPeriodCents + addOnPaidInSelectedPeriodCents,
     [subscriptionPaidInSelectedPeriodCents, addOnPaidInSelectedPeriodCents],
   );
-  const totalPaidInSelectedPeriodCents = useMemo(() => {
-    return Math.max(0, planReferenceForPeriodCents + addOnPaidInSelectedPeriodCents);
-  }, [addOnPaidInSelectedPeriodCents, planReferenceForPeriodCents]);
 
   const accountStatus = useMemo(() => computeAccountStatus(detail), [detail]);
 
@@ -523,6 +384,14 @@ export default function UsuarioAdminDetailPage() {
   const [invoicesError, setInvoicesError] = useState<string | null>(null);
   const [stripePortalBusy, setStripePortalBusy] = useState(false);
   const [stripePortalError, setStripePortalError] = useState<string | null>(null);
+
+  const [refundTarget, setRefundTarget] = useState<StoredStripeInvoice | null>(null);
+  const [refundAmountReais, setRefundAmountReais] = useState<string>("");
+  const [refundReason, setRefundReason] = useState<
+    "requested_by_customer" | "duplicate" | "fraudulent" | "none"
+  >("requested_by_customer");
+  const [refundBusy, setRefundBusy] = useState(false);
+  const [refundError, setRefundError] = useState<string | null>(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -586,46 +455,108 @@ export default function UsuarioAdminDetailPage() {
     }
   }, [user, uid]);
 
+  const loadInvoices = useCallback(async () => {
+    if (!user || !uid) return;
+    setInvoicesLoading(true);
+    setInvoicesError(null);
+    try {
+      const idToken = await user.getIdToken();
+      const res = await fetch(`/api/admin-users/${encodeURIComponent(uid)}/invoices?limit=50`, {
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        invoices?: StoredStripeInvoice[];
+        error?: string;
+      };
+      if (!res.ok) {
+        setInvoices(null);
+        setInvoicesError(
+          typeof body.error === "string" ? body.error : "Não foi possível carregar faturas.",
+        );
+        return;
+      }
+      setInvoices(Array.isArray(body.invoices) ? body.invoices : []);
+    } catch {
+      setInvoices(null);
+      setInvoicesError("Erro de rede ao carregar faturas.");
+    } finally {
+      setInvoicesLoading(false);
+    }
+  }, [user, uid]);
+
   useEffect(() => {
     if (authLoading || !user || !isGeneralAdmin || !uid) return;
-    let cancelled = false;
-    void (async () => {
-      setInvoicesLoading(true);
-      setInvoicesError(null);
-      try {
-        const idToken = await user.getIdToken();
-        const res = await fetch(`/api/admin-users/${encodeURIComponent(uid)}/invoices?limit=50`, {
-          headers: { Authorization: `Bearer ${idToken}` },
-        });
-        const body = (await res.json().catch(() => ({}))) as {
-          invoices?: StoredStripeInvoice[];
-          error?: string;
-        };
-        if (!res.ok) {
-          if (!cancelled) {
-            setInvoices(null);
-            setInvoicesError(
-              typeof body.error === "string" ? body.error : "Não foi possível carregar faturas.",
-            );
-          }
-          return;
-        }
-        if (!cancelled) {
-          setInvoices(Array.isArray(body.invoices) ? body.invoices : []);
-        }
-      } catch {
-        if (!cancelled) {
-          setInvoices(null);
-          setInvoicesError("Erro de rede ao carregar faturas.");
-        }
-      } finally {
-        if (!cancelled) setInvoicesLoading(false);
+    void loadInvoices();
+  }, [authLoading, user, isGeneralAdmin, uid, loadInvoices]);
+
+  const openRefundDialog = useCallback((inv: StoredStripeInvoice) => {
+    const paid = typeof inv.amountPaidCents === "number" ? inv.amountPaidCents : 0;
+    const refunded = typeof inv.refundedCents === "number" ? inv.refundedCents : 0;
+    const remaining = Math.max(0, paid - refunded);
+    setRefundTarget(inv);
+    setRefundAmountReais((remaining / 100).toFixed(2).replace(".", ","));
+    setRefundReason("requested_by_customer");
+    setRefundError(null);
+  }, []);
+
+  const closeRefundDialog = useCallback(() => {
+    if (refundBusy) return;
+    setRefundTarget(null);
+    setRefundError(null);
+  }, [refundBusy]);
+
+  const submitRefund = useCallback(async () => {
+    if (!user || !uid || !refundTarget) return;
+    const paid = typeof refundTarget.amountPaidCents === "number" ? refundTarget.amountPaidCents : 0;
+    const refundedSoFar =
+      typeof refundTarget.refundedCents === "number" ? refundTarget.refundedCents : 0;
+    const remaining = Math.max(0, paid - refundedSoFar);
+
+    const normalized = refundAmountReais.replace(/\s+/g, "").replace(",", ".");
+    const asFloat = Number(normalized);
+    if (!Number.isFinite(asFloat) || asFloat <= 0) {
+      setRefundError("Informe um valor válido em reais.");
+      return;
+    }
+    const amountCents = Math.round(asFloat * 100);
+    if (amountCents > remaining) {
+      setRefundError(
+        `Valor excede o disponível (${(remaining / 100).toFixed(2).replace(".", ",")}).`,
+      );
+      return;
+    }
+
+    setRefundBusy(true);
+    setRefundError(null);
+    try {
+      const idToken = await user.getIdToken();
+      const res = await fetch(
+        `/api/admin-users/${encodeURIComponent(uid)}/invoices/${encodeURIComponent(refundTarget.stripeInvoiceId)}/refund`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${idToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            amountCents,
+            ...(refundReason !== "none" ? { reason: refundReason } : {}),
+          }),
+        },
+      );
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setRefundError(typeof body.error === "string" ? body.error : "Falha ao estornar.");
+        return;
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [authLoading, user, isGeneralAdmin, uid]);
+      setRefundTarget(null);
+      await Promise.all([loadInvoices(), loadDetail()]);
+    } catch {
+      setRefundError("Erro de rede ao estornar.");
+    } finally {
+      setRefundBusy(false);
+    }
+  }, [user, uid, refundTarget, refundAmountReais, refundReason, loadInvoices, loadDetail]);
 
   useEffect(() => {
     if (authLoading || !user || !isGeneralAdmin || !userSeriesUrl) return;
@@ -852,27 +783,35 @@ export default function UsuarioAdminDetailPage() {
         <div className="grid items-stretch gap-6 lg:grid-cols-2">
           <Card className="h-full min-h-0 min-w-0 border-sidebar-border/80 dark:border-white/10">
             <CardHeader className="gap-2">
-              <Badge
-                variant={accountStatus.variant}
-                className={cn(
-                  "w-fit self-start text-xs font-medium",
-                  accountStatus.className,
-                )}
-              >
-                {accountStatus.icon === "alert" ? (
-                  <AlertTriangle className="mr-1 size-3" aria-hidden />
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Badge
+                  variant={accountStatus.variant}
+                  className={cn("text-xs font-medium", accountStatus.className)}
+                >
+                  {accountStatus.icon === "alert" ? (
+                    <AlertTriangle className="mr-1 size-3" aria-hidden />
+                  ) : null}
+                  {accountStatus.label}
+                </Badge>
+                {accountStatus.subBadge ? (
+                  <Badge
+                    variant="outline"
+                    className={cn("text-xs font-medium", accountStatus.subBadge.className)}
+                  >
+                    {accountStatus.subBadge.label}
+                  </Badge>
                 ) : null}
-                {accountStatus.label}
-              </Badge>
+              </div>
               {accountStatus.sub ? (
                 <p className="text-xs text-muted-foreground">{accountStatus.sub}</p>
               ) : null}
               {detail.autoSuspended ? (
-                <p className="flex items-start gap-1.5 rounded-md border border-destructive/30 bg-destructive/5 px-2 py-1.5 text-xs text-destructive">
+                <p className="flex items-start gap-1.5 rounded-md border border-amber-500/35 bg-amber-500/10 px-2 py-1.5 text-xs text-amber-900 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200">
                   <AlertTriangle className="mt-0.5 size-3 shrink-0" aria-hidden />
                   <span>
-                    Suspensão automática aplicada pelo webhook Stripe. Clique em{" "}
-                    <span className="font-semibold">Ativar conta</span> para sobrepor manualmente.
+                    Rebaixamento automático pelo webhook Stripe (pagamento não concluído). O utilizador
+                    mantém o login e passa a usar o plano Starter. O plano anterior é restaurado assim que
+                    a Stripe confirmar um pagamento.
                   </span>
                 </p>
               ) : null}
@@ -884,7 +823,7 @@ export default function UsuarioAdminDetailPage() {
                     {detail.lastPaymentFailureAtMs
                       ? ` em ${formatMsDateTimePt(detail.lastPaymentFailureAtMs)}`
                       : ""}
-                    . Stripe a tentar de novo — se desistir, a conta será suspensa automaticamente.
+                    . Stripe a tentar de novo — se desistir, a conta será rebaixada para Starter automaticamente.
                   </span>
                 </p>
               ) : null}
@@ -1032,67 +971,7 @@ export default function UsuarioAdminDetailPage() {
               <CardTitle className="font-heading text-lg">Plano e utilização</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 text-sm">
-              <dl className="grid gap-3">
-                <div className="flex w-full min-w-0 items-end gap-1.5">
-                  <dt className="min-w-0 text-muted-foreground">
-                    <span className="block">Valor do plano (referência no período)</span>
-                    {showBillingPeriodSubtext ? (
-                      <span className="text-xs text-muted-foreground/70">
-                        {billingPeriodLabel}
-                        {planReferencePeriodMonthCount === 0
-                          ? effectivePlan === "Starter"
-                            ? " · Plano sem mensalidade (referência)"
-                            : isSelectedSingleFutureCalendarMonth
-                              ? " · Mês calendário futuro (cobrança ainda não aplicável)"
-                              : detail?.subscriptionCycleAnchorAtMs != null
-                                ? " · Período anterior à 1.ª cobrança (sem referência de plano)"
-                                : " · —"
-                          : planReferencePeriodMonthCount > 1
-                            ? ` · ${planReferencePeriodMonthCount}× valor mensal atual`
-                            : " · 1 mês (valor mensal atual)"}
-                      </span>
-                    ) : null}
-                  </dt>
-                  <span
-                    className="min-w-2 flex-1 self-end border-b-2 border-dotted border-foreground/20 -translate-y-1.5"
-                    aria-hidden
-                  />
-                  <dd className="shrink-0 text-sm font-medium tabular-nums text-muted-foreground/85">
-                    {formatBrlFromCents(planReferenceForPeriodCents)}
-                  </dd>
-                </div>
-                <div className="flex w-full min-w-0 items-end gap-1.5">
-                  <dt className="min-w-0 text-muted-foreground">
-                    <span className="block">Pacotes adicionais</span>
-                    {showBillingPeriodSubtext ? (
-                      <span className="text-xs text-muted-foreground/70">{billingPeriodLabel}</span>
-                    ) : null}
-                  </dt>
-                  <span
-                    className="min-w-2 flex-1 self-end border-b-2 border-dotted border-foreground/20 -translate-y-1.5"
-                    aria-hidden
-                  />
-                  <dd className="shrink-0 text-sm font-medium tabular-nums text-muted-foreground/85">
-                    {formatBrlFromCents(addOnPaidInSelectedPeriodCents)}
-                  </dd>
-                </div>
-                <div className="flex w-full min-w-0 items-end gap-1.5">
-                  <dt className="min-w-0 text-muted-foreground">
-                    <span className="block">Total</span>
-                    {showBillingPeriodSubtext ? (
-                      <span className="text-xs text-muted-foreground/70">{billingPeriodLabel}</span>
-                    ) : null}
-                  </dt>
-                  <span
-                    className="min-w-2 flex-1 self-end border-b-2 border-dotted border-foreground/20 -translate-y-1.5"
-                    aria-hidden
-                  />
-                  <dd className="shrink-0 font-semibold tabular-nums text-foreground">
-                    {formatBrlFromCents(totalPaidInSelectedPeriodCents)}
-                  </dd>
-                </div>
-              </dl>
-              <dl className="grid gap-2.5 border-t border-border pt-3 dark:border-white/10">
+              <dl className="grid gap-2.5">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground/70">
                   Pago real (Stripe) · {billingPeriodLabel}
                 </p>
@@ -1273,7 +1152,8 @@ export default function UsuarioAdminDetailPage() {
                       <th className="py-2 pr-3 font-medium">Período</th>
                       <th className="py-2 pr-3 font-medium">Status</th>
                       <th className="py-2 pr-3 text-right font-medium">Valor</th>
-                      <th className="py-2 text-right font-medium">PDF</th>
+                      <th className="py-2 pr-3 text-right font-medium">PDF</th>
+                      <th className="py-2 text-right font-medium">Ações</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1332,22 +1212,37 @@ export default function UsuarioAdminDetailPage() {
                               : "—"}
                           </td>
                           <td className="py-2 pr-3">
-                            <Badge
-                              variant={
-                                inv.status === "paid"
-                                  ? "outline"
-                                  : inv.status === "open" || inv.status === "uncollectible"
-                                    ? "destructive"
-                                    : "secondary"
-                              }
-                              className={cn(
-                                "text-[10px] font-medium",
-                                inv.status === "paid" &&
-                                  "border-emerald-500/40 bg-emerald-500/10 text-emerald-800 dark:border-emerald-500/35 dark:bg-emerald-500/15 dark:text-emerald-300",
-                              )}
-                            >
-                              {statusLabel}
-                            </Badge>
+                            <div className="flex flex-wrap items-center gap-1">
+                              <Badge
+                                variant={
+                                  inv.status === "paid"
+                                    ? "outline"
+                                    : inv.status === "open" || inv.status === "uncollectible"
+                                      ? "destructive"
+                                      : "secondary"
+                                }
+                                className={cn(
+                                  "text-[10px] font-medium",
+                                  inv.status === "paid" &&
+                                    "border-emerald-500/40 bg-emerald-500/10 text-emerald-800 dark:border-emerald-500/35 dark:bg-emerald-500/15 dark:text-emerald-300",
+                                )}
+                              >
+                                {statusLabel}
+                              </Badge>
+                              {inv.refundStatus ? (
+                                <Badge
+                                  variant="outline"
+                                  className="border-amber-500/40 bg-amber-500/10 text-[10px] font-medium text-amber-800 dark:border-amber-400/35 dark:bg-amber-400/10 dark:text-amber-200"
+                                >
+                                  {inv.refundStatus === "refunded" ? "Estornada" : "Estorno parcial"}
+                                </Badge>
+                              ) : null}
+                            </div>
+                            {inv.refundedCents && inv.refundedCents > 0 ? (
+                              <span className="mt-1 block text-[10px] text-muted-foreground">
+                                Estornado: {formatBrlFromCents(inv.refundedCents)}
+                              </span>
+                            ) : null}
                             {inv.failureMessage ? (
                               <span className="mt-1 block text-[10px] text-destructive">
                                 {inv.failureMessage}
@@ -1357,7 +1252,7 @@ export default function UsuarioAdminDetailPage() {
                           <td className="py-2 pr-3 text-right font-medium tabular-nums">
                             {formatBrlFromCents(amountShownCents)}
                           </td>
-                          <td className="py-2 text-right">
+                          <td className="py-2 pr-3 text-right">
                             {inv.hostedInvoiceUrl || inv.invoicePdf ? (
                               <a
                                 href={inv.hostedInvoiceUrl ?? inv.invoicePdf ?? "#"}
@@ -1372,6 +1267,29 @@ export default function UsuarioAdminDetailPage() {
                               <span className="text-xs text-muted-foreground/60">—</span>
                             )}
                           </td>
+                          <td className="py-2 text-right">
+                            {(() => {
+                              const paid =
+                                typeof inv.amountPaidCents === "number" ? inv.amountPaidCents : 0;
+                              const refunded =
+                                typeof inv.refundedCents === "number" ? inv.refundedCents : 0;
+                              const remaining = Math.max(0, paid - refunded);
+                              if (inv.status !== "paid" || remaining <= 0) {
+                                return <span className="text-xs text-muted-foreground/60">—</span>;
+                              }
+                              return (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 text-xs"
+                                  onClick={() => openRefundDialog(inv)}
+                                >
+                                  <RotateCcw className="mr-1 size-3" aria-hidden />
+                                  Estornar
+                                </Button>
+                              );
+                            })()}
+                          </td>
                         </tr>
                       );
                     })}
@@ -1382,6 +1300,121 @@ export default function UsuarioAdminDetailPage() {
           </CardContent>
         </Card>
       ) : null}
+
+      <Dialog
+        open={refundTarget != null}
+        onOpenChange={(open) => {
+          if (!open) closeRefundDialog();
+        }}
+      >
+        <DialogContent className="sm:max-w-md" showCloseButton>
+          <DialogHeader>
+            <DialogTitle>Estornar pagamento Stripe</DialogTitle>
+            <DialogDescription>
+              {refundTarget ? (
+                <>
+                  Reembolsar{" "}
+                  <span className="font-mono text-xs">{refundTarget.stripeInvoiceId}</span>. O valor
+                  será devolvido ao cartão do cliente e descontado dos indicadores de receita.
+                </>
+              ) : null}
+            </DialogDescription>
+          </DialogHeader>
+          {refundTarget ? (
+            <div className="space-y-3 text-sm">
+              <div className="grid grid-cols-2 gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs dark:border-white/10 dark:bg-white/[0.03]">
+                <span className="text-muted-foreground">Valor pago</span>
+                <span className="text-right tabular-nums">
+                  {formatBrlFromCents(refundTarget.amountPaidCents)}
+                </span>
+                <span className="text-muted-foreground">Já estornado</span>
+                <span className="text-right tabular-nums">
+                  {formatBrlFromCents(refundTarget.refundedCents ?? 0)}
+                </span>
+                <span className="font-medium">Disponível para estorno</span>
+                <span className="text-right font-medium tabular-nums">
+                  {formatBrlFromCents(
+                    Math.max(
+                      0,
+                      (refundTarget.amountPaidCents ?? 0) - (refundTarget.refundedCents ?? 0),
+                    ),
+                  )}
+                </span>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="refund-amount">Valor a estornar (R$)</Label>
+                <Input
+                  id="refund-amount"
+                  inputMode="decimal"
+                  value={refundAmountReais}
+                  onChange={(e) => setRefundAmountReais(e.target.value)}
+                  disabled={refundBusy}
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Ex.: <span className="font-mono">0,50</span> para cinquenta centavos. Use o total
+                  para reembolso completo.
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="refund-reason">Motivo (Stripe)</Label>
+                <Select
+                  value={refundReason}
+                  onValueChange={(v) =>
+                    setRefundReason(v as typeof refundReason)
+                  }
+                  disabled={refundBusy}
+                >
+                  <SelectTrigger id="refund-reason">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="requested_by_customer">Pedido do cliente</SelectItem>
+                    <SelectItem value="duplicate">Cobrança duplicada</SelectItem>
+                    <SelectItem value="fraudulent">Transação fraudulenta</SelectItem>
+                    <SelectItem value="none">Sem motivo declarado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {refundError ? (
+                <p className="rounded-md border border-destructive/30 bg-destructive/5 px-2 py-1.5 text-xs text-destructive">
+                  {refundError}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+          <DialogFooter className="flex flex-col-reverse gap-2 border-0 bg-transparent p-0 sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={refundBusy}
+              onClick={closeRefundDialog}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="destructive"
+              className="gap-2"
+              disabled={refundBusy || !refundTarget}
+              onClick={() => void submitRefund()}
+            >
+              {refundBusy ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" aria-hidden />
+                  A processar…
+                </>
+              ) : (
+                <>
+                  <RotateCcw className="size-3" aria-hidden />
+                  Estornar
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={toggleDialogOpen} onOpenChange={setToggleDialogOpen}>
         <DialogContent className="sm:max-w-md" showCloseButton>

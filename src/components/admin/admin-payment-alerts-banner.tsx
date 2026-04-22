@@ -192,11 +192,11 @@ export function AdminPaymentAlertsBanner() {
             timestampKey="lastPaymentFailureAtMs"
           />
           <AlertList
-            title="Suspensas automaticamente"
-            description="Stripe marcou como unpaid/canceled/expired; login bloqueado."
-            tone="red"
+            title="Rebaixadas para Starter"
+            description="Stripe marcou unpaid/canceled/expired; plano rebaixado automaticamente. Login mantém-se."
+            tone="amber"
             entries={data.autoSuspended}
-            timestampLabel="suspensa em"
+            timestampLabel="rebaixada em"
             timestampKey="autoSuspendedAtMs"
           />
         </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { BadgeDollarSign, UserPlus, Wallet } from "lucide-react";
+import { BadgeDollarSign, UserPlus } from "lucide-react";
 
 import { PlatformStatAreaChart } from "@/components/admin/platform-stat-area-chart";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -111,13 +111,6 @@ function yMaxSignups(points: AdminSignupSeriesResponse["points"]): number {
   for (const p of points) m = Math.max(m, p.signups);
   if (m === 0) return 1;
   return Math.ceil(m * 1.08) || 1;
-}
-
-function yMaxReais(points: AdminSignupSeriesResponse["points"]): number {
-  let m = 0;
-  for (const p of points) m = Math.max(m, p.revenueCents / 100);
-  if (m === 0) return 1;
-  return Math.ceil(m * 100 * 1.12) / 100;
 }
 
 function yMaxRevenuePoints(points: AdminRevenueSeriesResponse["points"]): number {
@@ -235,14 +228,12 @@ export function AdminGrowthCharts({ queryString, disabled, className }: AdminGro
   }, [user, queryString, disabled]);
 
   const totals = useMemo(() => {
-    if (!data?.points?.length) return { signups: 0, reais: 0 };
+    if (!data?.points?.length) return { signups: 0 };
     let signups = 0;
-    let cents = 0;
     for (const p of data.points) {
       signups += p.signups;
-      cents += p.revenueCents;
     }
-    return { signups, reais: cents / 100 };
+    return { signups };
   }, [data]);
 
   const paidRevenueChartData = useMemo(() => {
@@ -277,17 +268,7 @@ export function AdminGrowthCharts({ queryString, disabled, className }: AdminGro
     }));
   }, [data]);
 
-  const revenueChartData = useMemo(() => {
-    if (!data?.points) return [];
-    return data.points.map((p, i) => ({
-      day: p.label,
-      value: p.revenueCents / 100,
-      dateLabel: pointDateLabel(data.granularity, data.year, data.month, p, i),
-    }));
-  }, [data]);
-
   const ySignups = data ? yMaxSignups(data.points) : 1;
-  const yReais = data ? yMaxReais(data.points) : 1;
 
   if (!user) return null;
 
@@ -320,11 +301,10 @@ export function AdminGrowthCharts({ queryString, disabled, className }: AdminGro
 
   const sub = periodSubtitle(data);
   const signupsAria = `Novos utilizadores: ${formatInt(totals.signups)} no período. ${sub}`;
-  const revenueAria = `Receita de referência: ${formatBrl(totals.reais)} no período. ${sub}`;
   const paidRevenueAria = `Receita paga (Stripe): ${formatBrl(paidRevenueTotalReais)} no período. ${sub}`;
 
   return (
-    <div className={cn("grid gap-6 md:grid-cols-2 xl:grid-cols-3", className)}>
+    <div className={cn("grid gap-6 md:grid-cols-2", className)}>
       <Card
         className={cn(
           "relative overflow-hidden rounded-t-2xl rounded-b-none border-sidebar-border/80 bg-card/80 shadow-sm ring-1 ring-foreground/[0.06] backdrop-blur-sm dark:border-white/10 dark:bg-zinc-950/45 dark:ring-white/[0.06]",
@@ -365,66 +345,6 @@ export function AdminGrowthCharts({ queryString, disabled, className }: AdminGro
                 yMax={ySignups}
                 ariaLabel={signupsAria}
                 valueLabel="Novos"
-              />
-            ) : (
-              <div className="flex h-[200px] items-center justify-center text-xs text-muted-foreground">
-                Sem pontos no período.
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card
-        className={cn(
-          "relative overflow-hidden rounded-t-2xl rounded-b-none border-sidebar-border/80 bg-card/80 shadow-sm ring-1 ring-foreground/[0.06] backdrop-blur-sm dark:border-white/10 dark:bg-zinc-950/45 dark:ring-white/[0.06]",
-          "before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-sidebar-primary/35 before:to-transparent dark:before:via-white/15",
-          loading && "opacity-[0.92]",
-        )}
-      >
-        <CardHeader className="relative z-[1] flex flex-row items-start gap-3 space-y-0 rounded-t-none border-b border-border/60 pb-3 dark:border-white/[0.07]">
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary/15 text-sidebar-primary dark:bg-white/10 dark:text-zinc-200">
-            <Wallet className="size-5" aria-hidden />
-          </div>
-          <div className="min-w-0 flex-1 space-y-1">
-            <CardTitle className="font-heading text-base font-semibold leading-snug tracking-tight text-foreground dark:text-zinc-50">
-              Receita (referência)
-            </CardTitle>
-            {sub ? (
-              <CardDescription className="text-xs leading-relaxed text-muted-foreground dark:text-zinc-500">
-                {sub}
-              </CardDescription>
-            ) : null}
-          </div>
-          <div className="flex shrink-0 flex-col items-end gap-0.5 text-right">
-            <span className="font-heading text-2xl font-bold tabular-nums tracking-tight text-right text-foreground dark:text-white sm:text-3xl">
-              {formatBrl(totals.reais)}
-            </span>
-            <span className="text-[11px] font-medium uppercase leading-tight tracking-wider text-muted-foreground dark:text-zinc-500">
-              Soma no período
-            </span>
-          </div>
-        </CardHeader>
-        <CardContent className="relative z-[1] space-y-2 pt-3">
-          <p className="text-[11px] leading-snug text-muted-foreground">
-            Soma de <span className="font-medium text-foreground/80">planPriceCents</span> /{" "}
-            <span className="font-medium text-foreground/80">subscriptionPriceCents</span> em{" "}
-            <span className="font-medium text-foreground/80">userSettings</span> só das contas criadas em cada
-            intervalo. Indicativo — para cash-in real, vê “Receita paga (Stripe)”.
-          </p>
-          <div className="rounded-t-xl rounded-b-none border border-border/50 bg-muted/30 px-1 pt-2 pb-0 dark:border-white/[0.06] dark:bg-zinc-900/40">
-            {revenueChartData.length ? (
-              <PlatformStatAreaChart
-                data={revenueChartData}
-                color={GROWTH_CHART_SERIES_COLOR}
-                yMax={yReais}
-                ariaLabel={revenueAria}
-                valueLabel="Valor"
-                yAllowDecimals
-                yTickFormatter={(v) =>
-                  v.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: v >= 100 ? 0 : 2 })
-                }
-                tooltipValueFormatter={(v) => formatBrl(v)}
               />
             ) : (
               <div className="flex h-[200px] items-center justify-center text-xs text-muted-foreground">

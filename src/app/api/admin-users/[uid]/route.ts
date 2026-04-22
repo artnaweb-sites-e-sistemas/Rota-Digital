@@ -93,6 +93,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
             autoSuspended: false,
             autoSuspendedReason: null,
             autoSuspendedAtMs: null,
+            autoSuspendedPlanSnapshot: null,
             adminDisabledAtMs: disabled ? Date.now() : null,
           },
           { merge: true },
@@ -136,6 +137,10 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
           leadCaptureMonthlyLimit: PLAN_LEADS_MONTHLY_LIMIT[planKey],
           planMasterUnlimited: planKey === "master" ? true : false,
           subscriptionCycleAnchorAt: Date.now(),
+          autoSuspended: false,
+          autoSuspendedReason: null,
+          autoSuspendedAtMs: null,
+          autoSuspendedPlanSnapshot: null,
         },
         { merge: true },
       );

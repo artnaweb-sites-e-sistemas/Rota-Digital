@@ -10,6 +10,7 @@ import {
   recordStripeInvoicePaid,
   recordStripeInvoicePaymentFailed,
 } from "@/lib/stripe-record-invoice";
+import { recordStripeChargeRefunded } from "@/lib/stripe-record-refund";
 import { getStripe } from "@/lib/stripe-server";
 import { syncStripeSubscriptionState } from "@/lib/stripe-sync-subscription";
 
@@ -72,6 +73,32 @@ export async function POST(req: NextRequest) {
       case "invoice.payment_failed": {
         const invoice = event.data.object as Stripe.Invoice;
         await recordStripeInvoicePaymentFailed(invoice, event.id ?? null);
+        break;
+      }
+      case "charge.refunded":
+      case "charge.refund.updated": {
+        /**
+         * `charge.refunded` dispara quando um refund é criado/aplicado sobre um Charge.
+         * `charge.refund.updated` cobre transições (ex: pending → succeeded).
+         * Em ambos re-obtemos o Charge com `refunds` expandidos para garantir o estado completo.
+         */
+        let chargeId: string | null = null;
+        if (event.type === "charge.refunded") {
+          const c = event.data.object as Stripe.Charge;
+          chargeId = c.id ?? null;
+        } else {
+          const refund = event.data.object as Stripe.Refund;
+          chargeId =
+            typeof refund.charge === "string" ? refund.charge : refund.charge?.id ?? null;
+        }
+        if (chargeId) {
+          try {
+            const charge = await stripe.charges.retrieve(chargeId, { expand: ["refunds"] });
+            await recordStripeChargeRefunded(charge, event.id ?? null);
+          } catch (e) {
+            console.error("[stripe webhook] charge refund retrieve", e);
+          }
+        }
         break;
       }
       default:

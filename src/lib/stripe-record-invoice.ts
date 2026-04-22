@@ -27,17 +27,24 @@ function monthKeyUtcFromMs(ms: number | null | undefined): string {
 
 /**
  * Resolve o `uid` do utilizador a partir da fatura:
- * 1) `invoice.subscription_details?.metadata?.uid` (Stripe API >= 2024)
- * 2) `invoice.metadata?.uid`
- * 3) Lookup em `userSettings` via `stripeCustomerId`.
+ * 1) `invoice.parent.subscription_details.metadata.uid` (API ≥ 2025)
+ * 2) `invoice.subscription_details.metadata.uid` (API ≤ 2024)
+ * 3) `invoice.metadata.uid`
+ * 4) Lookup em `userSettings` via `stripeCustomerId`.
  */
 async function resolveUidForInvoice(
   db: Firestore,
   invoice: Stripe.Invoice,
 ): Promise<string | null> {
+  const asUnknown = invoice as unknown as {
+    parent?: {
+      subscription_details?: { metadata?: Record<string, string> | null } | null;
+    } | null;
+    subscription_details?: { metadata?: Record<string, string> | null } | null;
+  };
   const metaUid =
-    (invoice as unknown as { subscription_details?: { metadata?: Record<string, string> } })
-      .subscription_details?.metadata?.uid ??
+    asUnknown.parent?.subscription_details?.metadata?.uid ??
+    asUnknown.subscription_details?.metadata?.uid ??
     invoice.metadata?.uid ??
     null;
   if (typeof metaUid === "string" && metaUid.trim()) return metaUid.trim();
@@ -53,29 +60,91 @@ async function resolveUidForInvoice(
   return snap.docs[0]!.id;
 }
 
-function mapLineKind(line: Stripe.InvoiceLineItem): StoredStripeInvoiceLineKind {
-  /**
-   * `type` saiu da tipagem oficial em versões recentes do SDK, mas ainda é devolvido pela API.
-   * Fazemos acesso dinâmico + heurística: linhas com `subscription`/`subscription_item` → "subscription".
-   */
+/**
+ * Extrai o `subscriptionId` da fatura, cobrindo ambas as formas da API:
+ *  - API ≥ 2025: `invoice.parent.subscription_details.subscription`
+ *  - API ≤ 2024: `invoice.subscription`
+ */
+function extractSubscriptionIdFromInvoice(invoice: Stripe.Invoice): string | null {
+  const asUnknown = invoice as unknown as {
+    parent?: {
+      subscription_details?: { subscription?: string | { id: string } | null } | null;
+    } | null;
+    subscription?: string | { id: string } | null;
+  };
+  return (
+    stripeResourceId(asUnknown.parent?.subscription_details?.subscription ?? null) ??
+    stripeResourceId(asUnknown.subscription ?? null)
+  );
+}
+
+/**
+ * Versões diferentes da API Stripe expõem a categoria das linhas em sítios diferentes.
+ * Tentamos, por ordem:
+ *  1. `line.parent.type === "subscription_item_details"` (API 2025+)
+ *  2. `line.type === "subscription"` (API ≤ 2024)
+ *  3. `line.subscription` / `line.subscription_item` presentes
+ *  4. `line.pricing.price_details.price` recorrente OR `line.price.type === "recurring"`
+ *  5. Fallback para `invoice.billing_reason` (sub → subscription, manual/invoice → add_on)
+ */
+function mapLineKind(
+  line: Stripe.InvoiceLineItem,
+  invoiceBillingReason: string | null | undefined,
+): StoredStripeInvoiceLineKind {
   const asUnknown = line as unknown as {
     type?: "subscription" | "invoiceitem" | null;
     subscription?: string | { id: string } | null;
     subscription_item?: string | { id: string } | null;
+    parent?: {
+      type?: "subscription_item_details" | "invoice_item_details" | string | null;
+      subscription_item_details?: {
+        subscription?: string | null;
+        subscription_item?: string | null;
+      } | null;
+    } | null;
     price?: { type?: "recurring" | "one_time" | null; recurring?: unknown } | null;
+    pricing?: {
+      type?: "one_time" | "recurring" | null;
+      price_details?: { price?: string | null } | null;
+    } | null;
   };
+
+  if (asUnknown.parent?.type === "subscription_item_details") return "subscription";
+  if (asUnknown.parent?.type === "invoice_item_details") return "add_on";
+  if (asUnknown.parent?.subscription_item_details?.subscription) return "subscription";
   if (asUnknown.type === "subscription") return "subscription";
   if (asUnknown.type === "invoiceitem") return "add_on";
   if (asUnknown.subscription || asUnknown.subscription_item) return "subscription";
+  if (asUnknown.pricing?.type === "recurring") return "subscription";
+  if (asUnknown.pricing?.type === "one_time") return "add_on";
   if (asUnknown.price?.type === "recurring") return "subscription";
   if (asUnknown.price?.type === "one_time") return "add_on";
+
+  /** Último recurso: usa o motivo da fatura. */
+  if (invoiceBillingReason) {
+    const r = invoiceBillingReason.toLowerCase();
+    if (
+      r === "subscription" ||
+      r === "subscription_create" ||
+      r === "subscription_cycle" ||
+      r === "subscription_update" ||
+      r === "subscription_threshold" ||
+      r === "upcoming"
+    ) {
+      return "subscription";
+    }
+    if (r === "manual" || r === "invoiceitem" || r === "invoice_item") {
+      return "add_on";
+    }
+  }
   return "other";
 }
 
 function mapLines(invoice: Stripe.Invoice): StoredStripeInvoiceLine[] {
   const data = invoice.lines?.data ?? [];
+  const billingReason = invoice.billing_reason ?? null;
   return data.map((l) => ({
-    kind: mapLineKind(l),
+    kind: mapLineKind(l, billingReason),
     description: l.description ?? null,
     amountCents: typeof l.amount === "number" ? l.amount : 0,
     currency: l.currency ?? invoice.currency ?? "brl",
@@ -95,9 +164,7 @@ function buildStoredInvoice(
     uid,
     stripeInvoiceId: invoice.id ?? "",
     stripeCustomerId: stripeResourceId(invoice.customer),
-    stripeSubscriptionId: stripeResourceId(
-      (invoice as unknown as { subscription?: string | { id: string } | null }).subscription ?? null,
-    ),
+    stripeSubscriptionId: extractSubscriptionIdFromInvoice(invoice),
     status: invoice.status ?? "",
     amountPaidCents: typeof invoice.amount_paid === "number" ? invoice.amount_paid : 0,
     amountDueCents: typeof invoice.amount_due === "number" ? invoice.amount_due : 0,

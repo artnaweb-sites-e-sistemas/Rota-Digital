@@ -12,6 +12,19 @@ export type StoredStripeInvoiceLine = {
   periodEndMs: number | null;
 };
 
+/** Registo de um reembolso aplicado sobre a fatura. */
+export type StoredStripeInvoiceRefund = {
+  stripeRefundId: string;
+  stripeChargeId: string | null;
+  amountCents: number;
+  /** `charge.refunds.reason`: `duplicate | fraudulent | requested_by_customer | ...` | null. */
+  reason: string | null;
+  createdAtMs: number;
+};
+
+/** Estado agregado de refund de uma fatura. */
+export type StoredStripeInvoiceRefundStatus = "partial" | "refunded";
+
 /** Documento persistido em `stripeInvoices/{invoiceId}` após webhook Stripe. */
 export type StoredStripeInvoice = {
   uid: string | null;
@@ -46,4 +59,12 @@ export type StoredStripeInvoice = {
   rawEventId: string | null;
   /** Timestamp de servidor Firestore (quando gravámos este documento). */
   webhookReceivedAt: Timestamp;
+  /** Total estornado para esta fatura (monotónico). Ausente / 0 em faturas sem reembolso. */
+  refundedCents?: number;
+  /** Timestamp do último reembolso aplicado. */
+  refundedAtMs?: number | null;
+  /** `"partial"` se `refundedCents < amountPaidCents`, `"refunded"` se total. */
+  refundStatus?: StoredStripeInvoiceRefundStatus | null;
+  /** Histórico de reembolsos processados — idempotente por `stripeRefundId`. */
+  refunds?: StoredStripeInvoiceRefund[];
 };

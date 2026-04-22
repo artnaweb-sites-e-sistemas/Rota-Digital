@@ -98,8 +98,11 @@ function emptyAggregate(): InvoiceAggregate {
 function accumulate(agg: InvoiceAggregate, inv: StoredStripeInvoice): void {
   const paid = typeof inv.amountPaidCents === "number" ? inv.amountPaidCents : 0;
   if (paid <= 0) return;
-  const { subscriptionCents, addOnCents } = splitAmountPaid(paid, inv.lines);
-  agg.amountPaidCents += paid;
+  const refunded = typeof inv.refundedCents === "number" ? inv.refundedCents : 0;
+  const net = Math.max(0, paid - refunded);
+  if (net <= 0) return;
+  const { subscriptionCents, addOnCents } = splitAmountPaid(net, inv.lines);
+  agg.amountPaidCents += net;
   agg.subscriptionCents += subscriptionCents;
   agg.addOnCents += addOnCents;
   agg.invoicesCount += 1;
