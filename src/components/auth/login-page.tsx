@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { signInWithEmailAndPassword } from "firebase/auth";
@@ -42,12 +42,20 @@ function GoogleGlyph({ className }: { className?: string }) {
 export function LoginPage({
   passwordResetSuccess = false,
   redirectTo = null,
+  prefillEmail = null,
 }: {
   passwordResetSuccess?: boolean;
   /** Caminho interno após login (ex.: `/assinatura?plan=pro&cycle=monthly`). */
   redirectTo?: string | null;
+  /** Preenchido a partir de `?email=` (ex.: vindo do cadastro quando o e-mail já existe). */
+  prefillEmail?: string | null;
 } = {}) {
   const [email, setEmail] = useState("");
+
+  useEffect(() => {
+    const t = prefillEmail?.trim();
+    if (t) setEmail(t);
+  }, [prefillEmail]);
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -183,7 +191,7 @@ export function LoginPage({
               </div>
             </div>
 
-            <header className="mb-8 space-y-2 text-center lg:text-left">
+            <header className="mb-8 space-y-2 text-center lg:hidden">
               <h2 className="text-2xl font-bold tracking-tight text-foreground">Login</h2>
               <p className="text-[0.9375rem] leading-relaxed text-muted-foreground">
                 Acesse a plataforma para visualizar os leads e as rotas

@@ -24,6 +24,21 @@ function isValidReason(v: unknown): v is RefundRequestBody["reason"] {
   );
 }
 
+/** Converte a mensagem crua da API Stripe (EN) em texto útil em PT. */
+function stripeErrorToUserMessage(raw: string): string {
+  const t = raw.toLowerCase();
+  if (
+    t.includes("test mode") &&
+    (t.includes("live mode") || t.includes("similar object exists in live") || t.includes("live key"))
+  ) {
+    return "A chave STRIPE_SECRET_KEY deste servidor está em ambiente de teste, mas esta fatura/cobrança é de produção (ou o contrário). O estorno tem de ser pedido com a mesma chave (sk_test… ou sk_live…) que originou o pagamento. No painel de deploy (ex.: Vercel), ajusta STRIPE_SECRET_KEY e STRIPE_WEBHOOK_SECRET para o ambiente correcto e volta a tentar.";
+  }
+  if (t.includes("live mode") && t.includes("test key") && t.includes("similar object")) {
+    return "A fatura existe em produção na Stripe, mas a API usou chave de teste. Coloca a chave live (sk_live…) em STRIPE_SECRET_KEY no ambiente do servidor e tenta de novo.";
+  }
+  return raw;
+}
+
 /**
  * Reembolso (parcial ou total) de uma fatura Stripe, iniciado pelo admin.
  *
@@ -119,7 +134,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Fatura inacessível na Stripe.";
-    return NextResponse.json({ error: msg }, { status: 502 });
+    return NextResponse.json({ error: stripeErrorToUserMessage(msg) }, { status: 502 });
   }
 
   let chargeId: string | null = null;
@@ -174,7 +189,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Falha ao criar reembolso na Stripe.";
     console.error("[admin refund]", e);
-    return NextResponse.json({ error: msg }, { status: 502 });
+    return NextResponse.json({ error: stripeErrorToUserMessage(msg) }, { status: 502 });
   }
 
   /** Reconcilia já: busca o charge actualizado com a lista de refunds e grava. */

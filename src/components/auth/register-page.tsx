@@ -4,10 +4,18 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
-import { ArrowLeft, Eye, EyeOff, Heart, Loader2, ShieldCheck, UserPlus } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Heart, Loader2, Mail, ShieldCheck, UserPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { auth, isFirebaseAuthConfigured } from "@/lib/firebase";
@@ -39,11 +47,15 @@ function GoogleGlyph({ className }: { className?: string }) {
   );
 }
 
+function getFirebaseAuthErrorCode(err: unknown): string {
+  if (typeof err === "object" && err !== null && "code" in err) {
+    return String((err as { code?: string }).code ?? "");
+  }
+  return "";
+}
+
 function firebaseSignupErrorMessage(err: unknown): string {
-  const code =
-    typeof err === "object" && err !== null && "code" in err
-      ? String((err as { code?: string }).code)
-      : "";
+  const code = getFirebaseAuthErrorCode(err);
   if (code === "auth/invalid-api-key") {
     return "Chave da API Firebase invalida. Revise NEXT_PUBLIC_FIREBASE_API_KEY na Vercel.";
   }
@@ -73,12 +85,24 @@ export function RegisterPage({
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [emailAlreadyInUseOpen, setEmailAlreadyInUseOpen] = useState(false);
   const router = useRouter();
 
+  const safeRedirect = safeInternalPath(redirectTo);
+
   const loginHref =
-    safeInternalPath(redirectTo) != null
-      ? `/login?redirect=${encodeURIComponent(safeInternalPath(redirectTo)!)}`
+    safeRedirect != null
+      ? `/login?redirect=${encodeURIComponent(safeRedirect)}`
       : "/login";
+
+  const getLoginWithPrefillHref = () => {
+    const params = new URLSearchParams();
+    const e = email.trim();
+    if (e) params.set("email", e);
+    if (safeRedirect) params.set("redirect", safeRedirect);
+    const q = params.toString();
+    return q ? `/login?${q}` : "/login";
+  };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -110,7 +134,12 @@ export function RegisterPage({
       const next = safeInternalPath(redirectTo);
       router.push(next ?? "/dashboard");
     } catch (err: unknown) {
-      setError(firebaseSignupErrorMessage(err));
+      if (getFirebaseAuthErrorCode(err) === "auth/email-already-in-use") {
+        setEmailAlreadyInUseOpen(true);
+        setError(null);
+      } else {
+        setError(firebaseSignupErrorMessage(err));
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -118,6 +147,57 @@ export function RegisterPage({
 
   return (
     <div className="flex min-h-svh w-full flex-col bg-background p-[max(1rem,min(3vw,2.75rem))] text-foreground sm:p-[max(1.25rem,min(3.5vw,3rem))]">
+      <Dialog
+        open={emailAlreadyInUseOpen}
+        onOpenChange={(open) => {
+          setEmailAlreadyInUseOpen(open);
+        }}
+      >
+        <DialogContent className="max-w-[calc(100%-2.5rem)] gap-0 overflow-hidden p-0 sm:max-w-md">
+          <div className="bg-gradient-to-br from-brand/18 via-background to-background px-6 pt-7 pb-6 pr-14 dark:from-brand/12 sm:px-8 sm:pt-8 sm:pb-7">
+            <div className="mb-5 flex size-14 items-center justify-center rounded-2xl border border-brand/20 bg-background/80 shadow-sm dark:bg-background/60 sm:mb-6">
+              <Mail className="size-7 text-brand" strokeWidth={2} aria-hidden />
+            </div>
+            <DialogHeader className="space-y-3 text-left sm:space-y-3.5">
+              <DialogTitle className="font-heading text-xl font-semibold tracking-tight text-foreground sm:text-[1.4rem]">
+                E-mail já cadastrado
+              </DialogTitle>
+              <DialogDescription className="text-[0.9375rem] leading-[1.55] text-muted-foreground [text-wrap:pretty] sm:text-base sm:leading-[1.6]">
+                {email.trim() ? (
+                  <>
+                    Já existe uma conta com{" "}
+                    <span className="font-medium text-foreground">{email.trim()}</span>. Deseja ir para o login e
+                    entrar com este e-mail?
+                  </>
+                ) : (
+                  "Já existe uma conta com este e-mail. Deseja ir para a página de login?"
+                )}
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+          <DialogFooter className="mx-0 mb-0 flex flex-col gap-3 border-t border-border/50 bg-muted/25 px-6 py-5 sm:flex-row sm:justify-end sm:gap-3 sm:px-8 sm:py-6">
+            <Button
+              type="button"
+              variant="outline"
+              className="h-12 w-full shrink-0 rounded-xl border-border bg-background sm:h-11 sm:w-auto sm:min-w-[9.5rem] sm:px-5"
+              onClick={() => setEmailAlreadyInUseOpen(false)}
+            >
+              Continuar no cadastro
+            </Button>
+            <Button
+              type="button"
+              className="h-12 w-full shrink-0 rounded-xl bg-foreground text-[0.9375rem] font-semibold text-background shadow-sm hover:bg-foreground/90 sm:h-11 sm:min-w-[10.5rem] sm:px-6"
+              onClick={() => {
+                setEmailAlreadyInUseOpen(false);
+                router.push(getLoginWithPrefillHref());
+              }}
+            >
+              Ir para login
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="mx-auto flex min-h-0 w-full max-w-[1450px] flex-1 flex-col">
         <div className="flex min-h-0 w-full flex-1 flex-col lg:flex-row lg:gap-x-3">
           <aside
@@ -209,7 +289,7 @@ export function RegisterPage({
                   </div>
                 </div>
 
-                <header className="mb-8 space-y-2 text-center lg:text-left">
+                <header className="mb-8 space-y-2 text-center lg:hidden">
                   <h2 className="text-2xl font-bold tracking-tight text-foreground">Cadastro</h2>
                   <p className="text-[0.9375rem] leading-relaxed text-muted-foreground">
                     Preencha os dados para começar a usar a plataforma

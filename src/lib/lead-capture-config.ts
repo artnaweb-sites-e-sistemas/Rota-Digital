@@ -15,7 +15,8 @@ export const LEAD_CAPTURE_MONTHLY_LIMIT_BY_PLAN = {
 export type LeadCapturePlanKey = keyof typeof LEAD_CAPTURE_MONTHLY_LIMIT_BY_PLAN;
 
 export const LEAD_CAPTURE_ADD_ON_PACKS = [
-  { id: "basic", label: "Básico", leads: 50, price: 37 },
+  /** Temporário: R$ 0,50 para teste em produção (repor price real depois). */
+  { id: "basic", label: "Básico", leads: 50, price: 0.5 },
   { id: "pro", label: "Pro", leads: 100, price: 67 },
   { id: "max", label: "Max", leads: 200, price: 127 },
 ] as const;

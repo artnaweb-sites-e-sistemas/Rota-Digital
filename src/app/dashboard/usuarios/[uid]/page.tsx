@@ -116,6 +116,16 @@ function mapAutoSuspendedReasonPt(reason: string | null | undefined): string {
   }
 }
 
+const STRIPE_REFUND_REASON_LABEL: Record<
+  "requested_by_customer" | "duplicate" | "fraudulent" | "none",
+  string
+> = {
+  requested_by_customer: "Pedido do cliente",
+  duplicate: "Cobrança duplicada",
+  fraudulent: "Transação fraudulenta",
+  none: "Sem motivo declarado",
+};
+
 function subscriptionStatusLabelPt(status: AdminUserSubscriptionStatus | undefined): string {
   switch (status) {
     case "active":
@@ -1307,22 +1317,32 @@ export default function UsuarioAdminDetailPage() {
           if (!open) closeRefundDialog();
         }}
       >
-        <DialogContent className="sm:max-w-md" showCloseButton>
-          <DialogHeader>
+        <DialogContent
+          className="gap-3 p-4 pt-3 pb-7 sm:max-w-md sm:gap-3 sm:px-6 sm:pt-4 sm:pb-8"
+          showCloseButton
+        >
+          <DialogHeader className="gap-2 space-y-0 text-left sm:gap-2.5">
             <DialogTitle>Estornar pagamento Stripe</DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="space-y-2.5 text-sm leading-relaxed text-muted-foreground">
               {refundTarget ? (
                 <>
-                  Reembolsar{" "}
-                  <span className="font-mono text-xs">{refundTarget.stripeInvoiceId}</span>. O valor
-                  será devolvido ao cartão do cliente e descontado dos indicadores de receita.
+                  <span className="block text-foreground/90">
+                    O valor devolvido volta para o cartão do cliente e deixa de contar nos
+                    indicadores de receita do painel.
+                  </span>
+                  <span className="block text-xs leading-normal text-muted-foreground/90">
+                    Referência da fatura:{" "}
+                    <span className="break-all text-foreground/80">
+                      {refundTarget.stripeInvoiceId}
+                    </span>
+                  </span>
                 </>
               ) : null}
             </DialogDescription>
           </DialogHeader>
           {refundTarget ? (
-            <div className="space-y-3 text-sm">
-              <div className="grid grid-cols-2 gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs dark:border-white/10 dark:bg-white/[0.03]">
+            <div className="space-y-5 text-sm">
+              <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 rounded-lg border border-border bg-muted/40 px-4 py-3.5 text-xs dark:border-white/10 dark:bg-white/[0.03]">
                 <span className="text-muted-foreground">Valor pago</span>
                 <span className="text-right tabular-nums">
                   {formatBrlFromCents(refundTarget.amountPaidCents)}
@@ -1341,31 +1361,36 @@ export default function UsuarioAdminDetailPage() {
                   )}
                 </span>
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="refund-amount">Valor a estornar (R$)</Label>
+              <div className="space-y-2">
+                <Label htmlFor="refund-amount" className="text-foreground">
+                  Valor a estornar (R$)
+                </Label>
                 <Input
                   id="refund-amount"
                   inputMode="decimal"
                   value={refundAmountReais}
                   onChange={(e) => setRefundAmountReais(e.target.value)}
                   disabled={refundBusy}
+                  className="h-10"
                 />
-                <p className="text-[11px] text-muted-foreground">
-                  Ex.: <span className="font-mono">0,50</span> para cinquenta centavos. Use o total
-                  para reembolso completo.
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                  Exemplo: 0,50 para cinquenta centavos. Para reembolsar tudo, deixa o valor igual ao
+                  disponível acima.
                 </p>
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="refund-reason">Motivo (Stripe)</Label>
+              <div className="space-y-2 pt-0.5">
+                <Label htmlFor="refund-reason" className="text-foreground">
+                  Motivo do reembolso
+                </Label>
                 <Select
                   value={refundReason}
-                  onValueChange={(v) =>
-                    setRefundReason(v as typeof refundReason)
-                  }
+                  onValueChange={(v) => setRefundReason(v as typeof refundReason)}
                   disabled={refundBusy}
                 >
-                  <SelectTrigger id="refund-reason">
-                    <SelectValue />
+                  <SelectTrigger id="refund-reason" className="w-full min-w-0" size="default">
+                    <SelectValue>
+                      {STRIPE_REFUND_REASON_LABEL[refundReason]}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="requested_by_customer">Pedido do cliente</SelectItem>
@@ -1376,13 +1401,13 @@ export default function UsuarioAdminDetailPage() {
                 </Select>
               </div>
               {refundError ? (
-                <p className="rounded-md border border-destructive/30 bg-destructive/5 px-2 py-1.5 text-xs text-destructive">
+                <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs leading-relaxed text-destructive">
                   {refundError}
                 </p>
               ) : null}
             </div>
           ) : null}
-          <DialogFooter className="flex flex-col-reverse gap-2 border-0 bg-transparent p-0 sm:flex-row sm:justify-end">
+          <DialogFooter className="flex flex-col-reverse gap-2 border-0 bg-transparent p-0 sm:flex-row sm:justify-end sm:gap-2">
             <Button
               type="button"
               variant="outline"
