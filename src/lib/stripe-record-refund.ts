@@ -75,11 +75,17 @@ type RecordRefundResult = {
  * Tem de ser chamado com um `charge` que tenha `invoice` (string ou expandido) e `refunds` expandidos
  * (o que o webhook `charge.refunded` já entrega).
  */
+function invoiceIdFromCharge(charge: Stripe.Charge): string | null {
+  /** API Stripe ainda retorna `invoice` em muitos Charges; a tipagem do SDK às vezes omite. */
+  const asUnknown = charge as unknown as { invoice?: string | { id: string } | null };
+  return stripeResourceId(asUnknown.invoice);
+}
+
 export async function recordStripeChargeRefunded(
   charge: Stripe.Charge,
   rawEventId: string | null,
 ): Promise<RecordRefundResult> {
-  const invoiceId = stripeResourceId(charge.invoice);
+  const invoiceId = invoiceIdFromCharge(charge);
   if (!invoiceId) {
     return { processed: false, alreadyProcessed: false, uid: null, deltaCents: 0, invoiceId: null };
   }
