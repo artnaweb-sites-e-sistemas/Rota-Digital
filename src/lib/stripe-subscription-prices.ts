@@ -5,7 +5,7 @@ export type StripeSubscriptionPlanKey = "pro" | "agency";
 
 export type StripeSubscriptionBillingCycle = "monthly" | "yearly";
 
-const PRO_MONTHLY_DEFAULT_CENTS = 12_700;
+const PRO_MONTHLY_DEFAULT_CENTS = 50;
 const PRO_YEARLY_DEFAULT_CENTS = 9_700;
 
 /**
@@ -67,7 +67,7 @@ export function subscriptionLineAmountCents(
       if (o != null) {
         return { unitAmount: o, interval: "month", label: "Plano Pro (mensal)" };
       }
-      return { unitAmount: 127 * 100, interval: "month", label: "Plano Pro (mensal)" };
+      return { unitAmount: 50, interval: "month", label: "Plano Pro (mensal)" };
     }
     return { unitAmount: 347 * 100, interval: "month", label: "Plano Agency (mensal)" };
   }
