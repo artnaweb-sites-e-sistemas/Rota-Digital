@@ -32,15 +32,13 @@ export type QuotaResource = "rotas" | "leads" | "propostas";
  * Preços ligeiramente mais altos para manter margem e incentivar upgrade.
  */
 export const ROTAS_ADD_ON_PACKS = [
-  /** Temporário: R$ 0,50 para teste em produção (repor price real depois). */
-  { id: "basic", label: "Básico", rotas: 5, price: 0.5 },
+  { id: "basic", label: "Básico", rotas: 5, price: 57 },
   { id: "pro", label: "Pro", rotas: 15, price: 147 },
   { id: "max", label: "Max", rotas: 30, price: 247 },
 ] as const;
 
 export const PROPOSALS_ADD_ON_PACKS = [
-  /** Temporário: R$ 0,50 para teste em produção (repor price real depois). */
-  { id: "basic", label: "Básico", proposals: 10, price: 0.5 },
+  { id: "basic", label: "Básico", proposals: 10, price: 47 },
   { id: "pro", label: "Pro", proposals: 25, price: 97 },
   { id: "max", label: "Max", proposals: 60, price: 177 },
 ] as const;

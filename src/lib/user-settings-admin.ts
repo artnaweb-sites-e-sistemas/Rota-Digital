@@ -37,6 +37,7 @@ function coerceCompanyAboutSettings(raw: Record<string, unknown>): UserCompanyAb
     services: typeof raw.services === "string" ? raw.services : "",
     defaultSpotPlans: coerceProposalPlansArray(raw.defaultSpotPlans),
     defaultRecurringPlans: coerceProposalPlansArray(raw.defaultRecurringPlans),
+    hideReportAgencyBranding: raw.hideReportAgencyBranding === true,
   };
 }
 

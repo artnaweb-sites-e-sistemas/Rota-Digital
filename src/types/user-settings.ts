@@ -37,6 +37,11 @@ export interface UserCompanyAboutSettings {
   defaultSpotPlans: ProposalPlan[];
   /** Modelos de planos (execução recorrente) para novas propostas. */
   defaultRecurringPlans: ProposalPlan[];
+  /**
+   * Quando `true`, o bloco de identidade (logo + texto) acima de «Próximos passos» no
+   * relatório público / dashboard fica oculto. Por defeito mostramos a marca.
+   */
+  hideReportAgencyBranding?: boolean;
 }
 
 /** Livre = IA sugere qualquer canal; restrito = só rótulos selecionados em recommendedChannels. */

@@ -4,6 +4,7 @@ import type { Firestore, Query } from "firebase-admin/firestore";
 import { canonicalPlanLabelFromKey, fetchAdminUserDetail, normalizedPlanKey } from "@/lib/admin-users-metrics";
 import { isGeneralAdminEmail } from "@/lib/general-admin";
 import { requireGeneralAdminApi } from "@/lib/require-general-admin-api";
+import { getStripe } from "@/lib/stripe-server";
 import { proPlanReferenceMonthlyCentsForUi } from "@/lib/stripe-subscription-prices";
 
 export const runtime = "nodejs";
@@ -62,7 +63,12 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: "Corpo inválido." }, { status: 400 });
   }
 
-  const payload = body as { disabled?: unknown; plan?: unknown };
+  const payload = body as {
+    disabled?: unknown;
+    plan?: unknown;
+    /** Confirmação explícita para cancelar a subscription Stripe quando o plano muda. */
+    cancelActiveSubscription?: unknown;
+  };
   const hasDisabled = "disabled" in payload;
   const hasPlan = "plan" in payload;
   if (!hasDisabled && !hasPlan) {
@@ -74,6 +80,31 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (typeof disabled !== "boolean") {
       return NextResponse.json({ error: "`disabled` deve ser boolean." }, { status: 400 });
     }
+
+    /**
+     * Guard: não deixa desativar conta com assinatura paga ainda activa.
+     * O admin tem de cancelar a assinatura antes (via refund modal ou botão dedicado).
+     */
+    if (disabled) {
+      try {
+        const snap = await gate.ctx.db.collection("userSettings").doc(uid.trim()).get();
+        const data = (snap.data() ?? {}) as Record<string, unknown>;
+        const status =
+          typeof data.subscriptionStatus === "string" ? data.subscriptionStatus.trim() : "";
+        if (status === "active" || status === "trialing" || status === "past_due") {
+          return NextResponse.json(
+            {
+              error:
+                "Esta conta tem uma assinatura activa. Cancela a assinatura antes de desactivar a conta.",
+            },
+            { status: 409 },
+          );
+        }
+      } catch (e) {
+        console.error("[admin-users PATCH] pre-check subscription", e);
+      }
+    }
+
     try {
       await gate.ctx.auth.updateUser(uid.trim(), { disabled });
     } catch (e) {
@@ -126,6 +157,73 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       }
     }
     const canonical = canonicalPlanLabelFromKey(planKey);
+
+    /**
+     * Se houver subscription Stripe activa, mudar o plano manualmente sem cancelar
+     * implicaria dessincronia (Stripe continuaria a cobrar o plano antigo). Exigimos
+     * confirmação explícita e, quando dada, cancelamos a subscription na Stripe antes
+     * de aplicar o novo plano local.
+     */
+    let currentSubscriptionId: string | null = null;
+    let currentStatus = "";
+    try {
+      const snap = await gate.ctx.db.collection("userSettings").doc(uid.trim()).get();
+      const data = (snap.data() ?? {}) as Record<string, unknown>;
+      currentSubscriptionId =
+        typeof data.stripeSubscriptionId === "string" && data.stripeSubscriptionId.trim()
+          ? data.stripeSubscriptionId.trim()
+          : null;
+      currentStatus =
+        typeof data.subscriptionStatus === "string" ? data.subscriptionStatus.trim() : "";
+    } catch (e) {
+      console.error("[admin-users PATCH] ler subscription pre-plan-change", e);
+    }
+
+    const isLiveStatus =
+      currentStatus === "active" ||
+      currentStatus === "trialing" ||
+      currentStatus === "past_due";
+    const hasLiveSubscription = Boolean(currentSubscriptionId) && isLiveStatus;
+
+    if (hasLiveSubscription && payload.cancelActiveSubscription !== true) {
+      return NextResponse.json(
+        {
+          error:
+            "Este utilizador tem uma assinatura Stripe activa. Altera o plano com `cancelActiveSubscription: true` para cancelar também a assinatura, ou cancela antes pelo botão dedicado.",
+          requiresSubscriptionCancellation: true,
+          currentSubscriptionId,
+        },
+        { status: 409 },
+      );
+    }
+
+    if (hasLiveSubscription && currentSubscriptionId) {
+      const stripe = getStripe();
+      if (!stripe) {
+        return NextResponse.json(
+          { error: "Stripe não configurado — impossível cancelar a assinatura actual." },
+          { status: 503 },
+        );
+      }
+      try {
+        await stripe.subscriptions.cancel(currentSubscriptionId);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "";
+        const lower = msg.toLowerCase();
+        const already =
+          lower.includes("no such subscription") ||
+          lower.includes("already canceled") ||
+          lower.includes("already cancelled");
+        if (!already) {
+          console.error("[admin-users PATCH] cancelar subscription antes do plan change", e);
+          return NextResponse.json(
+            { error: `Falha ao cancelar a assinatura Stripe actual: ${msg || "erro desconhecido"}` },
+            { status: 502 },
+          );
+        }
+      }
+    }
+
     await gate.ctx.db
       .collection("userSettings")
       .doc(uid.trim())
@@ -142,6 +240,19 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
           autoSuspendedReason: null,
           autoSuspendedAtMs: null,
           autoSuspendedPlanSnapshot: null,
+          /**
+           * Se cancelámos subscription, zera os IDs locais para o status não ficar "active"
+           * enquanto o webhook `customer.subscription.deleted` não chega.
+           */
+          ...(hasLiveSubscription
+            ? {
+                stripeSubscriptionId: null,
+                stripeSubscriptionPlanKey: null,
+                stripeBillingCycle: null,
+                subscriptionStatus: "canceled",
+                subscriptionStatusUpdatedAtMs: Date.now(),
+              }
+            : {}),
         },
         { merge: true },
       );
@@ -222,6 +333,26 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
   }
 
   const db = gate.ctx.db;
+
+  /** Guard: não apaga conta com assinatura activa — tem de ser cancelada antes. */
+  try {
+    const snap = await db.collection("userSettings").doc(trimmed).get();
+    const data = (snap.data() ?? {}) as Record<string, unknown>;
+    const status =
+      typeof data.subscriptionStatus === "string" ? data.subscriptionStatus.trim() : "";
+    if (status === "active" || status === "trialing" || status === "past_due") {
+      return NextResponse.json(
+        {
+          error:
+            "Esta conta tem uma assinatura activa. Cancela a assinatura antes de excluir a conta.",
+        },
+        { status: 409 },
+      );
+    }
+  } catch (e) {
+    console.error("[admin-users DELETE] pre-check subscription", e);
+  }
+
   const removed = {
     reports: 0,
     proposals: 0,

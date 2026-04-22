@@ -10,12 +10,30 @@ import {
   type ReactNode,
   type SVGProps,
 } from "react";
+import { motion } from "motion/react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { getProposalByLead } from "@/lib/proposals";
 import { updateReport } from "@/lib/reports";
-import { describeManualUploadFailure, uploadUserEvidenceImageForReport } from "@/lib/evidence-storage";
+import {
+  describeManualUploadFailure,
+  uploadUserEvidenceImageForReport,
+  uploadUserSettingsImage,
+} from "@/lib/evidence-storage";
 import { maturityFromDiagnosticScores } from "@/lib/maturity-from-diagnostics";
-import { getUserReportCtaSettings } from "@/lib/user-settings";
+import {
+  getUserCompanyAboutSettings,
+  getUserReportCtaSettings,
+  saveUserCompanyAboutSettings,
+} from "@/lib/user-settings";
+import {
+  DEFAULT_COMPANY_ABOUT_NAME,
+  resolveCompanyAboutNameForDisplay,
+  resolveCompanyAboutSummaryForDisplay,
+  resolveCompanyPrimaryImageForDisplay,
+  resolveCompanyAboutSummaryForSave,
+} from "@/lib/company-about-defaults";
+import { createEmptyProposalPlan } from "@/lib/proposal-plan-factory";
 import { resolveReportCtas } from "@/lib/report-cta";
 import { PublicReportFloatingCta } from "@/components/rotas/public-report-floating-cta";
 import { GenerateRouteProgressOverlay } from "@/components/rotas/generate-route-progress-overlay";
@@ -30,10 +48,12 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import {
   ArrowLeft,
   Loader2,
@@ -77,12 +97,32 @@ import BorderGlow from "@/components/BorderGlow";
 import { CardSpotlight } from "@/components/ui/card-spotlight";
 import { cn } from "@/lib/utils";
 import { WhatsAppIcon } from "@/components/icons/whatsapp-icon";
-import type { UserReportCtaSettings } from "@/types/user-settings";
+import type { UserCompanyAboutSettings, UserReportCtaSettings } from "@/types/user-settings";
 import { PublicThemeToggle } from "@/components/public-theme-toggle";
 import { PublicThemeToggleHint } from "@/components/public-theme-toggle-hint";
-import { auth } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
 import { PlanLimitModal, type PlanLimitModalState } from "@/components/limits/plan-limit-modal";
-import { normalizedSubscriptionPlanKey } from "@/lib/plan-quotas";
+import { normalizedSubscriptionPlanKey, planAllowsCustomLogo } from "@/lib/plan-quotas";
+
+function createDefaultCompanyAboutSettings(): UserCompanyAboutSettings {
+  return {
+    companyName: DEFAULT_COMPANY_ABOUT_NAME,
+    companySummary: "",
+    primaryImageUrl: "",
+    secondaryImageUrl: "",
+    companyPhone: "",
+    whatsApp: "",
+    address: "",
+    websiteUrl: "",
+    instagramUrl: "",
+    youtubeUrl: "",
+    services: "",
+    defaultSpotPlans: [createEmptyProposalPlan()],
+    defaultRecurringPlans: [createEmptyProposalPlan()],
+    hideReportAgencyBranding: false,
+  };
+}
 
 const PRIORITY_COLORS: Record<string, string> = {
   Alta:
@@ -195,6 +235,8 @@ function InstagramBrandGlyph(props: SVGProps<SVGSVGElement>) {
  * Casco dos blocos principais: sÃ³ padding vertical extra no Card (sem -mx / calc â€” isso â€œcomiaâ€ a margem lateral).
  */
 const ROTA_REPORT_CARD_BOX = "py-6 sm:py-7";
+/** Bloco «Sobre a agência» — padding vertical do casco alinhado em cima/baixo (conteúdo com `p` uniforme + ícone no canto). */
+const ROTA_REPORT_AGENCY_CARD_BOX = "py-3.5 sm:py-4";
 
 /** Casco vertical quando o topo do card Ã© â€œcoladoâ€ ao primeiro bloco (ex.: faixa de cabeÃ§alho interna). */
 const ROTA_REPORT_CARD_BOX_FLUSH_TOP = "pb-6 pt-0 sm:pb-7 sm:pt-0";
@@ -1803,6 +1845,8 @@ export type RotaDigitalReportViewProps = {
    * CTAs já resolvidos no servidor (página pública). O cliente anônimo não lê `userSettings`.
    */
   initialCtaSettings?: UserReportCtaSettings | null;
+  /** Sobre a empresa (bloco de marca) — leitura no servidor na página pública. */
+  initialCompanyAboutSettings?: UserCompanyAboutSettings | null;
 };
 
 export function RotaDigitalReportView({
@@ -1810,6 +1854,7 @@ export function RotaDigitalReportView({
   variant,
   onReportChange,
   initialCtaSettings,
+  initialCompanyAboutSettings,
 }: RotaDigitalReportViewProps) {
   const router = useRouter();
   const isDashboard = variant === "dashboard";
@@ -1838,6 +1883,24 @@ export function RotaDigitalReportView({
   const [ctaSettings, setCtaSettings] = useState<UserReportCtaSettings | null>(
     () => initialCtaSettings ?? null
   );
+  const [companyAboutSettings, setCompanyAboutSettings] = useState<UserCompanyAboutSettings | null>(
+    () => (variant === "public" ? initialCompanyAboutSettings ?? null : null),
+  );
+  const [agencyBrandingDialogOpen, setAgencyBrandingDialogOpen] = useState(false);
+  const [agencyBrandingDraft, setAgencyBrandingDraft] = useState({
+    primaryImageUrl: "",
+    companySummary: "",
+    showOnReport: true,
+  });
+  const [agencyBrandingSaving, setAgencyBrandingSaving] = useState(false);
+  const [agencyBrandingError, setAgencyBrandingError] = useState<string | null>(null);
+  const [agencyBrandingLogoUploading, setAgencyBrandingLogoUploading] = useState(false);
+  const agencyBrandingLogoInputRef = useRef<HTMLInputElement | null>(null);
+  /** `userSettings` (Firestore) para regra de logo/marca Pro/Agency vs Starter. */
+  const [userSettingsForAgencyBranding, setUserSettingsForAgencyBranding] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
   /** Modo tópico-a-tópico só depois de abrir a secção com o lápis da caixa. */
   const [listSectionEditOpen, setListSectionEditOpen] = useState<DashboardListSectionKey | null>(null);
   const [evidenceReplaceSlot, setEvidenceReplaceSlot] = useState<EvidenceManualSlot | null>(null);
@@ -1876,6 +1939,72 @@ export function RotaDigitalReportView({
     if (variant !== "public") return;
     setCtaSettings(initialCtaSettings ?? null);
   }, [variant, initialCtaSettings]);
+
+  useEffect(() => {
+    if (variant !== "public") return;
+    setCompanyAboutSettings(initialCompanyAboutSettings ?? null);
+  }, [variant, initialCompanyAboutSettings]);
+
+  useEffect(() => {
+    if (variant === "public") return;
+    if (!report.userId) {
+      setCompanyAboutSettings(null);
+      return;
+    }
+    let cancelled = false;
+    void getUserCompanyAboutSettings(report.userId)
+      .then((s) => {
+        if (!cancelled) setCompanyAboutSettings(s);
+      })
+      .catch(() => {
+        if (!cancelled) setCompanyAboutSettings(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [report.userId, variant]);
+
+  useEffect(() => {
+    if (!isDashboard || !report.userId) {
+      setUserSettingsForAgencyBranding(null);
+      return;
+    }
+    let cancelled = false;
+    void getDoc(doc(db, "userSettings", report.userId))
+      .then((snap) => {
+        if (cancelled) return;
+        if (snap.exists()) {
+          setUserSettingsForAgencyBranding(snap.data() as Record<string, unknown>);
+        } else {
+          setUserSettingsForAgencyBranding({});
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setUserSettingsForAgencyBranding({ plan: "pro" } as Record<string, unknown>);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isDashboard, report.userId]);
+
+  const reportAgencyBranding = useMemo((): {
+    logoSrc: string;
+    summary: string;
+    name: string;
+    /** Só no painel: a secção está oculta no link público; o admin vê em modo pré-visualização. */
+    isPreviewHidden: boolean;
+  } | null => {
+    if (!report.userId) return null;
+    const hidden = companyAboutSettings?.hideReportAgencyBranding === true;
+    if (hidden && variant === "public") return null;
+    return {
+      logoSrc: resolveCompanyPrimaryImageForDisplay(companyAboutSettings?.primaryImageUrl),
+      summary: resolveCompanyAboutSummaryForDisplay(companyAboutSettings?.companySummary),
+      name: resolveCompanyAboutNameForDisplay(companyAboutSettings?.companyName),
+      isPreviewHidden: hidden && isDashboard,
+    };
+  }, [report.userId, companyAboutSettings, variant, isDashboard]);
 
   useEffect(() => {
     if (!isDashboard || !report.leadId?.trim() || !report.userId) {
@@ -1938,6 +2067,73 @@ export function RotaDigitalReportView({
     cancelFieldEdit();
     setListSectionEditOpen(null);
   }, [cancelFieldEdit]);
+
+  const openAgencyBrandingDialog = useCallback(() => {
+    if (isDashboard) {
+      const raw = userSettingsForAgencyBranding;
+      if (raw == null) return;
+      if (!planAllowsCustomLogo(raw)) {
+        setLimitModalState({
+          kind: "logo",
+          plan: normalizedSubscriptionPlanKey(raw.subscriptionPlan ?? raw.plan),
+        });
+        return;
+      }
+    }
+    setAgencyBrandingError(null);
+    setAgencyBrandingDraft({
+      primaryImageUrl: (companyAboutSettings?.primaryImageUrl ?? "").trim(),
+      companySummary: resolveCompanyAboutSummaryForDisplay(companyAboutSettings?.companySummary),
+      showOnReport: companyAboutSettings?.hideReportAgencyBranding !== true,
+    });
+    setAgencyBrandingDialogOpen(true);
+  }, [companyAboutSettings, isDashboard, userSettingsForAgencyBranding]);
+
+  const saveAgencyBrandingFromModal = useCallback(async () => {
+    if (!report.userId) return;
+    setAgencyBrandingSaving(true);
+    setAgencyBrandingError(null);
+    try {
+      const base =
+        (await getUserCompanyAboutSettings(report.userId)) ?? createDefaultCompanyAboutSettings();
+      const next: UserCompanyAboutSettings = {
+        ...base,
+        primaryImageUrl: agencyBrandingDraft.primaryImageUrl.trim(),
+        companySummary: resolveCompanyAboutSummaryForSave(agencyBrandingDraft.companySummary),
+        hideReportAgencyBranding: !agencyBrandingDraft.showOnReport,
+      };
+      await saveUserCompanyAboutSettings(report.userId, next);
+      setCompanyAboutSettings(next);
+      setAgencyBrandingDialogOpen(false);
+    } catch (e) {
+      setAgencyBrandingError(e instanceof Error ? e.message : "Não foi possível guardar.");
+    } finally {
+      setAgencyBrandingSaving(false);
+    }
+  }, [report.userId, agencyBrandingDraft]);
+
+  const onAgencyBrandingLogoFile = useCallback(
+    async (file: File) => {
+      if (!isDashboard || !report.userId) return;
+      setAgencyBrandingLogoUploading(true);
+      setAgencyBrandingError(null);
+      try {
+        const result = await uploadUserSettingsImage({
+          file,
+          userId: report.userId,
+          slotLabel: "company-about-primary",
+        });
+        if (!result.ok) {
+          setAgencyBrandingError(describeManualUploadFailure(result));
+          return;
+        }
+        setAgencyBrandingDraft((d) => ({ ...d, primaryImageUrl: result.url }));
+      } finally {
+        setAgencyBrandingLogoUploading(false);
+      }
+    },
+    [isDashboard, report.userId],
+  );
 
   const applyReportPatch = useCallback(
     async (patch: Partial<RotaDigitalReport>): Promise<boolean> => {
@@ -2621,6 +2817,200 @@ export function RotaDigitalReportView({
               </DialogFooter>
             </DialogContent>
           </Dialog>
+
+          <Dialog
+            open={agencyBrandingDialogOpen}
+            onOpenChange={(open) => {
+              if (!open) {
+                if (agencyBrandingSaving || agencyBrandingLogoUploading) return;
+                setAgencyBrandingError(null);
+              }
+              setAgencyBrandingDialogOpen(open);
+            }}
+          >
+            <DialogContent
+              className="flex max-h-[min(92dvh,720px)] flex-col gap-0 overflow-hidden p-0 sm:max-w-lg"
+              showCloseButton={!agencyBrandingSaving && !agencyBrandingLogoUploading}
+            >
+              <div className="shrink-0 border-b border-border px-5 pb-3.5 pt-5 sm:px-6 sm:pb-3.5 sm:pt-5 dark:border-white/10">
+                <DialogHeader className="space-y-0 text-left">
+                  <DialogTitle className="text-base font-semibold sm:text-lg">Sobre a agência</DialogTitle>
+                  <DialogDescription className="mt-0.5 text-sm leading-snug text-muted-foreground">
+                    Logótipo, descrição e exibição no fim do relatório.
+                  </DialogDescription>
+                </DialogHeader>
+              </div>
+              <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5 sm:px-6 sm:py-5">
+                <div className="space-y-2.5">
+                  <Label className="text-xs font-medium">Logótipo</Label>
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-5">
+                    <div className="flex shrink-0 justify-center sm:justify-start">
+                      <img
+                        src={resolveCompanyPrimaryImageForDisplay(agencyBrandingDraft.primaryImageUrl || null)}
+                        alt="Pré-visualização do logótipo"
+                        className="h-20 w-20 rounded-full border border-border/80 object-contain bg-muted/30 p-1"
+                      />
+                    </div>
+                    <div className="flex min-w-0 flex-1 flex-col gap-2.5">
+                      <input
+                        ref={agencyBrandingLogoInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="sr-only"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          e.currentTarget.value = "";
+                          if (f) void onAgencyBrandingLogoFile(f);
+                        }}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="w-fit gap-2"
+                        disabled={agencyBrandingLogoUploading || agencyBrandingSaving}
+                        onClick={() => agencyBrandingLogoInputRef.current?.click()}
+                      >
+                        {agencyBrandingLogoUploading ? (
+                          <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                        ) : (
+                          <ImageUp className="size-3.5" aria-hidden />
+                        )}
+                        Trocar imagem
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="report-agency-branding-summary" className="text-xs font-medium">
+                    Descrição
+                  </Label>
+                  <Textarea
+                    id="report-agency-branding-summary"
+                    value={agencyBrandingDraft.companySummary}
+                    onChange={(e) =>
+                      setAgencyBrandingDraft((d) => ({ ...d, companySummary: e.target.value }))
+                    }
+                    className="min-h-[130px] resize-y text-sm"
+                    disabled={agencyBrandingSaving}
+                    placeholder="Texto de apresentação da agência…"
+                  />
+                </div>
+                <div
+                  className="space-y-2.5"
+                  aria-describedby={!agencyBrandingDraft.showOnReport ? "agency-branding-hidden-hint" : undefined}
+                >
+                  <div
+                    className={cn(
+                      "relative inline-flex h-8 w-fit shrink-0 items-stretch rounded-full border p-0.5 text-[11px] shadow-sm",
+                      "border-border/90 bg-muted/80",
+                      "dark:border-border dark:bg-background/80 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]",
+                    )}
+                    role="tablist"
+                    aria-label="Visibilidade do bloco Sobre a agência nos relatórios Rota digital partilhados com leads"
+                  >
+                    <div className="relative flex min-w-0 items-center gap-0.5">
+                      <motion.button
+                        type="button"
+                        role="tab"
+                        whileTap={{ scale: 0.98 }}
+                        aria-selected={!agencyBrandingDraft.showOnReport}
+                        onClick={() =>
+                          setAgencyBrandingDraft((d) => ({ ...d, showOnReport: false }))
+                        }
+                        disabled={agencyBrandingSaving}
+                        className={cn(
+                          "relative isolate shrink-0 rounded-full px-2.5 py-1 font-semibold tracking-tight transition-colors duration-200",
+                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                          !agencyBrandingDraft.showOnReport
+                            ? "text-brand-foreground"
+                            : "text-muted-foreground hover:text-foreground",
+                        )}
+                      >
+                        {!agencyBrandingDraft.showOnReport && (
+                          <motion.div
+                            layoutId="agency-show-on-report"
+                            aria-hidden
+                            className="pointer-events-none absolute inset-0 z-0 rounded-full shadow-sm ring-1 ring-black/5 dark:ring-2 dark:ring-white/20"
+                            style={{ backgroundColor: "var(--brand)" }}
+                            transition={{ type: "spring", bounce: 0.22, stiffness: 400, damping: 32 }}
+                          />
+                        )}
+                        <span className="relative z-10">Oculto</span>
+                      </motion.button>
+                      <motion.button
+                        type="button"
+                        role="tab"
+                        whileTap={{ scale: 0.98 }}
+                        aria-selected={agencyBrandingDraft.showOnReport}
+                        onClick={() => setAgencyBrandingDraft((d) => ({ ...d, showOnReport: true }))}
+                        disabled={agencyBrandingSaving}
+                        className={cn(
+                          "relative isolate shrink-0 rounded-full px-2.5 py-1 font-semibold tracking-tight transition-colors duration-200",
+                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                          agencyBrandingDraft.showOnReport
+                            ? "text-brand-foreground"
+                            : "text-muted-foreground hover:text-foreground",
+                        )}
+                      >
+                        {agencyBrandingDraft.showOnReport && (
+                          <motion.div
+                            layoutId="agency-show-on-report"
+                            aria-hidden
+                            className="pointer-events-none absolute inset-0 z-0 rounded-full shadow-sm ring-1 ring-black/5 dark:ring-2 dark:ring-white/20"
+                            style={{ backgroundColor: "var(--brand)" }}
+                            transition={{ type: "spring", bounce: 0.22, stiffness: 400, damping: 32 }}
+                          />
+                        )}
+                        <span className="relative z-10">Exibir</span>
+                      </motion.button>
+                    </div>
+                  </div>
+                  {!agencyBrandingDraft.showOnReport ? (
+                    <p
+                      className="max-w-md text-[11px] leading-relaxed text-muted-foreground"
+                      id="agency-branding-hidden-hint"
+                    >
+                      O bloco deixa de aparecer no link público de todos os relatórios Rota digital (atuais e futuros) que
+                      os leads abrirem. No painel, continua visível em pré-visualização para poder voltar a exibir.
+                    </p>
+                  ) : null}
+                </div>
+                {agencyBrandingError ? (
+                  <p
+                    className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
+                    role="alert"
+                  >
+                    {agencyBrandingError}
+                  </p>
+                ) : null}
+              </div>
+              <div className="shrink-0 border-t border-border bg-muted/15 px-5 py-4 dark:border-white/10 dark:bg-zinc-950/40 sm:px-6 sm:py-5">
+                <div className="flex flex-col-reverse gap-2.5 sm:flex-row sm:items-center sm:justify-end sm:gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setAgencyBrandingDialogOpen(false)}
+                    disabled={agencyBrandingSaving}
+                    className="w-full sm:w-auto"
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="cta"
+                    onClick={() => void saveAgencyBrandingFromModal()}
+                    disabled={agencyBrandingSaving || agencyBrandingLogoUploading}
+                    className="w-full gap-2 sm:w-auto"
+                  >
+                    {agencyBrandingSaving ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
+                    Guardar
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
           <GenerateRouteProgressOverlay
             open={reanalyzeProgressOpen}
             progress={reanalyzeProgress}
@@ -4162,6 +4552,99 @@ export function RotaDigitalReportView({
         </Card>
       </div>
 
+      {reportAgencyBranding ? (
+        <CardSpotlight
+          className={cn(
+            "scroll-mt-6 w-full print:border-zinc-200 print:bg-white",
+            ROTA_REPORT_AGENCY_CARD_BOX,
+            reportAgencyBranding.isPreviewHidden && "print:hidden",
+          )}
+        >
+          <Card
+            id="report-agencia"
+            className={cn(
+              "relative border-0 !bg-transparent shadow-none ring-0 print-white",
+              "py-0 gap-0",
+            )}
+          >
+            {reportAgencyBranding.isPreviewHidden ? (
+              <div className="no-print flex flex-none justify-end px-4 pb-1.5 pt-2.5 sm:px-7 sm:pb-2 sm:pt-3">
+                <Badge
+                  className="pointer-events-none border-amber-500/50 bg-amber-500/18 text-[10px] font-bold uppercase tracking-wide text-amber-950 shadow-sm dark:border-amber-400/45 dark:bg-amber-500/12 dark:text-amber-100"
+                  variant="outline"
+                >
+                  Oculta
+                </Badge>
+              </div>
+            ) : null}
+            <div
+              className={cn(
+                reportAgencyBranding.isPreviewHidden &&
+                  "pointer-events-none opacity-[0.42] [filter:saturate(0.7)] dark:opacity-[0.48]",
+              )}
+            >
+              <CardContent
+                className={cn(
+                  "px-4 sm:px-7",
+                  "py-3.5 sm:py-4",
+                  isDashboard && "pe-10 sm:pe-12",
+                  reportAgencyBranding.isPreviewHidden && isDashboard && "pt-0",
+                )}
+              >
+                <h2 className="sr-only">Sobre a agência</h2>
+                {/* Até md: coluna (logo em cima); a partir de md: linha — evita “lado a lado” em telemóveis largos. */}
+                <div className="flex min-w-0 flex-col items-stretch gap-4 md:flex-row md:items-center md:gap-6 lg:gap-7">
+                  {/* No mobile alinhada à esquerda; no desktop w-auto (coluna do logo sem roubar 100% da linha). */}
+                  <div className="flex w-full max-w-full shrink-0 justify-start md:w-auto md:max-w-none md:flex-none">
+                    <div
+                      className={cn(
+                        "relative flex aspect-square w-full max-w-[min(85vw,14rem)] items-center justify-center",
+                        "md:max-w-[14rem] lg:max-w-[15rem]",
+                        "rounded-full",
+                        "border-[8px] sm:border-[10px] border-white/[0.11] dark:border-white/[0.14]",
+                        "bg-[linear-gradient(180deg,rgba(255,255,255,0.07)_0%,rgba(255,255,255,0.02)_100%)]",
+                        "shadow-[0_0_0_1px_rgba(255,255,255,0.05),0_0_40px_-14px_rgba(255,255,255,0.1),0_20px_40px_-24px_rgba(0,0,0,0.5)]",
+                        "p-2.5 sm:p-3",
+                      )}
+                    >
+                      <img
+                        src={reportAgencyBranding.logoSrc}
+                        alt={`Logótipo de ${reportAgencyBranding.name}`}
+                        className="h-full w-full rounded-full object-contain"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    </div>
+                  </div>
+                  <p className="m-0 min-w-0 w-full flex-1 whitespace-pre-line text-left text-[13px] leading-snug text-foreground/92 dark:text-zinc-200/95 sm:text-[13.5px] sm:leading-relaxed md:min-w-0 md:flex-1">
+                    {reportAgencyBranding.summary}
+                  </p>
+                </div>
+              </CardContent>
+            </div>
+            {isDashboard ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => openAgencyBrandingDialog()}
+                disabled={userSettingsForAgencyBranding === null}
+                className={cn(
+                  "no-print pointer-events-auto absolute z-[8] size-8 rounded-md shadow-md",
+                  "bottom-3.5 right-3.5 sm:bottom-4 sm:right-4",
+                  "border-0 !bg-[color:var(--brand)] !text-[color:var(--brand-foreground)]",
+                  "hover:!bg-[color:var(--brand)] hover:brightness-110",
+                  "active:brightness-95 disabled:opacity-50",
+                )}
+                aria-label="Editar logótipo, descrição e exibição da secção (definições globais; Pro ou Agency)"
+              >
+                <Pencil className="size-3.5" aria-hidden />
+              </Button>
+            ) : null}
+          </Card>
+        </CardSpotlight>
+      ) : null}
+
       {/* PrÃ³ximos passos â€” spotlight ao hover */}
       <CardSpotlight className={cn("scroll-mt-6 w-full print:border-zinc-200 print:bg-white", ROTA_REPORT_CARD_BOX)}>
         <Card
@@ -4327,9 +4810,24 @@ export function RotaDigitalReportView({
       </CardSpotlight>
 
       {/* Footer */}
-      <div className="text-center text-muted-foreground text-xs leading-snug py-4 no-print">
-        <span className="block">Rota Digital</span>
-        <span className="mt-1 block">{reportCreatedAtLine2}</span>
+      <div className="text-center text-muted-foreground text-xs leading-snug space-y-2.5 py-4 no-print">
+        <div className="flex justify-center">
+          <Image
+            src="/assets/logo/logo-dark.png"
+            alt="Rota Digital"
+            width={220}
+            height={62}
+            className="h-6 w-auto object-contain object-center dark:hidden"
+          />
+          <Image
+            src="/assets/logo/logo-white.png"
+            alt="Rota Digital"
+            width={220}
+            height={62}
+            className="hidden h-6 w-auto object-contain object-center dark:block"
+          />
+        </div>
+        <span className="block">{reportCreatedAtLine2}</span>
       </div>
 
       <PublicReportFloatingCta bottomCta={reportCta.bottom} />

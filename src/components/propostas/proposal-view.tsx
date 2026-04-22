@@ -1789,6 +1789,21 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
     return [...PROPOSAL_NEXT_STEPS_COPY];
   }, [proposal.nextSteps]);
 
+  const proposalCreatedAtLine2 = useMemo(() => {
+    const d = new Date(proposal.createdAt);
+    const datePart = d.toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    });
+    const timePart = d.toLocaleTimeString("pt-BR", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+    return `${datePart} às ${timePart}`;
+  }, [proposal.createdAt]);
+
   const applyProposalPatch = async (
     patch: Partial<Omit<Proposal, "id" | "leadId" | "userId" | "createdAt">>,
   ) => {
@@ -2771,6 +2786,26 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
         onAddStep={() => setNextStepsDraft((prev) => [...prev, ""])}
         onRemoveStep={(i) => setNextStepsDraft((prev) => prev.filter((_, j) => j !== i))}
       />
+
+      <div className="text-center text-muted-foreground text-xs leading-snug space-y-2.5 py-4 no-print">
+        <div className="flex justify-center">
+          <Image
+            src="/assets/logo/logo-dark.png"
+            alt="Rota Digital"
+            width={220}
+            height={62}
+            className="h-6 w-auto object-contain object-center dark:hidden"
+          />
+          <Image
+            src="/assets/logo/logo-white.png"
+            alt="Rota Digital"
+            width={220}
+            height={62}
+            className="hidden h-6 w-auto object-contain object-center dark:block"
+          />
+        </div>
+        <span className="block">{proposalCreatedAtLine2}</span>
+      </div>
 
       {isDashboard ? (
         <Dialog

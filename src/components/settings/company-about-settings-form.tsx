@@ -54,6 +54,7 @@ const DEFAULT_FORM: UserCompanyAboutSettings = {
   services: "",
   defaultSpotPlans: [createEmptyProposalPlan()],
   defaultRecurringPlans: [createEmptyProposalPlan()],
+  hideReportAgencyBranding: false,
 };
 
 /** Zona de pré-visualização: mesma altura fixa nos dois cartões (não depende de aspect-ratio). */
@@ -249,6 +250,7 @@ export function CompanyAboutSettingsForm() {
             : "",
           defaultSpotPlans: spot,
           defaultRecurringPlans: normalizeRecurringPlansForSave(recurring),
+          hideReportAgencyBranding: data.hideReportAgencyBranding === true,
         });
       }
     } catch (e) {
@@ -292,6 +294,7 @@ export function CompanyAboutSettingsForm() {
       services: f.services.trim(),
       defaultSpotPlans: f.defaultSpotPlans,
       defaultRecurringPlans: normalizeRecurringPlansForSave(f.defaultRecurringPlans),
+      hideReportAgencyBranding: f.hideReportAgencyBranding === true,
     };
   }, []);
 
@@ -494,6 +497,31 @@ export function CompanyAboutSettingsForm() {
                     Disponível em planos pagos. Use o botão Bloqueado para ver opções de assinatura.
                   </p>
                 ) : null}
+              </div>
+
+              <div className="space-y-3 rounded-xl border border-border bg-muted/20 p-4 dark:border-white/10 dark:bg-white/[0.02]">
+                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Relatório (link público)</p>
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  No fim do relatório, o sistema pode mostrar o logo (à esquerda) e a descrição (à direita) definidos
+                  acima. Com plano pago podes trocar imagem e texto; no Starter vês a identidade padrão da RouteLAB —
+                  o que ajuda a perceber o valor de personalizar a marca. Podes desligar o bloco abaixo.
+                </p>
+                <label className="flex cursor-pointer items-start gap-3 rounded-md border border-transparent p-1 transition-colors hover:border-border/80 hover:bg-background/50 dark:hover:border-white/10">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 size-4 shrink-0 rounded border-border text-brand accent-brand"
+                    checked={form.hideReportAgencyBranding === true}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, hideReportAgencyBranding: e.target.checked }))
+                    }
+                  />
+                  <span className="min-w-0 text-sm leading-snug text-foreground">
+                    <span className="font-medium">Ocultar secção de marca</span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                      Não exibir o bloco de logo e descrição acima de «Próximos passos» no relatório.
+                    </span>
+                  </span>
+                </label>
               </div>
 
               <div className="space-y-3 rounded-xl border border-border bg-muted/20 p-4 dark:border-white/10 dark:bg-white/[0.02]">

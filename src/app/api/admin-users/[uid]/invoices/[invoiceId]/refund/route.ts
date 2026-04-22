@@ -15,6 +15,11 @@ type RefundRequestBody = {
   amountCents?: number;
   /** Motivo Stripe: `duplicate | fraudulent | requested_by_customer`. */
   reason?: "duplicate" | "fraudulent" | "requested_by_customer";
+  /**
+   * Se `true` e a fatura for de uma assinatura, cancela a assinatura Stripe
+   * e rebaixa o cliente para Starter depois de processar o refund.
+   */
+  cancelSubscription?: boolean;
 };
 
 function isValidReason(v: unknown): v is RefundRequestBody["reason"] {
@@ -284,10 +289,77 @@ export async function POST(request: NextRequest, context: RouteContext) {
     /** Não falha o request — o webhook charge.refunded garante a reconciliação. */
   }
 
+  /**
+   * Se pedido, também cancela a assinatura + rebaixa para Starter.
+   * Resolvemos `subscriptionId` por esta ordem:
+   *  1. Documento `stripeInvoices` armazenado (`stripeSubscriptionId`).
+   *  2. `userSettings.stripeSubscriptionId`.
+   */
+  let subscriptionCanceled: string | null = null;
+  if (payload.cancelSubscription === true) {
+    let subscriptionId =
+      typeof stored.stripeSubscriptionId === "string" ? stored.stripeSubscriptionId.trim() : "";
+
+    if (!subscriptionId) {
+      try {
+        const userSnap = await gate.ctx.db.collection("userSettings").doc(uid.trim()).get();
+        const data = (userSnap.data() ?? {}) as Record<string, unknown>;
+        if (typeof data.stripeSubscriptionId === "string") {
+          subscriptionId = data.stripeSubscriptionId.trim();
+        }
+      } catch (e) {
+        console.error("[admin refund] ler subscription do user", e);
+      }
+    }
+
+    if (subscriptionId) {
+      try {
+        await stripe.subscriptions.cancel(subscriptionId);
+        subscriptionCanceled = subscriptionId;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "";
+        const lower = msg.toLowerCase();
+        const already =
+          lower.includes("no such subscription") ||
+          lower.includes("already canceled") ||
+          lower.includes("already cancelled");
+        if (!already) {
+          console.error("[admin refund] cancelar assinatura", e);
+        } else {
+          subscriptionCanceled = subscriptionId;
+        }
+      }
+
+      if (subscriptionCanceled) {
+        try {
+          await gate.ctx.db.collection("userSettings").doc(uid.trim()).set(
+            {
+              plan: "Starter",
+              subscriptionPlan: "Starter",
+              planPriceCents: 0,
+              subscriptionPriceCents: 0,
+              leadCaptureMonthlyLimit: 30,
+              planMasterUnlimited: false,
+              subscriptionStatus: "canceled",
+              subscriptionStatusUpdatedAtMs: Date.now(),
+              stripeSubscriptionId: null,
+              stripeSubscriptionPlanKey: null,
+              stripeBillingCycle: null,
+            },
+            { merge: true },
+          );
+        } catch (e) {
+          console.error("[admin refund] downgrade user", e);
+        }
+      }
+    }
+  }
+
   return NextResponse.json({
     refundId: refund.id,
     amountCents,
     status: refund.status,
     chargeId,
+    subscriptionCanceled,
   });
 }

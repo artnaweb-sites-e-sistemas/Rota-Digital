@@ -4,7 +4,10 @@ import { notFound } from "next/navigation";
 import { PublicShareThemeBootstrap } from "@/components/public-share-theme-bootstrap";
 import { RotaDigitalReportView } from "@/components/rotas/rota-digital-report-view";
 import { getCachedPublicProposalReportBySlug } from "@/lib/public-report-cache";
-import { getCachedUserReportCtaSettingsAdmin } from "@/lib/user-settings-admin";
+import {
+  getCachedUserCompanyAboutSettingsAdmin,
+  getCachedUserReportCtaSettingsAdmin,
+} from "@/lib/user-settings-admin";
 import {
   buildPublicReportCanonicalUrl,
   buildReportShareDescription,
@@ -98,6 +101,9 @@ export default async function PublicProposalPage({
   const initialCtaSettings = report.userId
     ? await getCachedUserReportCtaSettingsAdmin(report.userId)
     : null;
+  const initialCompanyAboutSettings = report.userId
+    ? await getCachedUserCompanyAboutSettingsAdmin(report.userId)
+    : null;
 
   return (
     <div className="flex h-dvh max-h-dvh min-h-0 w-full min-w-0 flex-col overflow-hidden bg-background text-foreground">
@@ -111,6 +117,7 @@ export default async function PublicProposalPage({
             variant="public"
             report={report}
             initialCtaSettings={initialCtaSettings}
+            initialCompanyAboutSettings={initialCompanyAboutSettings}
           />
         </div>
       </main>

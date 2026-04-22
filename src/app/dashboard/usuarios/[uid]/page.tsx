@@ -214,34 +214,6 @@ function computeAccountStatus(detail: AdminListedUser | null): AccountStatusAppe
   };
 }
 
-function sumAddOnCentsForPeriod(
-  map: Record<string, number> | undefined,
-  year: PlatformPeriodYear,
-  month: PlatformPeriodMonth,
-): number {
-  if (!map) return 0;
-  if (typeof year === "number" && typeof month === "number") {
-    const k = `${year}-${String(month).padStart(2, "0")}`;
-    return map[k] ?? 0;
-  }
-  if (typeof year === "number" && month === "all") {
-    const p = `${year}-`;
-    return Object.entries(map)
-      .filter(([key]) => key.startsWith(p))
-      .reduce((s, [, v]) => s + (typeof v === "number" && Number.isFinite(v) ? v : 0), 0);
-  }
-  if (year === "all" && typeof month === "number") {
-    const m = String(month).padStart(2, "0");
-    return Object.entries(map)
-      .filter(([key]) => key.length >= 7 && key.endsWith(`-${m}`))
-      .reduce((s, [, v]) => s + (typeof v === "number" && Number.isFinite(v) ? v : 0), 0);
-  }
-  return Object.values(map).reduce(
-    (s, v) => s + (typeof v === "number" && Number.isFinite(v) ? v : 0),
-    0,
-  );
-}
-
 function formatBillingPeriodLabel(year: PlatformPeriodYear, month: PlatformPeriodMonth): string {
   if (typeof year === "number" && typeof month === "number") {
     const raw = new Date(2000, month - 1, 1).toLocaleDateString("pt-BR", { month: "long" });
@@ -369,24 +341,14 @@ export default function UsuarioAdminDetailPage() {
   }, [detail, platformSeries]);
   const effectivePlan = useMemo(() => normalizedPlanLabel(detail?.plan), [detail?.plan]);
   const canAssignMasterPlan = useMemo(() => isGeneralAdminEmail(detail?.email), [detail?.email]);
+  const hasActiveSubscription = useMemo(() => {
+    const status = detail?.subscriptionStatus ?? "none";
+    return status === "active" || status === "trialing" || status === "past_due";
+  }, [detail?.subscriptionStatus]);
   const billingPeriodLabel = useMemo(
     () => formatBillingPeriodLabel(periodYear, periodMonth),
     [periodYear, periodMonth],
   );
-  const addOnPaidInSelectedPeriodCents = useMemo(
-    () => sumAddOnCentsForPeriod(detail?.addOnPaidByMonthCents, periodYear, periodMonth),
-    [detail?.addOnPaidByMonthCents, periodYear, periodMonth],
-  );
-  /** Renovações de plano pagas (Stripe) — real, vindo do webhook `invoice.paid`. */
-  const subscriptionPaidInSelectedPeriodCents = useMemo(
-    () => sumAddOnCentsForPeriod(detail?.subscriptionPaidByMonthCents, periodYear, periodMonth),
-    [detail?.subscriptionPaidByMonthCents, periodYear, periodMonth],
-  );
-  const stripeRealPaidInSelectedPeriodCents = useMemo(
-    () => subscriptionPaidInSelectedPeriodCents + addOnPaidInSelectedPeriodCents,
-    [subscriptionPaidInSelectedPeriodCents, addOnPaidInSelectedPeriodCents],
-  );
-
   const accountStatus = useMemo(() => computeAccountStatus(detail), [detail]);
 
   const [invoices, setInvoices] = useState<StoredStripeInvoice[] | null>(null);
@@ -402,11 +364,81 @@ export default function UsuarioAdminDetailPage() {
   >("requested_by_customer");
   const [refundBusy, setRefundBusy] = useState(false);
   const [refundError, setRefundError] = useState<string | null>(null);
+  const [refundCancelSubscription, setRefundCancelSubscription] = useState(false);
+
+  const [cancelSubDialogOpen, setCancelSubDialogOpen] = useState(false);
+  const [cancelSubBusy, setCancelSubBusy] = useState(false);
+  const [cancelSubError, setCancelSubError] = useState<string | null>(null);
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  /**
+   * Receita real deste utilizador no período selecionado — calculada directamente a partir
+   * de `stripeInvoices` já carregadas, usando a mesma lógica do card global (Receita paga Stripe):
+   *  - Só entram faturas `paid` (com `paidAtMs`) dentro do período;
+   *  - Subtrai `refundedCents` e distribui proporcionalmente entre subscrição e add-on com base nas `lines`.
+   *
+   * Isto evita depender dos agregados `userSettings.{subscription,addOn}PaidByMonthCents`,
+   * que podiam estar dessincronizados por falha a resolver `uid` em webhooks legados.
+   */
+  const { subscriptionPaidInSelectedPeriodCents, addOnPaidInSelectedPeriodCents } = useMemo(() => {
+    const out = { subscriptionPaidInSelectedPeriodCents: 0, addOnPaidInSelectedPeriodCents: 0 };
+    if (!invoices || invoices.length === 0) return out;
+
+    const inPeriod = (ms: number): boolean => {
+      const d = new Date(ms);
+      const y = d.getUTCFullYear();
+      const m = d.getUTCMonth() + 1;
+      if (typeof periodYear === "number" && typeof periodMonth === "number") {
+        return y === periodYear && m === periodMonth;
+      }
+      if (typeof periodYear === "number" && periodMonth === "all") return y === periodYear;
+      if (periodYear === "all" && typeof periodMonth === "number") return m === periodMonth;
+      return true;
+    };
+
+    for (const inv of invoices) {
+      if (typeof inv.paidAtMs !== "number" || !Number.isFinite(inv.paidAtMs)) continue;
+      if (!inPeriod(inv.paidAtMs)) continue;
+
+      const paid = typeof inv.amountPaidCents === "number" ? inv.amountPaidCents : 0;
+      const refunded = typeof inv.refundedCents === "number" ? inv.refundedCents : 0;
+      const net = Math.max(0, paid - refunded);
+      if (net <= 0) continue;
+
+      let subLine = 0;
+      let addLine = 0;
+      for (const l of inv.lines ?? []) {
+        const amt = typeof l.amountCents === "number" ? l.amountCents : 0;
+        if (l.kind === "subscription") subLine += amt;
+        else addLine += amt;
+      }
+      const sum = subLine + addLine;
+      if (sum === net) {
+        out.subscriptionPaidInSelectedPeriodCents += subLine;
+        out.addOnPaidInSelectedPeriodCents += addLine;
+      } else if (sum <= 0) {
+        /** Sem breakdown nas linhas — presume subscrição se existir `stripeSubscriptionId`. */
+        if (inv.stripeSubscriptionId) {
+          out.subscriptionPaidInSelectedPeriodCents += net;
+        } else {
+          out.addOnPaidInSelectedPeriodCents += net;
+        }
+      } else {
+        const subShare = Math.round((subLine / sum) * net);
+        out.subscriptionPaidInSelectedPeriodCents += subShare;
+        out.addOnPaidInSelectedPeriodCents += Math.max(0, net - subShare);
+      }
+    }
+    return out;
+  }, [invoices, periodYear, periodMonth]);
+  const stripeRealPaidInSelectedPeriodCents = useMemo(
+    () => subscriptionPaidInSelectedPeriodCents + addOnPaidInSelectedPeriodCents,
+    [subscriptionPaidInSelectedPeriodCents, addOnPaidInSelectedPeriodCents],
+  );
 
   useEffect(() => {
     if (authLoading) return;
@@ -512,6 +544,7 @@ export default function UsuarioAdminDetailPage() {
     setRefundAmountReais((remaining / 100).toFixed(2).replace(".", ","));
     setRefundReason("requested_by_customer");
     setRefundError(null);
+    setRefundCancelSubscription(false);
   }, []);
 
   const closeRefundDialog = useCallback(() => {
@@ -556,6 +589,7 @@ export default function UsuarioAdminDetailPage() {
           body: JSON.stringify({
             amountCents,
             ...(refundReason !== "none" ? { reason: refundReason } : {}),
+            ...(refundCancelSubscription ? { cancelSubscription: true } : {}),
           }),
         },
       );
@@ -571,7 +605,47 @@ export default function UsuarioAdminDetailPage() {
     } finally {
       setRefundBusy(false);
     }
-  }, [user, uid, refundTarget, refundAmountReais, refundReason, loadInvoices, loadDetail]);
+  }, [
+    user,
+    uid,
+    refundTarget,
+    refundAmountReais,
+    refundReason,
+    refundCancelSubscription,
+    loadInvoices,
+    loadDetail,
+  ]);
+
+  const onCancelSubscription = useCallback(async () => {
+    if (!user || !uid) return;
+    setCancelSubBusy(true);
+    setCancelSubError(null);
+    try {
+      const idToken = await user.getIdToken();
+      const res = await fetch(
+        `/api/admin-users/${encodeURIComponent(uid)}/cancel-subscription`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${idToken}`,
+          },
+        },
+      );
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setCancelSubError(
+          typeof body.error === "string" ? body.error : "Falha ao cancelar assinatura.",
+        );
+        return;
+      }
+      setCancelSubDialogOpen(false);
+      await Promise.all([loadInvoices(), loadDetail()]);
+    } catch {
+      setCancelSubError("Erro de rede ao cancelar assinatura.");
+    } finally {
+      setCancelSubBusy(false);
+    }
+  }, [user, uid, loadInvoices, loadDetail]);
 
   useEffect(() => {
     if (authLoading || !user || !isGeneralAdmin || !userSeriesUrl) return;
@@ -691,13 +765,22 @@ export default function UsuarioAdminDetailPage() {
     setPlanError(null);
     try {
       const idToken = await user.getIdToken();
+      /**
+       * Mudar o plano de um cliente com subscription Stripe activa implica cancelar
+       * a subscription. Enviamos o consentimento explícito quando detetamos essa situação
+       * (a confirmação já foi dada na UI, via banner visível no diálogo).
+       */
+      const willCancelSubscription = hasActiveSubscription && planDraft !== effectivePlan;
       const res = await fetch(`/api/admin-users/${encodeURIComponent(uid)}`, {
         method: "PATCH",
         headers: {
           Authorization: `Bearer ${idToken}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ plan: planDraft }),
+        body: JSON.stringify({
+          plan: planDraft,
+          ...(willCancelSubscription ? { cancelActiveSubscription: true } : {}),
+        }),
       });
       const body = (await res.json().catch(() => ({}))) as AdminListedUser & { error?: string };
       if (!res.ok) {
@@ -706,6 +789,9 @@ export default function UsuarioAdminDetailPage() {
       }
       setDetail(body);
       setPlanDialogOpen(false);
+      if (willCancelSubscription) {
+        await loadInvoices();
+      }
     } catch {
       setPlanError("Erro de rede ao atualizar plano.");
     } finally {
@@ -962,7 +1048,12 @@ export default function UsuarioAdminDetailPage() {
                   variant={detail.disabled ? "outline" : "destructive"}
                   size="sm"
                   className="gap-2"
-                  disabled={toggleBusy}
+                  disabled={toggleBusy || (!detail.disabled && hasActiveSubscription)}
+                  title={
+                    !detail.disabled && hasActiveSubscription
+                      ? "Cancela a assinatura antes de desactivar a conta."
+                      : undefined
+                  }
                   onClick={() => setToggleDialogOpen(true)}
                 >
                   {detail.disabled ? "Ativar conta" : "Desativar conta"}
@@ -973,7 +1064,12 @@ export default function UsuarioAdminDetailPage() {
                     variant="destructive"
                     size="sm"
                     className="gap-2"
-                    disabled={deleteBusy}
+                    disabled={deleteBusy || hasActiveSubscription}
+                    title={
+                      hasActiveSubscription
+                        ? "Cancela a assinatura antes de excluir a conta."
+                        : undefined
+                    }
                     onClick={() => {
                       setDeleteDialogOpen(true);
                       setDeleteConfirmText("");
@@ -981,6 +1077,21 @@ export default function UsuarioAdminDetailPage() {
                     }}
                   >
                     Excluir conta
+                  </Button>
+                ) : null}
+                {hasActiveSubscription ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    disabled={cancelSubBusy}
+                    onClick={() => {
+                      setCancelSubDialogOpen(true);
+                      setCancelSubError(null);
+                    }}
+                  >
+                    Cancelar assinatura
                   </Button>
                 ) : null}
                 <Button
@@ -1453,6 +1564,30 @@ export default function UsuarioAdminDetailPage() {
                   </SelectContent>
                 </Select>
               </div>
+              {refundTarget.stripeSubscriptionId ||
+              (refundTarget.lines ?? []).some((l) => l.kind === "subscription") ? (
+                <label
+                  htmlFor="refund-cancel-sub"
+                  className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-border bg-muted/30 px-3.5 py-3 text-xs leading-relaxed text-foreground/90 hover:bg-muted/50 dark:border-white/10 dark:bg-white/[0.03]"
+                >
+                  <input
+                    id="refund-cancel-sub"
+                    type="checkbox"
+                    className="mt-0.5 size-4 shrink-0 cursor-pointer accent-destructive"
+                    checked={refundCancelSubscription}
+                    disabled={refundBusy}
+                    onChange={(e) => setRefundCancelSubscription(e.target.checked)}
+                  />
+                  <span className="min-w-0">
+                    <span className="block font-medium text-foreground">
+                      Também cancelar a assinatura
+                    </span>
+                    <span className="block text-[11px] text-muted-foreground">
+                      Cancela a assinatura na Stripe e rebaixa este cliente para o plano Starter.
+                    </span>
+                  </span>
+                </label>
+              ) : null}
               {refundError ? (
                 <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs leading-relaxed text-destructive">
                   {refundError}
@@ -1486,8 +1621,65 @@ export default function UsuarioAdminDetailPage() {
               ) : (
                 <>
                   <RotateCcw className="size-3" aria-hidden />
-                  Estornar
+                  {refundCancelSubscription ? "Estornar e cancelar" : "Estornar"}
                 </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={cancelSubDialogOpen}
+        onOpenChange={(open) => {
+          if (cancelSubBusy) return;
+          setCancelSubDialogOpen(open);
+          if (!open) setCancelSubError(null);
+        }}
+      >
+        <DialogContent className="gap-4 p-5 pb-6 sm:max-w-md sm:px-6 sm:pt-6 sm:pb-7" showCloseButton>
+          <DialogHeader className="gap-2 space-y-0 text-left">
+            <DialogTitle>Cancelar assinatura deste cliente?</DialogTitle>
+            <DialogDescription className="space-y-2 text-sm leading-relaxed text-muted-foreground">
+              <span className="block text-foreground/90">
+                A assinatura é cancelada imediatamente na Stripe e o cliente passa para o plano{" "}
+                <span className="font-medium text-foreground">Starter</span> (sem mensalidade).
+              </span>
+              <span className="block text-xs leading-normal text-muted-foreground/90">
+                Não é feito reembolso do ciclo atual — para isso usa o botão "Estornar" na linha da fatura.
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+          {cancelSubError ? (
+            <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs leading-relaxed text-destructive">
+              {cancelSubError}
+            </p>
+          ) : null}
+          <DialogFooter className="flex flex-col-reverse gap-2 border-0 bg-transparent p-0 sm:flex-row sm:justify-end sm:gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={cancelSubBusy}
+              onClick={() => setCancelSubDialogOpen(false)}
+            >
+              Voltar
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              className="gap-2"
+              disabled={cancelSubBusy}
+              onClick={() => void onCancelSubscription()}
+            >
+              {cancelSubBusy ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" aria-hidden />
+                  A cancelar…
+                </>
+              ) : (
+                "Cancelar assinatura"
               )}
             </Button>
           </DialogFooter>
@@ -1505,11 +1697,14 @@ export default function UsuarioAdminDetailPage() {
           }
         }}
       >
-        <DialogContent className="sm:max-w-md" showCloseButton>
-          <DialogHeader>
+        <DialogContent
+          className="gap-4 p-5 pb-6 sm:max-w-md sm:gap-4 sm:px-6 sm:pt-6 sm:pb-7"
+          showCloseButton
+        >
+          <DialogHeader className="gap-2 space-y-0 text-left">
             <DialogTitle>Excluir esta conta permanentemente?</DialogTitle>
-            <DialogDescription className="space-y-2">
-              <span className="block">
+            <DialogDescription className="space-y-2 text-sm leading-relaxed text-muted-foreground">
+              <span className="block text-foreground/90">
                 Esta ação é <strong>irreversível</strong>. Serão apagados todos os dados do
                 utilizador em Firestore (relatórios, propostas, leads, faturas sincronizadas) e o
                 registo no Firebase Authentication.
@@ -1521,7 +1716,7 @@ export default function UsuarioAdminDetailPage() {
                 </span>{" "}
                 ficará livre para voltar a registar-se do zero.
               </span>
-              <span className="block text-xs text-muted-foreground">
+              <span className="block text-xs leading-normal text-muted-foreground/90">
                 As faturas geradas na Stripe continuam preservadas no painel Stripe para auditoria.
               </span>
             </DialogDescription>
@@ -1544,7 +1739,7 @@ export default function UsuarioAdminDetailPage() {
               {deleteError}
             </p>
           ) : null}
-          <DialogFooter className="flex flex-col-reverse gap-2 border-0 bg-transparent p-0 sm:flex-row sm:justify-end">
+          <DialogFooter className="flex flex-col-reverse gap-2 border-0 bg-transparent p-0 sm:flex-row sm:justify-end sm:gap-2">
             <Button
               type="button"
               variant="outline"
@@ -1578,16 +1773,19 @@ export default function UsuarioAdminDetailPage() {
       </Dialog>
 
       <Dialog open={toggleDialogOpen} onOpenChange={setToggleDialogOpen}>
-        <DialogContent className="sm:max-w-md" showCloseButton>
-          <DialogHeader>
+        <DialogContent
+          className="gap-4 p-5 pb-6 sm:max-w-md sm:gap-4 sm:px-6 sm:pt-6 sm:pb-7"
+          showCloseButton
+        >
+          <DialogHeader className="gap-2 space-y-0 text-left">
             <DialogTitle>{detail?.disabled ? "Ativar esta conta?" : "Desativar esta conta?"}</DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-sm leading-relaxed text-muted-foreground">
               {detail?.disabled
                 ? "O utilizador voltará a poder iniciar sessão na plataforma."
                 : `A conta ${detail?.email?.trim() || detail?.uid || "deste utilizador"} deixará de poder iniciar sessão até ser reativada.`}
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="flex flex-col-reverse gap-2 border-0 bg-transparent p-0 sm:flex-row sm:justify-end">
+          <DialogFooter className="flex flex-col-reverse gap-2 border-0 bg-transparent p-0 sm:flex-row sm:justify-end sm:gap-2">
             <Button
               type="button"
               variant="outline"
@@ -1682,6 +1880,19 @@ export default function UsuarioAdminDetailPage() {
               </Select>
             </div>
 
+            {hasActiveSubscription && planDraft !== effectivePlan ? (
+              <div className="space-y-1.5 rounded-lg border border-red-400/35 bg-red-500/[0.08] px-3 py-2.5 text-[12px] leading-relaxed text-red-100">
+                <p className="font-semibold text-red-200">Atenção — assinatura Stripe activa</p>
+                <p className="text-[11px] leading-relaxed text-red-100/90">
+                  Este cliente tem uma assinatura paga em curso.
+                  Ao guardar, a assinatura será <strong>cancelada imediatamente na Stripe</strong> (a cobrança
+                  recorrente pára) e o novo plano <strong>{planDraft}</strong> passa a ser aplicado localmente.
+                  Esta acção não estorna o ciclo actual — se quiseres devolver o valor já cobrado, usa o botão
+                  "Estornar" na fatura.
+                </p>
+              </div>
+            ) : null}
+
             {canAssignMasterPlan ? (
               <p className="rounded-lg border border-amber-500/20 bg-amber-500/[0.07] px-3 py-2.5 text-[11px] leading-relaxed text-amber-100/90">
                 <span className="font-semibold text-amber-200">Plano Master:</span> exclusivo para a conta do
@@ -1716,14 +1927,16 @@ export default function UsuarioAdminDetailPage() {
             </Button>
             <Button
               type="button"
-              variant="cta"
+              variant={hasActiveSubscription && planDraft !== effectivePlan ? "destructive" : "cta"}
               size="lg"
               className="min-w-[10rem] gap-2"
               disabled={planBusy}
               onClick={() => void onSavePlan()}
             >
               {planBusy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
-              Salvar plano
+              {hasActiveSubscription && planDraft !== effectivePlan
+                ? "Salvar e cancelar assinatura"
+                : "Salvar plano"}
             </Button>
           </div>
         </DialogContent>

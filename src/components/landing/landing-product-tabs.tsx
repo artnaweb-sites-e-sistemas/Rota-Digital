@@ -17,7 +17,8 @@ const TABS = [
     icon: Users,
     videoSrc: "/videos/landing/leads-dark2.webm",
     title: "Controle total do seu funil",
-    description: "Veja os leads em um só lugar e saiba exatamente com quem falar e o que fazer em seguida.",
+    description:
+      "Veja o funil completo num só painel, priorize com quem falar e o próximo passo de cada oportunidade.",
     bullets: [
       "Organize os leads por etapa da negociação",
       "Guarde histórico de mensagens, contatos e anotações",
@@ -30,7 +31,8 @@ const TABS = [
     icon: Compass,
     videoSrc: PRODUCT_PANEL_VIDEO_SRC,
     title: "Diagnóstico que prepara a venda",
-    description: "A plataforma analisa o site e o Instagram da empresa e mostra, de forma simples, onde ela pode melhorar.",
+    description:
+      "A plataforma analisa o site e o Instagram e mostra, de forma clara, onde a empresa pode evoluir no digital.",
     bullets: [
       "Analisa automaticamente o site e o Instagram",
       "Mostra pontos fortes e oportunidades de melhoria",
@@ -43,7 +45,8 @@ const TABS = [
     icon: FileText,
     videoSrc: "/videos/landing/propsota-dark2.webm",
     title: "Propostas com mais poder de fechamento",
-    description: "Monte propostas mais claras e profissionais, com base no que o cliente realmente precisa.",
+    description:
+      "Monte propostas a partir do diagnóstico, com escopo, linguagem e tom prontos para fechar a negociação.",
     bullets: [
       "Crie o escopo com base no diagnóstico da empresa",
       "Apresente o valor da sua solução com mais clareza",

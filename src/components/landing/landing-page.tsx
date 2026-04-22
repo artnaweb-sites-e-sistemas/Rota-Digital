@@ -17,7 +17,6 @@ import { motion } from "motion/react";
 import {
   ArrowDown,
   ArrowRight,
-  Lightbulb,
   Bot,
   CheckCircle2,
   ChevronRight,
@@ -351,6 +350,35 @@ function HeroVisual({ className }: { className?: string }) {
   );
 }
 
+type LandingFaqItem = { id: string; q: ReactNode; a: ReactNode };
+
+function LandingFaqDetailsItem({ item, idx }: { item: LandingFaqItem; idx: number }) {
+  const [open, setOpen] = useState(item.id === "faq-route-lab");
+  return (
+    <motion.details
+      open={open}
+      onToggle={(e) => {
+        setOpen((e.currentTarget as HTMLDetailsElement).open);
+      }}
+      initial={{ opacity: 0, y: 10 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ delay: idx * 0.1 }}
+      className="group rounded-xl border border-zinc-300/70 bg-white shadow-sm transition-all open:shadow-md dark:border-white/12 dark:bg-zinc-950/40"
+    >
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-6 py-5 text-sm font-bold text-foreground sm:text-base">
+        <div className="min-w-0 pr-1">{item.q}</div>
+        <div className="flex size-6 items-center justify-center rounded-md bg-primary/10 text-primary transition-transform group-open:rotate-180">
+          <ChevronRight className="size-3.5 rotate-90" />
+        </div>
+      </summary>
+      <div className="border-t px-6 py-5 text-sm leading-relaxed text-muted-foreground sm:text-base dark:border-white/5">
+        {item.a}
+      </div>
+    </motion.details>
+  );
+}
+
 export function LandingPage() {
   const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -506,7 +534,7 @@ export function LandingPage() {
               className="max-w-2xl"
             >
               <div className="mb-6 inline-flex items-center gap-2 rounded-lg border border-zinc-900/12 bg-white/70 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-900 shadow-sm dark:border-white/18 dark:bg-white/[0.06] dark:text-white">
-                <Lightbulb className="size-3.5 shrink-0 text-brand" aria-hidden />
+                <Sparkles className="size-3.5 shrink-0 text-brand" aria-hidden />
                 <span>Comercial mais inteligente</span>
               </div>
               <h1 className="font-heading text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl md:text-6xl md:leading-[1.1] lg:text-[4rem]">
@@ -793,20 +821,34 @@ export function LandingPage() {
                       className="group relative flex flex-col"
                     >
                       {/* Card */}
-                      <div className="relative flex h-full flex-col overflow-hidden rounded-xl border bg-white p-6 shadow-sm transition-[transform,box-shadow] duration-300 hover:-translate-y-1 hover:shadow-md dark:border-white/5 dark:bg-[#121217]/60 dark:backdrop-blur-xl dark:hover:shadow-lg">
-                        {/* Brilho no topo no hover — igual à secção #visao */}
+                      <div
+                        className={cn(
+                          "relative flex h-full flex-col overflow-hidden rounded-xl border bg-white p-6 shadow-sm",
+                          "transition-all duration-300 hover:-translate-y-1",
+                          "hover:shadow-lg hover:shadow-brand/15",
+                          "dark:border-white/5 dark:bg-[#121217]/60 dark:backdrop-blur-xl",
+                          "dark:hover:shadow-lg dark:hover:shadow-brand/12",
+                        )}
+                      >
+                        {/* Brilho no hover — dourado/amarelo da marca (var(--brand)) */}
                         <div
                           className="pointer-events-none absolute inset-x-0 top-0 z-[1] h-[2px] opacity-0 transition-opacity duration-300 group-hover:opacity-100"
                           aria-hidden
                         >
                           <div className="h-full bg-gradient-to-r from-transparent via-brand to-transparent" />
-                          <div className="absolute left-1/2 top-full h-4 w-[85%] max-w-sm -translate-x-1/2 bg-gradient-to-b from-brand/35 to-transparent blur-md" />
+                          <div className="absolute left-1/2 top-full h-4 w-[85%] max-w-sm -translate-x-1/2 bg-gradient-to-b from-brand/30 to-transparent blur-md dark:from-brand/25" />
                         </div>
 
                         {/* Step number + icon row */}
                         <div className="mb-5 flex items-center justify-between">
-                          <div className={cn("flex size-11 items-center justify-center rounded-xl", step.iconBg)}>
-                            <step.icon className="size-5" aria-hidden />
+                          <div
+                            className={cn(
+                              "flex size-11 items-center justify-center rounded-xl sm:size-12",
+                              "transition-transform duration-300 group-hover:scale-110",
+                              step.iconBg,
+                            )}
+                          >
+                            <step.icon className="size-5 sm:size-6" aria-hidden />
                           </div>
                           <span className="font-heading text-3xl font-black tabular-nums text-foreground/14 [text-shadow:0_1px_0_rgba(255,255,255,0.35)] dark:text-brand/58 dark:[text-shadow:0_1px_2px_rgba(0,0,0,0.65)]">
                             {String(i + 1).padStart(2, "0")}
@@ -1140,42 +1182,82 @@ export function LandingPage() {
               description="Tudo o que você precisa saber sobre a plataforma que está mudando as agências digitais."
             />
             <div className="mt-16 space-y-4">
-              {[
-                {
-                  q: "Como a IA gera o diagnóstico?",
-                  a: "Nossa IA acessa as URLs públicas fornecidas (site e Instagram) e realiza uma varredura completa de copy, posicionamento e canais, comparando com as melhores práticas de mercado.",
-                },
-                {
-                  q: "Posso personalizar a proposta com minha marca?",
-                  a: "Com certeza. O Rota Digital foi feito para ser white-label. Você pode carregar seu logo, definir as cores da sua agência e os dados de contato que aparecerão nos links públicos.",
-                },
-                {
-                  q: "O cliente precisa de conta para ver o relatório?",
-                  a: "Não. Os links gerados (/r/ e /p/) são públicos e otimizados para qualquer dispositivo, permitindo visualização instantânea sem fricção.",
-                },
-                {
-                  q: "Existe limite de geração de diagnósticos?",
-                  a: "Depende do seu plano. Oferecemos créditos que são consumidos a cada diagnóstico gerado pela IA, garantindo que você sempre tenha o melhor custo-benefício.",
-                },
-              ].map((item, idx) => (
-                <motion.details
-                  key={item.q}
-                  initial={{ opacity: 0, y: 10 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: idx * 0.1 }}
-                  className="group rounded-xl border border-zinc-300/70 bg-white shadow-sm transition-all open:shadow-md dark:border-white/12 dark:bg-zinc-950/40"
-                >
-                  <summary className="flex cursor-pointer list-none items-center justify-between px-6 py-5 text-sm font-bold text-foreground sm:text-base">
-                    <span>{item.q}</span>
-                    <div className="flex size-6 items-center justify-center rounded-md bg-primary/10 text-primary transition-transform group-open:rotate-180">
-                      <ChevronRight className="size-3.5 rotate-90" />
-                    </div>
-                  </summary>
-                  <div className="border-t px-6 py-5 text-sm leading-relaxed text-muted-foreground sm:text-base dark:border-white/5">
-                    {item.a}
-                  </div>
-                </motion.details>
+              {(
+                [
+                  {
+                    id: "faq-route-lab",
+                    q: (
+                      <>
+                        <span className="sr-only">O que é o Route Lab?</span>
+                        <span
+                          className="inline-flex min-w-0 flex-wrap items-center gap-x-1 sm:gap-x-1.5"
+                          aria-hidden
+                        >
+                          <span>O que é o</span>
+                          <span className="inline-flex items-center gap-px">
+                            <Image
+                              src="/assets/logo/logo-dark.png"
+                              alt=""
+                              width={220}
+                              height={62}
+                              className="h-[1.3rem] w-auto max-w-[3.55rem] object-contain object-left sm:h-[1.6rem] sm:max-w-[4.1rem] dark:hidden"
+                            />
+                            <Image
+                              src="/assets/logo/logo-white.png"
+                              alt=""
+                              width={220}
+                              height={62}
+                              className="hidden h-[1.3rem] w-auto max-w-[3.55rem] object-contain object-left sm:h-[1.6rem] sm:max-w-[4.1rem] dark:block"
+                            />
+                            <span className="shrink-0">?</span>
+                          </span>
+                        </span>
+                      </>
+                    ),
+                    a: (
+                      <div className="space-y-3">
+                        <p>
+                          <span className="font-semibold text-foreground">Route Lab</span> reúne, num só fluxo, o que a
+                          sua agência precisa para vender: acompanhar leads, gerar o diagnóstico com IA a partir do site
+                          e do Instagram do lead e, depois, montar a proposta.
+                        </p>
+                        <p>
+                          O relatório pronto que você apresenta primeiro é o que chamamos de{" "}
+                          <strong className="font-semibold text-foreground">Rota digital</strong>.
+                        </p>
+                        <p>
+                          O lead abre tudo em um link. Funciona bem no celular e no computador, sem complicação.
+                        </p>
+                        <p>
+                          A sua operação fica centralizada: menos retrabalho, menos tarefa solta, mais tempo para
+                          conversar e fechar com organização e profissionalismo.
+                        </p>
+                      </div>
+                    ),
+                  },
+                  {
+                    id: "faq-ia-diagnostico",
+                    q: "Como a IA gera o diagnóstico?",
+                    a: "Nossa IA acessa as URLs públicas fornecidas (site e Instagram) e realiza uma varredura completa de copy, posicionamento e canais, comparando com as melhores práticas de mercado.",
+                  },
+                  {
+                    id: "faq-personalizacao",
+                    q: "Posso personalizar a proposta com minha marca?",
+                    a: "Sim. Com Pro ou Agency, o link aberto pelo cliente mostra sua logo, a apresentação da agência (Sobre) e os contatos, para quem lê associar a entrega diretamente a você.",
+                  },
+                  {
+                    id: "faq-conta-relatorio",
+                    q: "O cliente precisa de conta para ver o relatório?",
+                    a: "Não. Os links gerados (/r/ e /p/) são públicos e otimizados para qualquer dispositivo, permitindo visualização instantânea sem fricção.",
+                  },
+                  {
+                    id: "faq-limite-diagnosticos",
+                    q: "Existe limite de geração de diagnósticos?",
+                    a: "Depende do seu plano. Oferecemos créditos que são consumidos a cada diagnóstico gerado pela IA, garantindo que você sempre tenha o melhor custo-benefício.",
+                  },
+                ] satisfies { id: string; q: ReactNode; a: ReactNode }[]
+              ).map((item, idx) => (
+                <LandingFaqDetailsItem key={item.id} item={item} idx={idx} />
               ))}
             </div>
           </div>

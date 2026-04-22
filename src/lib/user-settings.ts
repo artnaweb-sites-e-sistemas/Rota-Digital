@@ -61,6 +61,7 @@ function coerceCompanyAboutSettings(raw: Record<string, unknown>): UserCompanyAb
     services: typeof raw.services === "string" ? raw.services : "",
     defaultSpotPlans: coerceProposalPlansArray(raw.defaultSpotPlans),
     defaultRecurringPlans: coerceProposalPlansArray(raw.defaultRecurringPlans),
+    hideReportAgencyBranding: raw.hideReportAgencyBranding === true,
   };
 }
 
@@ -125,6 +126,7 @@ export async function saveUserCompanyAboutSettings(
       services: settings.services,
       defaultSpotPlans: settings.defaultSpotPlans.map(proposalPlanToFirestoreValue),
       defaultRecurringPlans: settings.defaultRecurringPlans.map(proposalPlanToFirestoreValue),
+      hideReportAgencyBranding: settings.hideReportAgencyBranding === true,
       updatedAt: serverTimestamp(),
     },
     { merge: true }

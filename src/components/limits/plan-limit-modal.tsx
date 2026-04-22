@@ -95,7 +95,7 @@ const KIND_COPY: Record<
     badge: "Recurso de marca exclusivo",
     title: "Logo e capa próprias são recursos Pro/Agency",
     description:
-      "Logo personalizada e capa da empresa entram a partir do plano Pro. Assine um plano para enviar a sua marca e reforçar a identidade nas propostas.",
+      "Logótipo, capa e o bloco «Sobre a agência» no relatório Rota digital (link partilhado) estão incluídos a partir do plano Pro. Assine Pro ou Agency para personalizar a sua marca e editar essa secção.",
     unit: "",
     unitShort: "",
     checkoutEndpoint: "",
