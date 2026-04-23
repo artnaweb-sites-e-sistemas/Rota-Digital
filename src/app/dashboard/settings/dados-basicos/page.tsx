@@ -2,6 +2,7 @@
 
 import { ReportCtaSettingsForm } from "@/components/settings/report-cta-settings-form";
 import { AppearanceSettingsForm } from "@/components/settings/appearance-settings-form";
+import { SettingsQuotaOverview } from "@/components/settings/settings-quota-overview";
 
 export default function SettingsDadosBasicosPage() {
   return (
@@ -9,7 +10,7 @@ export default function SettingsDadosBasicosPage() {
       <div className="flex flex-col gap-2">
         <h1 className="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">Dados básicos</h1>
         <p className="max-w-2xl text-base text-muted-foreground">
-          Aparência do painel e destino dos botões de ação nos relatórios.
+          Aparência do painel, destino dos botões de ação nos relatórios e consumo de cotas no ciclo atual.
         </p>
       </div>
 
@@ -17,6 +18,8 @@ export default function SettingsDadosBasicosPage() {
         <AppearanceSettingsForm />
         <ReportCtaSettingsForm />
       </div>
+
+      <SettingsQuotaOverview />
     </div>
   );
 }

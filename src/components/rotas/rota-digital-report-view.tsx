@@ -1887,6 +1887,7 @@ export function RotaDigitalReportView({
   const [reanalyzeNotes, setReanalyzeNotes] = useState("");
   const [reanalyzing, setReanalyzing] = useState(false);
   const [reanalyzeError, setReanalyzeError] = useState<string | null>(null);
+  const [reanalyzeEntryQuotaChecking, setReanalyzeEntryQuotaChecking] = useState(false);
   const [limitModalState, setLimitModalState] = useState<PlanLimitModalState | null>(null);
   const [reanalyzeProgressOpen, setReanalyzeProgressOpen] = useState(false);
   const [reanalyzeProgress, setReanalyzeProgress] = useState(0);
@@ -2539,6 +2540,46 @@ export function RotaDigitalReportView({
   );
   const reanalysisWillConsumeRotasQuota = priorReanalysesCount >= 1;
 
+  const onReanalyzeButtonClick = useCallback(async () => {
+    if (!reanalysisWillConsumeRotasQuota) {
+      setReanalyzeOpen(true);
+      setReanalyzeError(null);
+      return;
+    }
+    const current = auth?.currentUser;
+    if (!current) {
+      setReanalyzeOpen(true);
+      setReanalyzeError(null);
+      return;
+    }
+    setReanalyzeEntryQuotaChecking(true);
+    try {
+      const idToken = await current.getIdToken();
+      const res = await fetch("/api/user-quota", { headers: { Authorization: `Bearer ${idToken}` } });
+      if (res.ok) {
+        const data = (await res.json()) as {
+          plan: string;
+          rotas: { atLimit: boolean; limit: number; used: number };
+        };
+        if (data.rotas.atLimit) {
+          setLimitModalState({
+            kind: "rotas",
+            plan: normalizedSubscriptionPlanKey(data.plan),
+            monthlyLimit: data.rotas.limit,
+            usedThisMonth: data.rotas.used,
+          });
+          return;
+        }
+      }
+    } catch {
+      /* abre o diálogo: o API valida cota no pedido */
+    } finally {
+      setReanalyzeEntryQuotaChecking(false);
+    }
+    setReanalyzeOpen(true);
+    setReanalyzeError(null);
+  }, [reanalysisWillConsumeRotasQuota]);
+
   const headlineMaturity = useMemo(() => {
     const fromTopics = maturityFromDiagnosticScores(report.diagnosticScores);
     if (fromTopics) return fromTopics;
@@ -2913,14 +2954,13 @@ export function RotaDigitalReportView({
             <Button
               type="button"
               variant="ctaMotion"
-              disabled={reanalyzing || reanalyzeProgressOpen}
+              disabled={reanalyzing || reanalyzeProgressOpen || reanalyzeEntryQuotaChecking}
               onClick={() => {
-                setReanalyzeOpen(true);
-                setReanalyzeError(null);
+                void onReanalyzeButtonClick();
               }}
               className="gap-2 no-print"
             >
-              <Bot size={16} />
+              {reanalyzeEntryQuotaChecking ? <Loader2 size={16} className="animate-spin" /> : <Bot size={16} />}
               Reanalise
             </Button>
           </div>

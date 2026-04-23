@@ -1,12 +1,12 @@
 import Image from "next/image";
+import { AlertTriangle } from "lucide-react";
+
+import { cn } from "@/lib/utils";
 
 /** Logo de marca do topo dos modais de progresso (geração, captura, reanálise) — pulso leve. */
 export function ProgressOverlayRotaLabLogo() {
   return (
-    <div
-      className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[#6b5f3a] to-brand p-2.5 ring-1 ring-white/10"
-      aria-hidden
-    >
+    <div className="mb-5 flex justify-center" aria-hidden>
       <Image
         src="/assets/logo/logo-white.png"
         alt=""
@@ -19,14 +19,26 @@ export function ProgressOverlayRotaLabLogo() {
   );
 }
 
-/** Aviso para não interromper o fluxo com refresh. */
-export function ProgressOverlayPageReloadWarning() {
+type ProgressOverlayPageReloadWarningProps = {
+  className?: string;
+};
+
+/** Aviso discreto para não interromper o fluxo com refresh (ícone de atenção na cor de marca). */
+export function ProgressOverlayPageReloadWarning({ className }: ProgressOverlayPageReloadWarningProps) {
   return (
     <p
-      role="alert"
-      className="mt-4 w-full rounded-lg border border-amber-500/45 bg-amber-500/12 px-3 py-2 text-center text-xs font-medium leading-snug text-amber-950 dark:border-amber-400/40 dark:bg-amber-400/10 dark:text-amber-50"
+      role="note"
+      className={cn(
+        "flex w-full max-w-full items-start gap-2 text-left text-[11px] leading-relaxed text-muted-foreground/80",
+        className,
+      )}
     >
-      Aguarde a conclusão; não recarregue a página.
+      <AlertTriangle
+        className="mt-0.5 size-3.5 shrink-0 text-brand"
+        strokeWidth={2.25}
+        aria-hidden
+      />
+      <span>Aguarde a conclusão; não recarregue a página.</span>
     </p>
   );
 }

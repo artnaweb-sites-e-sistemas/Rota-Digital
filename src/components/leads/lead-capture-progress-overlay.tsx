@@ -87,8 +87,6 @@ export function LeadCaptureProgressOverlay({ open, progress, hint }: Props) {
             {label}
           </p>
 
-          <ProgressOverlayPageReloadWarning />
-
           <div className="mt-6 w-full space-y-2">
             <div className="flex items-baseline justify-between gap-3 text-xs text-muted-foreground">
               <span>Progresso estimado</span>
@@ -107,6 +105,7 @@ export function LeadCaptureProgressOverlay({ open, progress, hint }: Props) {
                 />
               </div>
             </div>
+            <ProgressOverlayPageReloadWarning className="mt-2.5" />
           </div>
         </div>
       </div>

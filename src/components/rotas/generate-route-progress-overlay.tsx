@@ -152,8 +152,6 @@ function EvidenceRecoveryPanel({ r }: { r: GenerateRouteEvidenceRecovery }) {
         </div>
       ) : null}
 
-      <ProgressOverlayPageReloadWarning />
-
       <div className="mt-5 flex w-full flex-col gap-2 sm:flex-row sm:justify-center sm:gap-3">
         <Button
           type="button"
@@ -176,6 +174,8 @@ function EvidenceRecoveryPanel({ r }: { r: GenerateRouteEvidenceRecovery }) {
           Prosseguir com a análise
         </Button>
       </div>
+
+      <ProgressOverlayPageReloadWarning className="mt-3.5" />
     </>
   );
 }
@@ -263,8 +263,6 @@ export function GenerateRouteProgressOverlay({
                 {label}
               </p>
 
-              <ProgressOverlayPageReloadWarning />
-
               <div className="mt-6 w-full space-y-2">
                 <div className="flex items-baseline justify-between gap-3 text-xs text-muted-foreground">
                   <span>Progresso estimado</span>
@@ -289,6 +287,7 @@ export function GenerateRouteProgressOverlay({
                     />
                   </div>
                 </div>
+                <ProgressOverlayPageReloadWarning className="mt-2.5" />
               </div>
             </>
           )}
