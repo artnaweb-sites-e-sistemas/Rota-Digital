@@ -31,11 +31,12 @@ export function normalizedSubscriptionPlanKey(raw: unknown): LeadCapturePlanKey 
   const text = String(raw ?? "")
     .trim()
     .toLowerCase();
-  if (!text) return "pro";
+  if (!text) return "starter";
   if (text.includes("master")) return "master";
   if (text.includes("agency") || text.includes("enterprise")) return "agency";
   if (text.includes("starter") || text.includes("free") || text.includes("trial")) return "starter";
-  return "pro";
+  if (text.includes("pro")) return "pro";
+  return "starter";
 }
 
 /** Limite mensal de leads de captação (Google Places), respeitando override no Firestore e Master. */

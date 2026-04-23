@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
           /** Seed com a contagem já existente (inclui a recém-criada) menos 1 para
            *  preservar o valor incrementado. Evita que o contador regrida em quem
            *  já tinha propostas criadas antes deste recurso. */
-          seed: Math.max(0, docsUsed - 1),
+          seed: Math.max(0, docsUsed),
         });
       } catch (counterErr) {
         console.error("[proposals-create] falha ao incrementar cycleUsage", counterErr);
