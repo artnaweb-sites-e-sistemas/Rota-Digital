@@ -2095,6 +2095,13 @@ export function RotaDigitalReportView({
     return planIdFromUserSettings(raw as Record<string, unknown>);
   }, [report.billingPlanSnapshot, userSettingsForAgencyBranding]);
 
+  const openCompetitorUpgradeModal = useCallback(() => {
+    setLimitModalState({
+      kind: "competitors",
+      plan: normalizedSubscriptionPlanKey(effectiveReportPlan),
+    });
+  }, [effectiveReportPlan]);
+
   const isViewerMasterAdmin = useMemo(() => {
     if (!isDashboard) return false;
     if (!viewerUserSettings) return false;
@@ -3751,6 +3758,7 @@ export function RotaDigitalReportView({
         plan={effectiveReportPlan}
         patchReport={async (patch) => await applyReportPatch(patch)}
         showMasterPlacesSearchTest={isViewerMasterAdmin}
+        onRequestCompetitorUpgrade={openCompetitorUpgradeModal}
       />
 
       {report.evidences ? (

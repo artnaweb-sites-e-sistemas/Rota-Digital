@@ -39,6 +39,8 @@ export type ReportPlacesSectionsProps = {
   patchReport: (patch: Partial<RotaDigitalReport>) => Promise<boolean | void>;
   /** Só o Admin Master vê e usa «Testar busca» (debug de Places). */
   showMasterPlacesSearchTest?: boolean;
+  /** Abre o `PlanLimitModal` para o utilizador assinar (ranking de concorrentes, plano Pro). */
+  onRequestCompetitorUpgrade?: () => void;
 };
 
 function InstagramGlyph({ className }: { className?: string }) {
@@ -299,12 +301,20 @@ function ScrollHintWrapper({ children }: { children: React.ReactNode }) {
 function LockedSectionOverlay({
   title,
   description,
+  onPlanClick,
   children,
 }: {
   title: string;
-  description: string;
+  description?: string;
+  onPlanClick?: () => void;
   children: React.ReactNode;
 }) {
+  const cta = (
+    <>
+      <Sparkles className="size-3" aria-hidden />
+      <span>Disponível no plano Pro</span>
+    </>
+  );
   return (
     <div className={cn("relative select-none overflow-hidden rounded-md print-white", REPORT_SECTION_SURFACE)}>
       <div
@@ -320,12 +330,23 @@ function LockedSectionOverlay({
         </div>
         <div className="max-w-md text-center">
           <p className="text-sm font-semibold text-foreground">{title}</p>
-          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{description}</p>
+          {description ? (
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{description}</p>
+          ) : null}
         </div>
-        <div className="mt-1 flex items-center gap-1.5 rounded-full border border-brand/30 bg-brand/8 px-3 py-1.5 text-[11px] font-medium text-brand dark:border-brand/25 dark:bg-brand/12">
-          <Sparkles className="size-3" aria-hidden />
-          Disponível no plano Pro
-        </div>
+        {onPlanClick ? (
+          <button
+            type="button"
+            onClick={onPlanClick}
+            className="mt-1 inline-flex items-center gap-1.5 rounded-full border border-brand/30 bg-brand/8 px-3 py-1.5 text-[11px] font-medium text-brand transition-colors hover:bg-brand/12 dark:border-brand/25 dark:bg-brand/12 dark:hover:bg-brand/18 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/35"
+          >
+            {cta}
+          </button>
+        ) : (
+          <div className="mt-1 flex items-center gap-1.5 rounded-full border border-brand/30 bg-brand/8 px-3 py-1.5 text-[11px] font-medium text-brand dark:border-brand/25 dark:bg-brand/12">
+            {cta}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -337,6 +358,7 @@ export function ReportPlacesSections({
   isDashboard,
   patchReport,
   showMasterPlacesSearchTest = false,
+  onRequestCompetitorUpgrade,
 }: ReportPlacesSectionsProps) {
   const features = PLAN_FEATURES[plan];
   const [busy, setBusy] = useState(false);
@@ -606,15 +628,15 @@ export function ReportPlacesSections({
 
       {!features.competitorAnalysis ? (
         <LockedSectionOverlay
-          title="Ranking Local"
-          description="Comparativo de notas, avaliações e presença digital com os concorrentes da mesma região. Faça upgrade para desbloquear."
+          title="Ranking dos concorrentes"
+          onPlanClick={onRequestCompetitorUpgrade}
         >
           <Card className="border-0 bg-transparent py-4 shadow-none ring-0 sm:py-5">
             <CardHeader className="pb-3">
               <div className="flex items-center gap-2">
                 <MapPin className="size-4 text-brand" aria-hidden />
                 <CardTitle className="text-xs font-semibold uppercase tracking-wider text-foreground/78 dark:text-muted-foreground">
-                  Ranking Local
+                  Ranking dos concorrentes
                 </CardTitle>
               </div>
             </CardHeader>
@@ -664,7 +686,7 @@ export function ReportPlacesSections({
               <div className="flex items-center gap-2">
                 <MapPin className="size-4 text-brand" aria-hidden />
                 <CardTitle className="text-xs font-semibold uppercase tracking-wider text-foreground/78 dark:text-muted-foreground print:text-foreground">
-                  Ranking Local
+                  Ranking dos concorrentes
                 </CardTitle>
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -815,7 +837,7 @@ export function ReportPlacesSections({
                 variant="ghost"
                 size="icon"
                 className="no-print absolute bottom-3 right-3 z-[6] size-8 rounded-md border border-border/70 bg-background/95 text-muted-foreground shadow-sm backdrop-blur-sm hover:bg-muted hover:text-foreground sm:bottom-4 sm:right-4"
-                aria-label="Editar ranking local (lead e concorrentes)"
+                aria-label="Editar ranking dos concorrentes (lead e concorrentes)"
                 onClick={() => setRankingEditOpen(true)}
               >
                 <Pencil className="size-3.5" aria-hidden />

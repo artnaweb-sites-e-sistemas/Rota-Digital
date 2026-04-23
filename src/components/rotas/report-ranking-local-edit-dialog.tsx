@@ -360,7 +360,7 @@ export function ReportRankingLocalEditDialog({
       >
         <div className="shrink-0 border-b border-border/50 bg-muted/20 px-5 pb-4 pt-5 sm:px-6 sm:pb-5 sm:pt-6 dark:border-white/10 dark:bg-white/[0.04]">
           <DialogHeader className="gap-2 space-y-0 p-0 pr-8 text-left">
-            <DialogTitle className="text-lg">Editar ranking local</DialogTitle>
+            <DialogTitle className="text-lg">Editar ranking dos concorrentes</DialogTitle>
             <DialogDescription className="text-[13px] leading-relaxed">
               Ajuste o lead e os concorrentes. Ao guardar, as posições são recalculadas automaticamente (primeiro por
               número de avaliações, depois por nota). “Tem site” segue o URL de site próprio.

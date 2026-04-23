@@ -26,7 +26,7 @@ const SALES_EMAIL = "suporte@rotadigital.app";
 
 const QUOTA_RENEWAL_NOTE = "*A cota não é acumulativa e renova a cada mês.";
 
-type Kind = QuotaResource | "logo";
+type Kind = QuotaResource | "logo" | "competitors";
 
 export type PlanLimitModalState = {
   kind: Kind;
@@ -101,6 +101,16 @@ const KIND_COPY: Record<
     checkoutEndpoint: "",
     salesSubject: "Quero assinar um plano para usar logo personalizada",
   },
+  competitors: {
+    badge: "Recurso Pro",
+    title: "Ranking dos concorrentes",
+    description:
+      "Compare a sua nota, avaliações e presença com negócios da mesma região. Incluído a partir do plano Pro. Escolha Pro ou Agency abaixo para desbloquear.",
+    unit: "",
+    unitShort: "",
+    checkoutEndpoint: "",
+    salesSubject: "Quero assinar um plano para desbloquear o ranking de concorrentes",
+  },
 };
 
 function packsForKind(kind: Kind): AddOnPack[] {
@@ -138,9 +148,10 @@ export function PlanLimitModal({ state, onClose, getIdToken }: Props) {
   const isPro = plan === "pro";
   const isAgency = plan === "agency";
   const isMaster = plan === "master";
-  const showPacks = !isStarter && !isMaster && kind !== "logo";
-  const showAgencyUpsell = isPro && kind !== "logo";
-  const showSubscribeCtas = isStarter || kind === "logo";
+  const isFeatureUpsell = kind === "logo" || kind === "competitors";
+  const showPacks = !isStarter && !isMaster && !isFeatureUpsell;
+  const showAgencyUpsell = isPro && !isFeatureUpsell;
+  const showSubscribeCtas = isStarter || isFeatureUpsell;
 
   const proPriceLabel =
     billingCycle === "monthly" ? "R$ 127" : "R$ 97";
@@ -254,7 +265,7 @@ export function PlanLimitModal({ state, onClose, getIdToken }: Props) {
         </div>
 
         <div className="space-y-5 px-6 py-6 sm:px-8 sm:py-7">
-          {kind !== "logo" ? (
+          {!isFeatureUpsell ? (
             <div className="grid gap-3 rounded-xl border border-white/12 bg-white/[0.04] p-4 sm:grid-cols-3">
               <InfoCell label="Plano" value={plan.toUpperCase()} icon={<Crown className="size-3.5 text-brand" aria-hidden />} />
               <InfoCell
@@ -408,7 +419,7 @@ export function PlanLimitModal({ state, onClose, getIdToken }: Props) {
             </div>
           ) : null}
 
-          {isAgency && kind !== "logo" && packs.length > 0 ? (
+          {isAgency && !isFeatureUpsell && packs.length > 0 ? (
             <p className="text-xs leading-relaxed text-zinc-400">
               Já está no plano Agency. Use um pacote extra para cobrir picos de produção sem mexer
               na assinatura.
