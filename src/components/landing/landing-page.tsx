@@ -25,6 +25,7 @@ import {
   FileText,
   AlertCircle,
   Link2,
+  Lock,
   LogIn,
   Menu,
   Send,
@@ -48,7 +49,11 @@ import { LandingRotasCompare } from "@/components/landing/landing-rotas-compare"
 import BorderGlow from "@/components/BorderGlow";
 import StarBorder from "@/components/StarBorder";
 
-type LandingPlanFeature = string | { before: string; gold: string } | { before: string; red: string };
+type LandingPlanFeature =
+  | string
+  | { before: string; gold: string }
+  | { before: string; red: string }
+  | { locked: true; text: string };
 
 /** Cards de preço na landing — tipo explícito evita união inferida sem `originalPrice`/`ctaHref` (falha no `next build`). */
 type LandingPricingPlan = {
@@ -56,6 +61,8 @@ type LandingPricingPlan = {
   price: string;
   description: string;
   features: LandingPlanFeature[];
+  /** Ancoragem de ROI, logo abaixo do preço */
+  roiAnchor: string;
   buttonText: string;
   ctaHref: string;
   isFeatured: boolean;
@@ -91,6 +98,9 @@ function PlanFeatureLabel({ feature }: { feature: LandingPlanFeature }) {
       <span className="leading-normal tracking-normal">{goldNumbersInText(feature)}</span>
     );
   }
+  if ("locked" in feature && feature.locked) {
+    return <span className="leading-normal tracking-normal">{feature.text}</span>;
+  }
   if ("gold" in feature) {
     return (
       <span className="inline leading-normal tracking-normal">
@@ -100,12 +110,43 @@ function PlanFeatureLabel({ feature }: { feature: LandingPlanFeature }) {
       </span>
     );
   }
+  if ("red" in feature) {
+    return (
+      <span className="inline leading-normal tracking-normal">
+        {goldNumbersInText(feature.before)}
+        {" "}
+        <span className="font-medium text-destructive">{feature.red}</span>
+      </span>
+    );
+  }
+  return <span className="leading-normal tracking-normal" />;
+}
+
+function LandingPricingFeatureRow({
+  feature,
+  isFeatured,
+}: {
+  feature: LandingPlanFeature;
+  isFeatured: boolean;
+}) {
+  const locked = typeof feature === "object" && feature !== null && "locked" in feature && feature.locked;
   return (
-    <span className="inline leading-normal tracking-normal">
-      {goldNumbersInText(feature.before)}
-      {" "}
-      <span className="font-medium text-destructive">{feature.red}</span>
-    </span>
+    <li
+      className={cn(
+        "flex items-start gap-2 text-sm font-normal tracking-normal",
+        locked && "text-muted-foreground/85",
+      )}
+    >
+      {locked ? (
+        <Lock className="mt-0.5 size-4 shrink-0 text-muted-foreground/45" aria-hidden />
+      ) : (
+        <CheckCircle2
+          className={cn("mt-0.5 size-4 shrink-0", isFeatured ? "text-brand" : "text-brand/60")}
+          aria-hidden
+        />
+      )}
+      <PlanFeatureLabel feature={feature} />
+    </li>
   );
 }
 
@@ -421,11 +462,13 @@ export function LandingPage() {
         name: "Starter",
         price: "0",
         description: "Grátis, para conhecer a plataforma e validar o funil.",
+        roiAnchor: "Perfeito para testar o método",
         features: [
           "2 diagnósticos (Rota Digital) com IA.",
           "30 prospecções de leads.",
           "2 gerações de propostas",
           { before: "Link Público", red: "sem a sua marca" },
+          { locked: true, text: "Análise do Google Meu Negócio e concorrentes (disponível no Pro)" },
         ],
         buttonText: "Começar Grátis",
         ctaHref: "/cadastro",
@@ -435,11 +478,13 @@ export function LandingPage() {
         name: "Pro",
         price: billingCycle === "monthly" ? "127" : "97",
         description: "Diagnósticos diários e prospecção consistente para sua agência crescer.",
+        roiAnchor: "Feche 1 proposta a mais no mês e o plano se paga várias vezes",
         features: [
           "20 diagnósticos (Rota Digital) com IA.",
           "50 prospecções de leads.",
           "30 gerações de propostas",
           { before: "Link Público", gold: "com a sua marca" },
+          "Análise completa do Google Meu Negócio e comparativo com concorrentes",
         ],
         buttonText: "Assinar Pro",
         ctaHref: `/assinatura?plan=pro&cycle=${cycle}`,
@@ -449,11 +494,13 @@ export function LandingPage() {
         name: "Agency",
         price: billingCycle === "monthly" ? "347" : "267",
         description: "Volume máximo para agências com alta demanda de prospecção.",
+        roiAnchor: "Ideal para agências que fecham 3+ clientes por mês",
         features: [
           "50 diagnósticos (Rota Digital) com IA.",
           "100 prospecções de leads.",
           "Propostas ilimitadas",
           { before: "Link Público", gold: "com a sua marca" },
+          "Análise completa do Google Meu Negócio e comparativo com concorrentes",
         ],
         buttonText: "Assinar Agency",
         ctaHref: `/assinatura?plan=agency&cycle=${cycle}`,
@@ -1132,15 +1179,15 @@ export function LandingPage() {
                               ~3 meses grátis · R$ {(parseInt(plan.price, 10) * 12).toLocaleString("pt-BR")},00/ANO
                             </span>
                           )}
+                          <p className="mt-2.5 text-pretty text-sm leading-snug text-muted-foreground/80 dark:text-muted-foreground/75">
+                            {plan.roiAnchor}
+                          </p>
                         </div>
                         <p className="mt-4 text-pretty text-sm leading-snug text-muted-foreground">{plan.description}</p>
                         <div className="my-8 h-px bg-border" />
                         <ul className="flex-1 space-y-2.5">
                           {plan.features.map((f, idx) => (
-                            <li key={`${plan.name}-${idx}`} className="flex items-start gap-2 text-sm font-normal tracking-normal">
-                              <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-brand" />
-                              <PlanFeatureLabel feature={f} />
-                            </li>
+                            <LandingPricingFeatureRow key={`${plan.name}-${idx}`} feature={f} isFeatured />
                           ))}
                         </ul>
                         <LinkButton
@@ -1179,15 +1226,15 @@ export function LandingPage() {
                               *Gratuito para testar
                             </span>
                           )}
+                          <p className="mt-2.5 text-pretty text-sm leading-snug text-muted-foreground/80 dark:text-muted-foreground/75">
+                            {plan.roiAnchor}
+                          </p>
                         </div>
                         <p className="mt-4 text-pretty text-sm leading-snug text-muted-foreground">{plan.description}</p>
                         <div className="my-8 h-px bg-border" />
                         <ul className="flex-1 space-y-2.5">
                           {plan.features.map((f, idx) => (
-                            <li key={`${plan.name}-${idx}`} className="flex items-start gap-2 text-sm font-normal tracking-normal">
-                              <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-brand/60" />
-                              <PlanFeatureLabel feature={f} />
-                            </li>
+                            <LandingPricingFeatureRow key={`${plan.name}-${idx}`} feature={f} isFeatured={false} />
                           ))}
                         </ul>
                         <LinkButton
@@ -1288,6 +1335,26 @@ export function LandingPage() {
                     q: "Existe limite de geração de diagnósticos?",
                     a: "Depende do seu plano. Oferecemos créditos que são consumidos a cada diagnóstico gerado pela IA, garantindo que você sempre tenha o melhor custo-benefício.",
                   },
+                  {
+                    id: "faq-cancelar",
+                    q: "Posso cancelar a qualquer momento?",
+                    a: "Sim. Não temos fidelidade nem multa de cancelamento. Você cancela com um clique dentro da plataforma e mantém acesso até o fim do período já pago.",
+                  },
+                  {
+                    id: "faq-limite-mes",
+                    q: "O que acontece se eu atingir o limite do meu plano no meio do mês?",
+                    a: "Você pode comprar pacotes extras avulsos de leads, rotas ou propostas sem precisar mudar de plano. Os créditos ficam disponíveis imediatamente e não expiram no fim do mês. Se o padrão de uso for recorrente, você também pode fazer upgrade para um plano maior a qualquer momento.",
+                  },
+                  {
+                    id: "faq-nicho",
+                    q: "A Rota Digital funciona para qualquer nicho de negócio?",
+                    a: "Sim. O sistema analisa qualquer empresa que tenha presença digital — site, Instagram ou Google Meu Negócio. Funciona desde restaurantes e clínicas até imobiliárias, lojas, prestadores de serviço e B2B. A IA adapta o diagnóstico ao tipo de negócio automaticamente.",
+                  },
+                  {
+                    id: "faq-instalacao",
+                    q: "Preciso instalar algo ou integrar com outras ferramentas?",
+                    a: "Não. Tudo acontece dentro da plataforma, pelo navegador. Você só precisa fornecer o nome e a cidade da empresa ou prospectar direto pelo Google Maps integrado — a IA cuida do resto.",
+                  },
                 ] satisfies { id: string; q: ReactNode; a: ReactNode }[]
               ).map((item, idx) => (
                 <LandingFaqDetailsItem key={item.id} item={item} idx={idx} />
@@ -1330,12 +1397,11 @@ export function LandingPage() {
 
             <div className="relative z-10 mx-auto flex max-w-2xl flex-col gap-5 sm:gap-6">
               <h2 className="pr-2 text-xl font-bold leading-snug tracking-tight text-zinc-900 sm:text-4xl sm:leading-[1.14] lg:text-5xl">
-                Pronto para escalar os
-                <br />
-                resultados da sua agência?
+                Teste grátis hoje. Feche mais amanhã.
               </h2>
               <p className="text-sm leading-relaxed text-[#6f5a2f] sm:text-lg">
-                Pare de perder tempo com propostas em PDF. Impressione seus clientes desde o primeiro diagnóstico.
+                Comece pelo plano Starter sem pagar nada. Faça upgrade só quando estiver fechando mais clientes. Cancele
+                quando quiser, sem multa e sem pegadinha.
               </p>
 
               <div className="mt-1 flex justify-center sm:mt-10">

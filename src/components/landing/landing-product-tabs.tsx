@@ -30,13 +30,14 @@ const TABS = [
     label: "Rota Digital",
     icon: Compass,
     videoSrc: PRODUCT_PANEL_VIDEO_SRC,
-    title: "Diagnóstico que prepara a venda",
+    title: "O diagnóstico que vende antes da proposta",
     description:
-      "A plataforma analisa o site e o Instagram e mostra, de forma clara, onde a empresa pode evoluir no digital.",
+      "Em segundos, a IA gera um relatório completo da presença digital do lead — site, Instagram e Google Meu Negócio — com uma rota de ações priorizadas. Você envia um link profissional ao cliente e ele já entende que você conhece o negócio dele melhor do que ele mesmo. A proposta vira consequência, não argumento.",
     bullets: [
-      "Analisa automaticamente o site e o Instagram",
-      "Mostra pontos fortes e oportunidades de melhoria",
-      "Gera um link pronto para apresentar ao cliente",
+      "Análise completa em menos de 60 segundos (site + Instagram + Google Meu Negócio)",
+      "Comparativo com concorrentes da mesma cidade e nicho",
+      "Rota de ações priorizadas que vira argumento de venda",
+      "Link público com a sua marca para enviar direto ao cliente",
     ],
   },
   {
