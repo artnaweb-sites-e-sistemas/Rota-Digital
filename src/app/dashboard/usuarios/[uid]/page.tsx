@@ -873,7 +873,10 @@ export default function UsuarioAdminDetailPage() {
               Voltar à lista
             </Link>
             <h1 className="font-heading text-2xl font-bold tracking-tight text-foreground dark:text-zinc-100">
-              {detail?.companyName?.trim() || detail?.displayName?.trim() || detail?.email || "Utilizador"}
+              {detail?.companyName?.trim() ||
+                detail?.email?.trim() ||
+                detail?.displayName?.trim() ||
+                "Utilizador"}
             </h1>
             <p className="text-sm text-muted-foreground dark:text-zinc-400">
               Gráficos e totais só deste utilizador (UTC).

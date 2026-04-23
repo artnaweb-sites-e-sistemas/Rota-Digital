@@ -908,13 +908,14 @@ export default function UsuariosAdminPage() {
                       </div>
                     </TableCell>
                     <TableCell className="max-w-0 whitespace-normal px-3 py-4 align-middle text-xs sm:text-sm">
-                      <span
-                        className="line-clamp-2"
-                        title={
-                          [row.companyName?.trim(), row.displayName?.trim()].filter(Boolean).join(" · ") || undefined
-                        }
-                      >
-                        {row.companyName?.trim() || row.displayName?.trim() || "—"}
+                      {/*
+                        Só `companyName` (Sobre a Empresa). Não usar `displayName` do Auth como fallback:
+                        o nome de exibição é independente e pode ser preenchido por engano (ex.: colar a
+                        palavra-passe no "Nome" ao criar o utilizador), o que faria a coluna "Agência"
+                        mostrar dados que não são o nome da agência.
+                      */}
+                      <span className="line-clamp-2" title={row.companyName?.trim() || undefined}>
+                        {row.companyName?.trim() || "—"}
                       </span>
                     </TableCell>
                     <TableCell className="px-3 py-4 align-middle">
