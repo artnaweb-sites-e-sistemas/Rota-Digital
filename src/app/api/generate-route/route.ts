@@ -14,6 +14,17 @@ import {
   resolveCycleStartMs,
   resolveQuotaLimit,
 } from "@/lib/plan-quotas";
+import { PLAN_FEATURES, type PlanFeatures } from "@/lib/plan-limits";
+import { getUserPlanAdmin } from "@/lib/plan-limits-admin";
+import {
+  ensureLeadCompetitorsCacheAdmin,
+  ensureLeadGmbCacheAdmin,
+  readLeadPlacesFromData,
+} from "@/lib/lead-places-enrichment";
+import type { LeadPlacesRead } from "@/lib/lead-places-enrichment";
+import { buildCompetitorRanking } from "@/lib/competitor-ranking";
+import { localityTierLabelPt } from "@/lib/locality-tier";
+import { splitWebsiteUriForSnapshot } from "@/lib/gmb-website-split";
 import { countReportsSinceAdmin } from "@/lib/reports-admin";
 import type { DiagnosticScore, RotaDigitalReport } from "@/types/report";
 import type {
@@ -1522,6 +1533,91 @@ function ensureDiagnosticCommentActionability(
   };
 }
 
+function mapGmbBusinessStatusPt(status: string | undefined, openNow: boolean | undefined): string {
+  if (!status?.trim()) return "Desconhecido";
+  const u = status.toUpperCase();
+  if (u.includes("CLOSED_TEMPORARILY")) return "Temporariamente fechado";
+  if (u.includes("CLOSED_PERMANENTLY")) return "Encerrado permanentemente";
+  if (u.includes("OPERATIONAL")) {
+    if (openNow === true) return "Em operação — aberto agora";
+    if (openNow === false) return "Em operação — fechado no momento";
+    return "Em operação";
+  }
+  return status;
+}
+
+function buildPlacesContextPromptBlock(args: {
+  places: LeadPlacesRead;
+  features: PlanFeatures;
+  company: string;
+  leadWebsiteUrl?: string;
+  leadInstagramUrl?: string;
+}): string {
+  if (!args.features.gmbAnalysis) return "";
+  const p = args.places;
+  const hasListing = p.gmbHasListing === true;
+  const listingLine = hasListing ? "sim" : p.gmbHasListing === false ? "não" : "desconhecido";
+  const ratingLine =
+    typeof p.gmbRating === "number" ? `${p.gmbRating.toFixed(1)} estrelas` : "não disponível";
+  const reviewsLine = typeof p.gmbReviewCount === "number" ? String(p.gmbReviewCount) : "não disponível";
+  const statusLine = mapGmbBusinessStatusPt(p.gmbBusinessStatus, p.gmbOpenNow);
+  const photosLine = typeof p.gmbPhotoCount === "number" ? `${p.gmbPhotoCount} fotos` : "não disponível";
+  const nicheLine = p.gmbPrimaryTypeDisplay?.trim() || p.gmbPrimaryType?.trim() || "não identificado";
+  const locationLine = [p.gmbSubLocality, p.gmbCity, p.gmbRegion]
+    .filter((v): v is string => Boolean(v?.trim()))
+    .join(", ") || "não identificada";
+
+  let competitorsSection = "";
+  if (args.features.competitorAnalysis && Array.isArray(p.competitors) && p.competitors.length > 0) {
+    const ranking = buildCompetitorRanking({
+      leadName: args.company,
+      leadRating: p.gmbRating,
+      leadReviewCount: p.gmbReviewCount,
+      leadFormattedAddress: p.gmbFormattedAddress,
+      leadCity: p.gmbCity,
+      leadSubLocality: p.gmbSubLocality,
+      leadWebsiteUrl: args.leadWebsiteUrl,
+      leadInstagramUrl: args.leadInstagramUrl,
+      competitors: p.competitors,
+    });
+    const leadRow = ranking.find((r) => r.isLead);
+    const leadRankLine = leadRow
+      ? `Posição atual deste lead no ranking local (ordenado por total de avaliações, depois por nota média): **${leadRow.position}º** de ${ranking.length}.`
+      : "Posição do lead no ranking: não disponível.";
+    const lines = ranking.map((r) => {
+      const site = r.hasWebsite ? "sim" : "não";
+      const rating = typeof r.rating === "number" ? r.rating.toFixed(1) : "—";
+      const reviews = typeof r.reviewCount === "number" ? String(r.reviewCount) : "—";
+      const tag = r.isLead ? " (ESTE LEAD)" : "";
+      const loc =
+        r.localityTier === 0 || r.localityTier === 1 || r.localityTier === 2
+          ? `, local: ${localityTierLabelPt(r.localityTier)}`
+          : "";
+      return `${r.position}º. ${r.name}${tag} — ${rating} estrelas, ${reviews} avaliações, site: ${site}${loc}`;
+    });
+    competitorsSection = `## Ranking local (lead + concorrentes na mesma região/nicho)\n${lines.join("\n")}\n${leadRankLine}\n`;
+  } else if (args.features.competitorAnalysis) {
+    competitorsSection =
+      "## Ranking local (lead + concorrentes na mesma região/nicho)\n(dados não disponíveis nesta execução — não invente concorrentes nem posições)\n";
+  }
+
+  return `## Dados do Google Meu Negócio
+- Tem perfil GMB: ${listingLine}
+- Nicho (tipo primário Google): ${nicheLine}
+- Localização (bairro/cidade/UF): ${locationLine}
+- Nota média: ${ratingLine}
+- Total de avaliações: ${reviewsLine}
+- Status: ${statusLine}
+- Fotos no GMB: ${photosLine}
+
+${competitorsSection}
+Com base nesses dados (e somente quando estiverem listados acima), inclua na Rota Digital para "${args.company}":
+- Uma análise do perfil GMB do lead (pontos fracos e o que melhorar)
+- Um comparativo direto com os concorrentes explicitando a **posição do lead no ranking** e a diferença para os líderes (nota, avaliações, presença de site)
+- Ações específicas, priorizadas para fechar o gap até as primeiras posições do ranking local
+Se algum dado acima estiver "não disponível" ou ausente, não invente números, nomes ou posições de concorrentes.`;
+}
+
 function buildPrompt(body: {
   name: string;
   email?: string;
@@ -1550,6 +1646,8 @@ function buildPrompt(body: {
   /** URL de snapshot gerada para o relatório (o cliente pode ver a imagem mesmo se o download para a IA falhou). */
   instagramSnapshotForReport?: boolean;
   websiteSnapshotForReport?: boolean;
+  /** Bloco opcional Google Meu Negócio / concorrentes (Places). */
+  placesBlock?: string;
 }): string {
   const siteEvidence = body.websiteEvidence;
   const instaEvidence = body.instagramEvidence;
@@ -1640,7 +1738,7 @@ ${aiGuidelinesBlock}${channelsPolicyBlock}${servicesFocusBlock}${scoringStrictne
 - Instagram link na bio (destino final verificado): ${
     instaEvidence?.bioLinkResolvedUrl || "não verificado"
   }
-
+${body.placesBlock?.trim() ? `\n${body.placesBlock.trim()}\n` : ""}
 **Tarefas**
 ${buildReportCopyVoicePromptSection()}
 0) Escreva em linguagem simples, direta e humana. Frases curtas. Evite linguagem formal/corporativa exagerada. Siga o bloco **Voz do relatório** acima em todos os campos de texto do JSON (e no HTML da proposta).
@@ -1834,6 +1932,16 @@ export async function POST(req: NextRequest) {
     }
 
     const db = getFirestore(adminApp);
+    const leadRef = db.collection("leads").doc(String(leadId).trim());
+    const leadSnapGate = await leadRef.get();
+    if (!leadSnapGate.exists) {
+      return NextResponse.json({ error: "Lead não encontrado." }, { status: 404 });
+    }
+    const leadOwnerUid = String(leadSnapGate.data()?.userId ?? "");
+    if (leadOwnerUid !== authedUid) {
+      return NextResponse.json({ error: "Sem permissão para este lead." }, { status: 403 });
+    }
+
     const userSettingsSnap = await db.collection("userSettings").doc(authedUid).get();
     const userSettings = userSettingsSnap.exists
       ? (userSettingsSnap.data() as Record<string, unknown>)
@@ -1871,17 +1979,23 @@ export async function POST(req: NextRequest) {
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     const normalizedWebsiteUrlRaw = normalizeUrl(websiteUrl);
-    const normalizedInstagramUrl = normalizeInstagramUrl(instagramUrl);
-    const normalizedWebsiteUrl =
-      normalizedWebsiteUrlRaw && !isInstagramDomainUrl(normalizedWebsiteUrlRaw)
-        ? normalizedWebsiteUrlRaw
-        : undefined;
+    const splitFromWebsiteField = normalizedWebsiteUrlRaw
+      ? splitWebsiteUriForSnapshot(normalizedWebsiteUrlRaw)
+      : {};
+    const normalizedWebsiteUrl = splitFromWebsiteField.website;
+    let normalizedInstagramUrl = normalizeInstagramUrl(instagramUrl);
+    if (!normalizedInstagramUrl && splitFromWebsiteField.instagram) {
+      normalizedInstagramUrl = splitFromWebsiteField.instagram;
+    }
+    const websiteFieldWasSocialOnly =
+      Boolean(normalizedWebsiteUrlRaw) && !normalizedWebsiteUrl && !splitFromWebsiteField.instagram;
     console.info("[IG_DEBUG][generate-route] Entrada normalizada.", {
       leadId,
       userId,
       websiteUrl: normalizedWebsiteUrl || null,
       websiteUrlIgnoredAsInstagram:
-        Boolean(normalizedWebsiteUrlRaw) && !normalizedWebsiteUrl && isInstagramDomainUrl(normalizedWebsiteUrlRaw),
+        Boolean(normalizedWebsiteUrlRaw) && Boolean(splitFromWebsiteField.instagram) && !normalizedWebsiteUrl,
+      websiteUrlIgnoredAsNonCompanySite: websiteFieldWasSocialOnly,
       instagramUrl: normalizedInstagramUrl || null,
     });
     if (mode === "collectEvidence") {
@@ -1934,6 +2048,41 @@ export async function POST(req: NextRequest) {
       instagramBioLinkScreenshotSentToAi: Boolean(instagramBioLinkImagePart),
     });
 
+    const plan = await getUserPlanAdmin(authedUid);
+    const planFeatures = PLAN_FEATURES[plan];
+    let placesAnalysisWarning: string | undefined;
+    if (planFeatures.gmbAnalysis) {
+      const placesKey = process.env.GOOGLE_PLACES_API_KEY?.trim();
+      if (placesKey) {
+        try {
+          await ensureLeadGmbCacheAdmin(db, placesKey, authedUid, String(leadId));
+        } catch (gmbErr) {
+          console.warn("[generate-route] Enriquecimento GMB (Places) ignorado.", gmbErr);
+          placesAnalysisWarning = "Dados do GMB temporariamente indisponíveis";
+        }
+        if (planFeatures.competitorAnalysis) {
+          try {
+            await ensureLeadCompetitorsCacheAdmin(db, placesKey, authedUid, String(leadId));
+          } catch (compErr) {
+            console.warn("[generate-route] Enriquecimento de concorrentes (Places) ignorado.", compErr);
+          }
+        }
+      } else {
+        placesAnalysisWarning = "Dados do GMB temporariamente indisponíveis";
+      }
+    }
+    const leadSnapAfterPlaces = await leadRef.get();
+    const leadPlacesForPrompt = readLeadPlacesFromData(
+      (leadSnapAfterPlaces.data() as Record<string, unknown>) ?? {},
+    );
+    const placesBlock = buildPlacesContextPromptBlock({
+      places: leadPlacesForPrompt,
+      features: planFeatures,
+      company,
+      leadWebsiteUrl: prepared.normalizedWebsiteUrl,
+      leadInstagramUrl: prepared.normalizedInstagramUrl,
+    });
+
     const prompt = buildPrompt({
       name,
       email,
@@ -1959,6 +2108,7 @@ export async function POST(req: NextRequest) {
       hasInstagramBioLinkScreenshot: Boolean(instagramBioLinkImagePart),
       instagramSnapshotForReport: Boolean(instagramSnapshotUrl),
       websiteSnapshotForReport: Boolean(siteHeroSnapshotUrl),
+      placesBlock,
     });
     const generateContentInput = buildGenerateContentInput(prompt, {
       websiteImagePart,
@@ -2293,6 +2443,32 @@ export async function POST(req: NextRequest) {
         totalEstimatedCostUsd: generationEstimatedCostUsd,
         totalEstimatedCostBrl: generationEstimatedCostBrl,
       },
+      billingPlanSnapshot: plan,
+      gmbSnapshot: planFeatures.gmbAnalysis
+        ? {
+            gmbFetchedAt: leadPlacesForPrompt.gmbFetchedAt,
+            gmbRating: leadPlacesForPrompt.gmbRating,
+            gmbReviewCount: leadPlacesForPrompt.gmbReviewCount,
+            gmbHasListing: leadPlacesForPrompt.gmbHasListing,
+            gmbPhotoCount: leadPlacesForPrompt.gmbPhotoCount,
+            gmbBusinessStatus: leadPlacesForPrompt.gmbBusinessStatus,
+            gmbOpenNow: leadPlacesForPrompt.gmbOpenNow,
+            gmbGoogleMapsUri: leadPlacesForPrompt.gmbGoogleMapsUri,
+            gmbPlaceId: leadPlacesForPrompt.gmbPlaceId,
+            gmbFormattedAddress: leadPlacesForPrompt.gmbFormattedAddress,
+            gmbCity: leadPlacesForPrompt.gmbCity,
+            gmbSubLocality: leadPlacesForPrompt.gmbSubLocality,
+            gmbListingWebsiteUrl: leadPlacesForPrompt.gmbListingWebsiteUrl,
+            gmbListingInstagramUrl: leadPlacesForPrompt.gmbListingInstagramUrl,
+          }
+        : null,
+      competitorsSnapshot: planFeatures.competitorAnalysis
+        ? (leadPlacesForPrompt.competitors ?? null)
+        : null,
+      competitorsFetchedAt: planFeatures.competitorAnalysis
+        ? leadPlacesForPrompt.competitorsFetchedAt
+        : undefined,
+      placesAnalysisWarning: placesAnalysisWarning,
     };
 
     const debug = {

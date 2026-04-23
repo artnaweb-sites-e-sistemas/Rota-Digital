@@ -11,7 +11,7 @@ export function normalizePlaceResourceName(hit: { name?: string; id?: string }):
 }
 
 /** Path HTTP oficial: `/v1/places/{PLACE_ID}` — só o sufixo após `places/`, sem codificar a barra. */
-function placeIdForDetailsHttpPath(resourceOrId: string): string {
+export function placeIdForDetailsHttpPath(resourceOrId: string): string {
   const t = resourceOrId.trim();
   if (t.startsWith("places/")) return t.slice("places/".length);
   return t;
@@ -23,6 +23,10 @@ export type PlacesSearchHit = {
   id: string;
   displayName?: string;
   formattedAddress?: string;
+  primaryType?: string;
+  types?: string[];
+  rating?: number;
+  userRatingCount?: number;
 };
 
 export type PlacesPlaceDetails = {
@@ -51,6 +55,8 @@ export async function placesSearchText(
     regionCode: string;
     maxResultCount?: number;
     pageToken?: string;
+    /** Opcional: limita a pesquisa a um círculo geográfico (lat/lng + raio em metros). */
+    locationBias?: { latitude: number; longitude: number; radiusMeters: number };
   },
 ): Promise<{ places: PlacesSearchHit[]; nextPageToken?: string }> {
   const body: Record<string, unknown> = {
@@ -60,13 +66,22 @@ export async function placesSearchText(
     maxResultCount: Math.min(20, Math.max(1, opts.maxResultCount ?? 20)),
   };
   if (opts.pageToken) body.pageToken = opts.pageToken;
+  if (opts.locationBias) {
+    body.locationBias = {
+      circle: {
+        center: { latitude: opts.locationBias.latitude, longitude: opts.locationBias.longitude },
+        radius: Math.max(1, opts.locationBias.radiusMeters),
+      },
+    };
+  }
 
   const res = await fetch(`${PLACES_V1}/places:searchText`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "X-Goog-Api-Key": apiKey,
-      "X-Goog-FieldMask": "places.name,places.id,places.displayName,places.formattedAddress,nextPageToken",
+      "X-Goog-FieldMask":
+        "places.name,places.id,places.displayName,places.formattedAddress,places.primaryType,places.types,places.rating,places.userRatingCount,nextPageToken",
     },
     body: JSON.stringify(body),
   });
@@ -82,6 +97,10 @@ export async function placesSearchText(
       id?: string;
       displayName?: unknown;
       formattedAddress?: string;
+      primaryType?: string;
+      types?: string[];
+      rating?: number;
+      userRatingCount?: number;
     }>;
     nextPageToken?: string;
   };
@@ -94,6 +113,11 @@ export async function placesSearchText(
         id,
         displayName: readDisplayName(p.displayName),
         formattedAddress: typeof p.formattedAddress === "string" ? p.formattedAddress.trim() : undefined,
+        primaryType: typeof p.primaryType === "string" ? p.primaryType : undefined,
+        types: Array.isArray(p.types) ? p.types.filter((t): t is string => typeof t === "string") : undefined,
+        rating: typeof p.rating === "number" ? p.rating : undefined,
+        userRatingCount:
+          typeof p.userRatingCount === "number" ? Math.floor(p.userRatingCount) : undefined,
       };
     })
     .filter(Boolean) as PlacesSearchHit[];

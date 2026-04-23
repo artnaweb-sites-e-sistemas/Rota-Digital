@@ -35,7 +35,7 @@ Regras:
 - NÃO inclua em "recommendedChannels" nenhum canal que não esteja na lista acima.
 - Não duplique canais: use cada "name" no máximo uma vez.
 - Se a lista permitida tiver 1 ou 2 canais, retorne exatamente esses canais (sem inventar extras).
-- Copie cada "name" **caractere a caractere** como na lista (incluindo maiúsculas, espaços e parênteses). Ex.: use "TikTok Ads", não "TikTok", "tiktok" nem "Tik Tok Ads".
+- Copie cada "name" **caractere a caractere** como na lista (incluindo maiúsculas, espaços e parênteses). Ex.: use "Google Meu Negócio", não "GMB", "Google Business" nem "Meu Negócio Google".
 - Para **cada** canal da lista restrita que você incluir, preencha "description" e "actions" com análise **específica** deste lead (negócio, público, jornada, criativos ou dados já observados). Frases genéricas do tipo "canal autorizado na configuração" ou só "definir plano de execução" sem contexto são **proibidas**.
 - Em "opportunities", "quickWins", "longTermActions" e "nextSteps", não peça para o cliente abrir canais fora de: ${quoted}. Pode falar em melhorias genéricas (ex.: "melhorar página de destino", "revisar criativos dos anúncios") sem nomear canais proibidos.`;
 }

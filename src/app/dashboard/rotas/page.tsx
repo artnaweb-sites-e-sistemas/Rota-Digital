@@ -241,7 +241,7 @@ export default function RotasPage() {
             </div>
           ) : (
             <>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:[grid-template-columns:repeat(auto-fill,minmax(min(100%,24rem),1fr))]">
           {paginatedReports.map((report) => (
             <Card
               key={report.id}
@@ -311,7 +311,7 @@ export default function RotasPage() {
                         href={`/dashboard/rotas/${report.id}`}
                         className={cn(
                           buttonVariants({ variant: "cta", size: "sm" }),
-                          "h-auto min-h-9 w-full min-w-0 items-center justify-center gap-1.5 whitespace-normal px-2 py-2 text-center text-xs font-medium leading-tight shadow-sm sm:gap-2 sm:px-2.5 sm:text-[13px]",
+                          "h-auto min-h-9 w-full min-w-0 items-center justify-center gap-1.5 whitespace-nowrap px-2 py-2 text-center text-xs font-medium leading-tight shadow-sm sm:gap-2 sm:px-2.5 sm:text-[13px]",
                         )}
                       >
                         <Eye className="size-3.5 shrink-0 opacity-95" aria-hidden />
@@ -324,7 +324,7 @@ export default function RotasPage() {
                           rel="noopener noreferrer"
                           className={cn(
                             buttonVariants({ variant: "outline", size: "sm" }),
-                            "h-auto min-h-9 w-full min-w-0 items-center justify-center gap-1.5 whitespace-normal border-border/80 px-2 py-2 text-center text-xs font-medium leading-tight shadow-sm sm:gap-2 sm:px-2.5 sm:text-[13px] dark:border-zinc-600 dark:bg-zinc-900/25 dark:hover:bg-zinc-800/55",
+                            "h-auto min-h-9 w-full min-w-0 items-center justify-center gap-1.5 whitespace-nowrap border-border/80 px-2 py-2 text-center text-xs font-medium leading-tight shadow-sm sm:gap-2 sm:px-2.5 sm:text-[13px] dark:border-zinc-600 dark:bg-zinc-900/25 dark:hover:bg-zinc-800/55",
                           )}
                         >
                           <ExternalLink className="size-3.5 shrink-0 opacity-90" aria-hidden />

@@ -3,7 +3,7 @@ export const AI_AGENCY_SERVICE_OPTIONS = [
   { id: "trafego_pago", label: "Gestão de tráfego pago (mídia)" },
   { id: "meta_ads", label: "Meta Ads (Instagram e Facebook)" },
   { id: "google_ads", label: "Google Ads" },
-  { id: "tiktok_ads", label: "TikTok Ads" },
+  { id: "google_meu_negocio", label: "Google Meu Negócio" },
   { id: "linkedin_ads", label: "LinkedIn Ads" },
   { id: "producao_criativos", label: "Produção de criativos (imagem e vídeo)" },
   { id: "edicao_video", label: "Edição de vídeo" },
@@ -18,11 +18,17 @@ export const AI_AGENCY_SERVICE_OPTIONS = [
 
 const VALID_SERVICE_IDS = new Set<string>(AI_AGENCY_SERVICE_OPTIONS.map((o) => o.id));
 
+function mapLegacyServiceId(id: string): string {
+  return id === "tiktok_ads" ? "google_meu_negocio" : id;
+}
+
 export function sanitizeAiServiceOfferingIds(ids: unknown): string[] {
   if (!Array.isArray(ids)) return [];
   const out: string[] = [];
   for (const x of ids) {
-    if (typeof x === "string" && VALID_SERVICE_IDS.has(x) && !out.includes(x)) out.push(x);
+    if (typeof x !== "string") continue;
+    const id = mapLegacyServiceId(x.trim());
+    if (VALID_SERVICE_IDS.has(id) && !out.includes(id)) out.push(id);
   }
   return out;
 }

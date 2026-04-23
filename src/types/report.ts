@@ -27,6 +27,28 @@ export interface ReportEvidence {
   researchNotes?: string;
 }
 
+import type { LeadCompetitorSnapshot, LeadPlacesCache } from "@/types/lead";
+import type { PlanId } from "@/lib/plan-limits";
+
+/** Cópia dos dados GMB gravada no relatório no momento da geração. */
+export type ReportGmbSnapshot = Pick<
+  LeadPlacesCache,
+  | "gmbFetchedAt"
+  | "gmbRating"
+  | "gmbReviewCount"
+  | "gmbHasListing"
+  | "gmbPhotoCount"
+  | "gmbBusinessStatus"
+  | "gmbOpenNow"
+  | "gmbGoogleMapsUri"
+  | "gmbPlaceId"
+  | "gmbFormattedAddress"
+  | "gmbCity"
+  | "gmbSubLocality"
+  | "gmbListingWebsiteUrl"
+  | "gmbListingInstagramUrl"
+>;
+
 export interface ReportBrief {
   websiteUrl?: string;
   instagramUrl?: string;
@@ -100,4 +122,14 @@ export interface RotaDigitalReport {
   evidences?: ReportEvidence;
   /** Telemetria de custo/tokens de IA (estimada). */
   aiUsage?: ReportAiUsageSummary;
+  /** Dados Google Meu Negócio (snapshot no momento da geração). */
+  gmbSnapshot?: ReportGmbSnapshot | null;
+  /** Concorrentes próximos (snapshot no momento da geração ou após atualização). */
+  competitorsSnapshot?: LeadCompetitorSnapshot[] | null;
+  /** Ms da última sincronização de concorrentes (alinhado ao lead). */
+  competitorsFetchedAt?: number;
+  /** Aviso discreto quando a Places API falhou durante a geração. */
+  placesAnalysisWarning?: string;
+  /** Plano comercial no momento da geração (para UI de secções GMB/concorrentes). */
+  billingPlanSnapshot?: PlanId;
 }

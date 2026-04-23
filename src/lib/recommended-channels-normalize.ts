@@ -12,7 +12,7 @@ function normalizeChannelName(name: string): string {
 }
 
 /**
- * Quando a política é restrita, a IA costuma encurtar rótulos ("TikTok" vs "TikTok Ads").
+ * Quando a política é restrita, a IA costuma encurtar rótulos (ex.: "GMB" vs "Google Meu Negócio").
  * Mapeia variações comuns para o rótulo canônico permitido, sem ambiguidade agressiva.
  */
 function resolveCanonicalRestrictedLabel(rawName: string, allowedLabels: string[]): string | undefined {
@@ -22,8 +22,13 @@ function resolveCanonicalRestrictedLabel(rawName: string, allowedLabels: string[
 
   const pick = (predicate: (label: string) => boolean) => allowedLabels.find(predicate);
 
-  if (/\btiktok\b|\btik\s*tok\b/i.test(rawLower)) {
-    const row = pick((l) => /\btiktok\b/i.test(l));
+  if (
+    /\bgmb\b/i.test(rawLower) ||
+    norm.includes("google meu neg") ||
+    norm.includes("google business") ||
+    /\bgoogle\s+maps\b/i.test(rawLower)
+  ) {
+    const row = pick((l) => normalizeChannelName(l).includes("google meu neg"));
     if (row) return row;
   }
   if (/\bwhatsapp\b|\bzap\b/i.test(rawLower)) {

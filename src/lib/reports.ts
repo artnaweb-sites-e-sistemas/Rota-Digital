@@ -19,6 +19,22 @@ import { normalizeLeadStatus } from "@/types/lead";
 import { RotaDigitalReport } from "@/types/report";
 
 const REPORTS_COLLECTION = "reports";
+
+/** Firestore (cliente) rejeita valores `undefined` em updates — remove recursivamente (preserva `null`). */
+function omitUndefinedDeep(value: unknown): unknown {
+  if (value === undefined) return undefined;
+  if (value === null || typeof value !== "object") return value;
+  if (Array.isArray(value)) {
+    return value.map((item) => omitUndefinedDeep(item));
+  }
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+    if (v === undefined) continue;
+    const next = omitUndefinedDeep(v);
+    if (next !== undefined) out[k] = next;
+  }
+  return out;
+}
 const LEADS_COLLECTION = "leads";
 
 export const saveReport = async (
@@ -138,7 +154,8 @@ export const updateReport = async (
   reportId: string,
   reportData: Partial<Omit<RotaDigitalReport, "id" | "leadId" | "userId" | "createdAt">>
 ): Promise<void> => {
-  await updateDoc(doc(db, REPORTS_COLLECTION, reportId), reportData);
+  const cleaned = omitUndefinedDeep(reportData) as Record<string, unknown>;
+  await updateDoc(doc(db, REPORTS_COLLECTION, reportId), cleaned);
 };
 
 /** Leitura pública por slug (requer regra Firestore que permita get/list anônimo nesta query). */

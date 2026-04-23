@@ -250,7 +250,7 @@ export default function PropostasPage() {
             </div>
           ) : (
             <>
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <div className="grid grid-cols-1 gap-4 sm:[grid-template-columns:repeat(auto-fill,minmax(min(100%,24rem),1fr))]">
                 {paginatedProposals.map((proposal) => {
                   const expiryTag = proposalExpiryCountdownTag(proposal);
                   return (
@@ -306,12 +306,12 @@ export default function PropostasPage() {
                       </div>
 
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex min-w-0 flex-wrap gap-2">
                           <LinkButton
                             href={`/dashboard/propostas/${proposal.id}`}
                             variant="cta"
                             size="lg"
-                            className="h-9 gap-2 rounded-md px-3.5 text-sm"
+                            className="h-9 shrink-0 gap-2 whitespace-nowrap rounded-md px-3.5 text-sm"
                           >
                             Abrir proposta
                           </LinkButton>
@@ -320,7 +320,7 @@ export default function PropostasPage() {
                               href={`/p/${proposal.publicSlug}`}
                               variant="ghost"
                               size="lg"
-                              className="h-9 gap-2 rounded-md border-0 bg-transparent px-3.5 text-sm font-medium text-muted-foreground shadow-none hover:bg-transparent hover:text-foreground dark:hover:bg-transparent"
+                              className="h-9 shrink-0 gap-2 whitespace-nowrap rounded-md border-0 bg-transparent px-3.5 text-sm font-medium text-muted-foreground shadow-none hover:bg-transparent hover:text-foreground dark:hover:bg-transparent"
                               target="_blank"
                               rel="noreferrer"
                             >

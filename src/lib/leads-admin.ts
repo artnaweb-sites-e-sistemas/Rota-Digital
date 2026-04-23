@@ -38,6 +38,26 @@ function adminLeadFromDoc(id: string, data: Record<string, unknown>): Lead {
     googlePlaceId: typeof data.googlePlaceId === "string" ? data.googlePlaceId : undefined,
     leadSource: data.leadSource === "google_places" || data.leadSource === "manual" ? data.leadSource : undefined,
     followupStartedAt: millisFromFirestoreValue(data.followupStartedAt),
+    gmbFetchedAt: typeof data.gmbFetchedAt === "number" ? data.gmbFetchedAt : undefined,
+    gmbRating: typeof data.gmbRating === "number" ? data.gmbRating : undefined,
+    gmbReviewCount: typeof data.gmbReviewCount === "number" ? data.gmbReviewCount : undefined,
+    gmbHasListing: typeof data.gmbHasListing === "boolean" ? data.gmbHasListing : undefined,
+    gmbPhotoCount: typeof data.gmbPhotoCount === "number" ? data.gmbPhotoCount : undefined,
+    gmbBusinessStatus: typeof data.gmbBusinessStatus === "string" ? data.gmbBusinessStatus : undefined,
+    gmbOpenNow: typeof data.gmbOpenNow === "boolean" ? data.gmbOpenNow : undefined,
+    gmbGoogleMapsUri: typeof data.gmbGoogleMapsUri === "string" ? data.gmbGoogleMapsUri : undefined,
+    gmbPlaceId: typeof data.gmbPlaceId === "string" ? data.gmbPlaceId : undefined,
+    gmbLatitude: typeof data.gmbLatitude === "number" ? data.gmbLatitude : undefined,
+    gmbLongitude: typeof data.gmbLongitude === "number" ? data.gmbLongitude : undefined,
+    gmbFormattedAddress: typeof data.gmbFormattedAddress === "string" ? data.gmbFormattedAddress : undefined,
+    gmbPrimaryType: typeof data.gmbPrimaryType === "string" ? data.gmbPrimaryType : undefined,
+    gmbPrimaryTypeDisplay:
+      typeof data.gmbPrimaryTypeDisplay === "string" ? data.gmbPrimaryTypeDisplay : undefined,
+    gmbCity: typeof data.gmbCity === "string" ? data.gmbCity : undefined,
+    gmbRegion: typeof data.gmbRegion === "string" ? data.gmbRegion : undefined,
+    gmbSubLocality: typeof data.gmbSubLocality === "string" ? data.gmbSubLocality : undefined,
+    competitorsFetchedAt: typeof data.competitorsFetchedAt === "number" ? data.competitorsFetchedAt : undefined,
+    competitors: Array.isArray(data.competitors) ? (data.competitors as Lead["competitors"]) : undefined,
   };
 }
 

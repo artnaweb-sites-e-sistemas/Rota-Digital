@@ -101,8 +101,11 @@ import type { UserCompanyAboutSettings, UserReportCtaSettings } from "@/types/us
 import { PublicThemeToggle } from "@/components/public-theme-toggle";
 import { PublicThemeToggleHint } from "@/components/public-theme-toggle-hint";
 import { auth, db } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { PlanLimitModal, type PlanLimitModalState } from "@/components/limits/plan-limit-modal";
+import { ReportPlacesSections } from "@/components/rotas/report-places-sections";
+import { planIdFromUserSettings, type PlanId } from "@/lib/plan-limits";
 import { normalizedSubscriptionPlanKey, planAllowsCustomLogo } from "@/lib/plan-quotas";
 
 function createDefaultCompanyAboutSettings(): UserCompanyAboutSettings {
@@ -1901,6 +1904,8 @@ export function RotaDigitalReportView({
     string,
     unknown
   > | null>(null);
+  /** Quem está a ver o dashboard (token): para regras como «Testar busca» só Master. */
+  const [viewerUserSettings, setViewerUserSettings] = useState<Record<string, unknown> | null>(null);
   /** Modo tópico-a-tópico só depois de abrir a secção com o lápis da caixa. */
   const [listSectionEditOpen, setListSectionEditOpen] = useState<DashboardListSectionKey | null>(null);
   const [evidenceReplaceSlot, setEvidenceReplaceSlot] = useState<EvidenceManualSlot | null>(null);
@@ -1963,6 +1968,34 @@ export function RotaDigitalReportView({
       cancelled = true;
     };
   }, [report.userId, variant]);
+
+  useEffect(() => {
+    if (!isDashboard || !auth) {
+      setViewerUserSettings(null);
+      return;
+    }
+    let cancelled = false;
+    let loadGen = 0;
+    const unsub = onAuthStateChanged(auth, (user) => {
+      const gen = ++loadGen;
+      if (!user) {
+        if (!cancelled) setViewerUserSettings(null);
+        return;
+      }
+      void getDoc(doc(db, "userSettings", user.uid))
+        .then((snap) => {
+          if (cancelled || gen !== loadGen) return;
+          setViewerUserSettings(snap.exists() ? (snap.data() as Record<string, unknown>) : {});
+        })
+        .catch(() => {
+          if (!cancelled && gen === loadGen) setViewerUserSettings(null);
+        });
+    });
+    return () => {
+      cancelled = true;
+      unsub();
+    };
+  }, [isDashboard]);
 
   useEffect(() => {
     if (!isDashboard || !report.userId) {
@@ -2055,6 +2088,19 @@ export function RotaDigitalReportView({
     setDiagEditSortedIndex(null);
   }, []);
 
+  const effectiveReportPlan: PlanId = useMemo(() => {
+    if (report.billingPlanSnapshot) return report.billingPlanSnapshot;
+    const raw = userSettingsForAgencyBranding;
+    if (!raw) return "starter";
+    return planIdFromUserSettings(raw as Record<string, unknown>);
+  }, [report.billingPlanSnapshot, userSettingsForAgencyBranding]);
+
+  const isViewerMasterAdmin = useMemo(() => {
+    if (!isDashboard) return false;
+    if (!viewerUserSettings) return false;
+    return planIdFromUserSettings(viewerUserSettings) === "master";
+  }, [isDashboard, viewerUserSettings]);
+
   const openListSectionEdit = useCallback(
     (key: DashboardListSectionKey) => {
       cancelFieldEdit();
@@ -2141,6 +2187,7 @@ export function RotaDigitalReportView({
       setFieldError(null);
       try {
         await updateReport(report.id, patch);
+        let nextReport: RotaDigitalReport | null = null;
         setReport((prev) => {
           const { evidences: evPatch, brief: brPatch, ...rest } = patch;
           const next = { ...prev, ...rest } as RotaDigitalReport;
@@ -2150,9 +2197,10 @@ export function RotaDigitalReportView({
           if (brPatch) {
             next.brief = { ...(prev.brief || {}), ...brPatch };
           }
-          onReportChange?.(next);
+          nextReport = next;
           return next;
         });
+        if (nextReport) onReportChange?.(nextReport);
         cancelFieldEdit();
         return true;
       } catch (err: unknown) {
@@ -3696,6 +3744,14 @@ export function RotaDigitalReportView({
           </CardContent>
         </Card>
       ) : null}
+
+      <ReportPlacesSections
+        report={report}
+        isDashboard={isDashboard}
+        plan={effectiveReportPlan}
+        patchReport={async (patch) => await applyReportPatch(patch)}
+        showMasterPlacesSearchTest={isViewerMasterAdmin}
+      />
 
       {report.evidences ? (
         <Card className={cn(ROTA_REPORT_SURFACE_SECTION, "print-white", ROTA_REPORT_CARD_BOX)}>
