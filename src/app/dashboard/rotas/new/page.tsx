@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, Loader2, Phone, Search, Sparkles, UserPlus } from "lucide-react";
 
@@ -24,7 +24,11 @@ import type {
   AiScoringStrictness,
   AiServicesFocusPolicy,
 } from "@/types/user-settings";
-import { persistEvidenceImagesToStorage } from "@/lib/evidence-storage";
+import {
+  describeManualUploadFailure,
+  persistEvidenceImagesToStorage,
+  uploadRotaGenerationDraftImage,
+} from "@/lib/evidence-storage";
 import { isLeadStatusSelectable } from "@/lib/lead-status-rules";
 import { Lead, LEAD_STATUSES, type LeadStatus } from "@/types/lead";
 import type { RotaDigitalReport } from "@/types/report";
@@ -41,7 +45,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { GenerateRouteProgressOverlay } from "@/components/rotas/generate-route-progress-overlay";
+import {
+  GenerateRouteProgressOverlay,
+  type GenerateRouteEvidenceRecovery,
+} from "@/components/rotas/generate-route-progress-overlay";
 import { PlanLimitModal, type PlanLimitModalState } from "@/components/limits/plan-limit-modal";
 import { normalizedSubscriptionPlanKey, type PlanKey } from "@/lib/plan-quotas";
 import { cn } from "@/lib/utils";
@@ -74,6 +81,32 @@ function scoringCompactClass(id: AiScoringStrictness, selected: boolean): string
 
 function easeOutCubic(t: number): number {
   return 1 - (1 - t) ** 3;
+}
+
+type PreparedEvidenceClient = Record<string, unknown> & {
+  siteHeroSnapshotUrl?: string;
+  instagramSnapshotUrl?: string;
+  normalizedWebsiteUrl?: string;
+  normalizedInstagramUrl?: string;
+  websiteCandidateUrls?: string[];
+  instagramSnapshotCandidates?: string[];
+};
+
+function mergeManualIntoPrepared(
+  p: PreparedEvidenceClient,
+  siteUrl: string | null,
+  igUrl: string | null,
+): PreparedEvidenceClient {
+  const out: PreparedEvidenceClient = { ...p };
+  if (siteUrl) {
+    out.siteHeroSnapshotUrl = siteUrl;
+    out.websiteCandidateUrls = [siteUrl, ...(p.websiteCandidateUrls || [])];
+  }
+  if (igUrl) {
+    out.instagramSnapshotUrl = igUrl;
+    out.instagramSnapshotCandidates = [igUrl, ...(p.instagramSnapshotCandidates || [])];
+  }
+  return out;
 }
 
 function normalizeSearchText(s: string): string {
@@ -181,6 +214,22 @@ export default function NewRotaPage() {
   const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const analysisProgressRef = useRef(0);
   const progressStartedAtRef = useRef(0);
+  /** após mostrar o passo "prints em falta", o `finally` de `handleGenerate` não repõe `saving` */
+  const recoveryStashActiveRef = useRef(false);
+  const generationPayloadRef = useRef<Record<string, unknown> | null>(null);
+  const runSecondPhaseRef = useRef<((p: PreparedEvidenceClient) => Promise<void>) | null>(null);
+  const [generateOverlayView, setGenerateOverlayView] = useState<"progress" | "recovery">("progress");
+  const [preparedEvidenceStash, setPreparedEvidenceStash] = useState<PreparedEvidenceClient | null>(null);
+  const [evidenceMissingSite, setEvidenceMissingSite] = useState(false);
+  const [evidenceMissingIg, setEvidenceMissingIg] = useState(false);
+  const [manualSiteUrl, setManualSiteUrl] = useState<string | null>(null);
+  const [manualInstagramUrl, setManualInstagramUrl] = useState<string | null>(null);
+  const [uploadingManualSite, setUploadingManualSite] = useState(false);
+  const [uploadingManualIg, setUploadingManualIg] = useState(false);
+  const [recoveryError, setRecoveryError] = useState<string | null>(null);
+  const [recoveryBusy, setRecoveryBusy] = useState(false);
+  const siteFileInputRef = useRef<HTMLInputElement | null>(null);
+  const instagramFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const selectedLead = useMemo(
     () => leads.find((lead) => lead.id === leadId) ?? null,
@@ -300,6 +349,33 @@ export default function NewRotaPage() {
     }
   };
 
+  const startProgressInterval = () => {
+    clearProgressTimer();
+    analysisProgressRef.current = 0;
+    progressStartedAtRef.current = Date.now();
+    setAnalysisProgress(0);
+    progressIntervalRef.current = setInterval(() => {
+      setAnalysisProgress((p) => {
+        if (p >= 88) return p;
+        const elapsedMs = Math.max(0, Date.now() - progressStartedAtRef.current);
+        const ratio = Math.min(1, elapsedMs / ESTIMATED_PROGRESS_TO_88_MS);
+        const target = ratio * 88;
+        const gapToTarget = target - p;
+        let inc: number;
+        if (gapToTarget > 1.2) {
+          inc = 0.3 + Math.random() * 0.16;
+        } else if (gapToTarget > 0.25) {
+          inc = 0.12 + Math.random() * 0.1;
+        } else {
+          inc = 0.04 + Math.random() * 0.05;
+        }
+        const next = Math.min(88, Math.round((p + inc) * 10) / 10);
+        analysisProgressRef.current = next;
+        return next;
+      });
+    }, 250);
+  };
+
   const toggleAiChannel = (id: string) => {
     setAiChannelIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
@@ -344,39 +420,19 @@ export default function NewRotaPage() {
       return;
     }
 
-    clearProgressTimer();
     setCompletingFinalStretch(false);
-    analysisProgressRef.current = 0;
-    progressStartedAtRef.current = Date.now();
-    setAnalysisProgress(0);
+    recoveryStashActiveRef.current = false;
+    setGenerateOverlayView("progress");
+    setPreparedEvidenceStash(null);
+    setEvidenceMissingSite(false);
+    setEvidenceMissingIg(false);
+    setManualSiteUrl(null);
+    setManualInstagramUrl(null);
+    setRecoveryError(null);
     setProgressOverlayOpen(true);
     setSaving(true);
     setError(null);
-
-    progressIntervalRef.current = setInterval(() => {
-      setAnalysisProgress((p) => {
-        if (p >= 88) return p;
-        const elapsedMs = Math.max(0, Date.now() - progressStartedAtRef.current);
-        const ratio = Math.min(1, elapsedMs / ESTIMATED_PROGRESS_TO_88_MS);
-        const target = ratio * 88;
-        const gapToTarget = target - p;
-        let inc: number;
-
-        // Acelera no início/meio, desacelera perto do alvo e mantém fluidez sem “disparar”.
-        if (gapToTarget > 1.2) {
-          inc = 0.30 + Math.random() * 0.16;
-        } else if (gapToTarget > 0.25) {
-          inc = 0.12 + Math.random() * 0.10;
-        } else {
-          // Pequeno avanço visual mesmo quando já está perto do alvo do tempo.
-          inc = 0.04 + Math.random() * 0.05;
-        }
-
-        const next = Math.min(88, Math.round((p + inc) * 10) / 10);
-        analysisProgressRef.current = next;
-        return next;
-      });
-    }, 250);
+    startProgressInterval();
 
     try {
       const aiRecommendedChannelsPolicy: AiRecommendedChannelsPolicy =
@@ -454,6 +510,93 @@ export default function NewRotaPage() {
         return true;
       };
 
+      generationPayloadRef.current = payload;
+      const runSecondPhase = async (prepared: PreparedEvidenceClient) => {
+        const generateRes = await fetch("/api/generate-route", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+          body: JSON.stringify({
+            ...payload,
+            mode: "generateFromEvidence",
+            preparedEvidence: prepared,
+          }),
+        });
+        const data = await parseApiResponse(generateRes);
+        if (maybeHandleQuotaResponse(generateRes, data)) {
+          return;
+        }
+        if (!generateRes.ok) {
+          const fallbackMessage =
+            generateRes.status === 504
+              ? "Tempo esgotado ao gerar a rota em produção. Tente novamente em instantes."
+              : "Erro ao gerar rota.";
+          throw new Error(data.error || fallbackMessage);
+        }
+        if (!data.report) {
+          throw new Error("Resposta inválida da API ao gerar rota.");
+        }
+        console.info("[IG_DEBUG][client][generate-route-response]", data?.debug || null);
+
+        let reportWithStoredEvidence = data.report as Omit<RotaDigitalReport, "id">;
+        try {
+          reportWithStoredEvidence = await persistEvidenceImagesToStorage({
+            report: data.report as Omit<RotaDigitalReport, "id">,
+            userId: user.uid,
+            leadId: selectedLead.id,
+          });
+        } catch (storageErr) {
+          console.warn("Falha ao persistir evidências no Storage, seguindo com URLs originais.", storageErr);
+        }
+        console.info("[IG_DEBUG][client][report-after-storage]", {
+          instagramBioExcerpt: reportWithStoredEvidence?.evidences?.instagramBioExcerpt || null,
+          instagramSnapshotUrl: reportWithStoredEvidence?.evidences?.instagramSnapshotUrl || null,
+          instagramProfileImageUrl: reportWithStoredEvidence?.evidences?.instagramProfileImageUrl || null,
+          researchNotes: reportWithStoredEvidence?.evidences?.researchNotes || null,
+        });
+
+        const existing = await getReportByLead(selectedLead.id, user.uid);
+        console.info("[IG_DEBUG][client][firestore-step]", {
+          step: "getReportByLead",
+          foundExisting: Boolean(existing),
+          existingReportId: existing?.id || null,
+        });
+        let reportId: string;
+        if (existing) {
+          console.info("[IG_DEBUG][client][firestore-step]", {
+            step: "updateReport",
+            reportId: existing.id,
+          });
+          await updateReport(existing.id, {
+            ...reportWithStoredEvidence,
+            publicSlug: existing.publicSlug || reportWithStoredEvidence.publicSlug,
+          });
+          reportId = existing.id;
+        } else {
+          console.info("[IG_DEBUG][client][firestore-step]", {
+            step: "saveReport",
+          });
+          reportId = await saveReport(reportWithStoredEvidence);
+        }
+
+        console.info("[IG_DEBUG][client][firestore-step]", {
+          step: "updateLead.reportId",
+          leadId: selectedLead.id,
+          reportId,
+        });
+        await updateLead(selectedLead.id, { reportId, status: "Rota Gerada" });
+
+        clearProgressTimer();
+        setCompletingFinalStretch(true);
+        await runProgressTo100(analysisProgressRef.current, FINAL_PROGRESS_MS, (pct) => {
+          analysisProgressRef.current = pct;
+          setAnalysisProgress(pct);
+        });
+        setCompletingFinalStretch(false);
+        setProgressOverlayOpen(false);
+        router.push(`/dashboard/rotas/${reportId}`);
+      };
+      runSecondPhaseRef.current = runSecondPhase;
+
       // Etapa 1: coleta de evidências (prints, bio, URLs verificadas).
       const collectRes = await fetch("/api/generate-route", {
         method: "POST",
@@ -475,101 +618,172 @@ export default function NewRotaPage() {
         throw new Error(collectData.error || fallbackMessage);
       }
 
-      // Etapa 2: geração do relatório com IA usando as evidências já coletadas.
-      const generateRes = await fetch("/api/generate-route", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
-        body: JSON.stringify({
-          ...payload,
-          mode: "generateFromEvidence",
-          preparedEvidence: collectData.preparedEvidence,
-        }),
-      });
-      const data = await parseApiResponse(generateRes);
-      if (maybeHandleQuotaResponse(generateRes, data)) {
+      const prepared = collectData.preparedEvidence as PreparedEvidenceClient;
+      const nWeb = String(prepared.normalizedWebsiteUrl || "").trim();
+      const nIg = String(prepared.normalizedInstagramUrl || "").trim();
+      const missSite = Boolean(nWeb) && !prepared.siteHeroSnapshotUrl;
+      const missIg = Boolean(nIg) && !prepared.instagramSnapshotUrl;
+      if (missSite || missIg) {
+        setPreparedEvidenceStash(prepared);
+        setEvidenceMissingSite(missSite);
+        setEvidenceMissingIg(missIg);
+        setManualSiteUrl(null);
+        setManualInstagramUrl(null);
+        setRecoveryError(null);
+        setGenerateOverlayView("recovery");
+        recoveryStashActiveRef.current = true;
+        clearProgressTimer();
+        setAnalysisProgress(100);
         return;
       }
-      if (!generateRes.ok) {
-        const fallbackMessage =
-          generateRes.status === 504
-            ? "Tempo esgotado ao gerar a rota em produção. Tente novamente em instantes."
-            : "Erro ao gerar rota.";
-        throw new Error(data.error || fallbackMessage);
-      }
-      if (!data.report) {
-        throw new Error("Resposta inválida da API ao gerar rota.");
-      }
-      console.info("[IG_DEBUG][client][generate-route-response]", data?.debug || null);
 
-      let reportWithStoredEvidence = data.report as Omit<RotaDigitalReport, "id">;
-      try {
-        reportWithStoredEvidence = await persistEvidenceImagesToStorage({
-          report: data.report as Omit<RotaDigitalReport, "id">,
-          userId: user.uid,
-          leadId: selectedLead.id,
-        });
-      } catch (storageErr) {
-        // Não bloqueia o fluxo principal se upload de imagem falhar no cliente.
-        console.warn("Falha ao persistir evidências no Storage, seguindo com URLs originais.", storageErr);
-      }
-      console.info("[IG_DEBUG][client][report-after-storage]", {
-        instagramBioExcerpt: reportWithStoredEvidence?.evidences?.instagramBioExcerpt || null,
-        instagramSnapshotUrl: reportWithStoredEvidence?.evidences?.instagramSnapshotUrl || null,
-        instagramProfileImageUrl: reportWithStoredEvidence?.evidences?.instagramProfileImageUrl || null,
-        researchNotes: reportWithStoredEvidence?.evidences?.researchNotes || null,
-      });
-
-      const existing = await getReportByLead(selectedLead.id, user.uid);
-      console.info("[IG_DEBUG][client][firestore-step]", {
-        step: "getReportByLead",
-        foundExisting: Boolean(existing),
-        existingReportId: existing?.id || null,
-      });
-      let reportId: string;
-      if (existing) {
-        console.info("[IG_DEBUG][client][firestore-step]", {
-          step: "updateReport",
-          reportId: existing.id,
-        });
-        await updateReport(existing.id, {
-          ...reportWithStoredEvidence,
-          publicSlug: existing.publicSlug || reportWithStoredEvidence.publicSlug,
-        });
-        reportId = existing.id;
-      } else {
-        console.info("[IG_DEBUG][client][firestore-step]", {
-          step: "saveReport",
-        });
-        reportId = await saveReport(reportWithStoredEvidence);
-      }
-
-      console.info("[IG_DEBUG][client][firestore-step]", {
-        step: "updateLead.reportId",
-        leadId: selectedLead.id,
-        reportId,
-      });
-      await updateLead(selectedLead.id, { reportId, status: "Rota Gerada" });
-
-      clearProgressTimer();
-      setCompletingFinalStretch(true);
-      await runProgressTo100(analysisProgressRef.current, FINAL_PROGRESS_MS, (pct) => {
-        analysisProgressRef.current = pct;
-        setAnalysisProgress(pct);
-      });
-      setCompletingFinalStretch(false);
-      router.push(`/dashboard/rotas/${reportId}`);
+      await runSecondPhase(prepared);
     } catch (err: unknown) {
       clearProgressTimer();
       setCompletingFinalStretch(false);
       setProgressOverlayOpen(false);
       setAnalysisProgress(0);
       analysisProgressRef.current = 0;
+      setGenerateOverlayView("progress");
       const msg = err instanceof Error ? err.message : "Erro desconhecido";
       setError(msg);
     } finally {
+      if (!recoveryStashActiveRef.current) {
+        setSaving(false);
+      }
+    }
+  };
+
+  const handleSiteDraftFile = async (e: ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if (!f || !user || !selectedLead) return;
+    setUploadingManualSite(true);
+    setRecoveryError(null);
+    const res = await uploadRotaGenerationDraftImage({
+      file: f,
+      userId: user.uid,
+      leadId: selectedLead.id,
+      kind: "site",
+    });
+    setUploadingManualSite(false);
+    if (!res.ok) {
+      setRecoveryError(describeManualUploadFailure(res));
+      return;
+    }
+    setManualSiteUrl(res.url);
+  };
+
+  const handleInstagramDraftFile = async (e: ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if (!f || !user || !selectedLead) return;
+    setUploadingManualIg(true);
+    setRecoveryError(null);
+    const res = await uploadRotaGenerationDraftImage({
+      file: f,
+      userId: user.uid,
+      leadId: selectedLead.id,
+      kind: "instagram",
+    });
+    setUploadingManualIg(false);
+    if (!res.ok) {
+      setRecoveryError(describeManualUploadFailure(res));
+      return;
+    }
+    setManualInstagramUrl(res.url);
+  };
+
+  const handleRecoveryWithoutPrints = async () => {
+    const run = runSecondPhaseRef.current;
+    const p = preparedEvidenceStash;
+    if (!user || !selectedLead || !p || !run) return;
+    setRecoveryError(null);
+    setRecoveryBusy(true);
+    recoveryStashActiveRef.current = false;
+    setGenerateOverlayView("progress");
+    setSaving(true);
+    startProgressInterval();
+    try {
+      await run(p);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Erro desconhecido";
+      setRecoveryError(msg);
+      setGenerateOverlayView("recovery");
+      clearProgressTimer();
+      setAnalysisProgress(0);
+    } finally {
+      setRecoveryBusy(false);
       setSaving(false);
     }
   };
+
+  const handleRecoveryWithPrints = async () => {
+    const run = runSecondPhaseRef.current;
+    const p = preparedEvidenceStash;
+    if (!user || !selectedLead || !p || !run) return;
+    let canProceedRecovery = false;
+    if (evidenceMissingSite && evidenceMissingIg) {
+      canProceedRecovery = Boolean(manualSiteUrl || manualInstagramUrl);
+    } else if (evidenceMissingSite) {
+      canProceedRecovery = Boolean(manualSiteUrl);
+    } else if (evidenceMissingIg) {
+      canProceedRecovery = Boolean(manualInstagramUrl);
+    }
+    if (!canProceedRecovery) {
+      setRecoveryError("Envie os prints necessários para esta opção.");
+      return;
+    }
+    const merged = mergeManualIntoPrepared(p, manualSiteUrl, manualInstagramUrl);
+    setRecoveryError(null);
+    setRecoveryBusy(true);
+    recoveryStashActiveRef.current = false;
+    setGenerateOverlayView("progress");
+    setSaving(true);
+    startProgressInterval();
+    try {
+      await run(merged);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Erro desconhecido";
+      setRecoveryError(msg);
+      setGenerateOverlayView("recovery");
+      clearProgressTimer();
+      setAnalysisProgress(0);
+    } finally {
+      setRecoveryBusy(false);
+      setSaving(false);
+    }
+  };
+
+  const generateEvidenceRecoveryPanel: GenerateRouteEvidenceRecovery | null =
+    generateOverlayView === "recovery" && preparedEvidenceStash
+      ? (() => {
+          let canProceedRecovery = false;
+          if (evidenceMissingSite && evidenceMissingIg) {
+            canProceedRecovery = Boolean(manualSiteUrl || manualInstagramUrl);
+          } else if (evidenceMissingSite) {
+            canProceedRecovery = Boolean(manualSiteUrl);
+          } else if (evidenceMissingIg) {
+            canProceedRecovery = Boolean(manualInstagramUrl);
+          }
+          return {
+            companyName: selectedLead?.company,
+            missingSite: evidenceMissingSite,
+            missingInstagram: evidenceMissingIg,
+            sitePreviewUrl: manualSiteUrl,
+            instagramPreviewUrl: manualInstagramUrl,
+            uploadingSite: uploadingManualSite,
+            uploadingInstagram: uploadingManualIg,
+            onRequestSiteFile: () => siteFileInputRef.current?.click(),
+            onRequestInstagramFile: () => instagramFileInputRef.current?.click(),
+            onAnalyzeWithoutPrints: () => void handleRecoveryWithoutPrints(),
+            onProceedWithAnalysis: () => void handleRecoveryWithPrints(),
+            canProceed: canProceedRecovery,
+            running: recoveryBusy,
+            error: recoveryError,
+          };
+        })()
+      : null;
 
   const openCreateLeadDialog = () => {
     setNewLeadName(leadQuery.trim());
@@ -629,11 +843,29 @@ export default function NewRotaPage() {
 
   return (
     <div className="space-y-6 w-full">
+      <input
+        type="file"
+        ref={siteFileInputRef}
+        className="sr-only"
+        accept="image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif"
+        tabIndex={-1}
+        onChange={handleSiteDraftFile}
+      />
+      <input
+        type="file"
+        ref={instagramFileInputRef}
+        className="sr-only"
+        accept="image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif"
+        tabIndex={-1}
+        onChange={handleInstagramDraftFile}
+      />
       <GenerateRouteProgressOverlay
         open={progressOverlayOpen}
+        view={generateOverlayView === "recovery" ? "recovery" : "progress"}
         progress={analysisProgress}
         companyName={selectedLead?.company}
         instantBarWidth={completingFinalStretch}
+        evidenceRecovery={generateEvidenceRecoveryPanel}
       />
       <PlanLimitModal
         state={limitModalState}

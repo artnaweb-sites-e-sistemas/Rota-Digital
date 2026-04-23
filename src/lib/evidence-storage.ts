@@ -344,6 +344,24 @@ export async function uploadUserEvidenceImageForReport(params: {
   });
 }
 
+/**
+ * Antes de existir relatório: prints enviados pelo utilizador no fluxo "Gerar Rota"
+ * quando a coleta automática de site/Instagram falha.
+ * `users/{userId}/leads/{leadId}/rota-generation-draft/...`
+ */
+export async function uploadRotaGenerationDraftImage(params: {
+  file: File;
+  userId: string;
+  leadId: string;
+  kind: "site" | "instagram";
+}): Promise<UserManualStorageUploadResult> {
+  const { file, userId, leadId, kind } = params;
+  return uploadUserFileToStorage({
+    file,
+    destinationPath: `users/${userId}/leads/${leadId}/rota-generation-draft/${kind}-${Date.now()}`,
+  });
+}
+
 async function uploadUserFileToStorage(params: {
   file: File;
   destinationPath: string;
