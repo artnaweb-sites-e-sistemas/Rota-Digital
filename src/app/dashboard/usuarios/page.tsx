@@ -17,6 +17,7 @@ import {
 
 import { AdminGrowthCharts } from "@/components/admin/admin-growth-charts";
 import { AdminPaymentAlertsBanner } from "@/components/admin/admin-payment-alerts-banner";
+import { PlanUsageMetricsSection } from "@/components/admin/plan-usage-metrics-section";
 import { PlatformVolumeCharts } from "@/components/admin/platform-volume-charts";
 import {
   PlatformPeriodSelector,
@@ -567,6 +568,7 @@ export default function UsuariosAdminPage() {
           refreshing={chartsLoading && platformSeries != null && platformStats != null}
           error={chartsError}
         />
+        <PlanUsageMetricsSection user={user} isGeneralAdmin={isGeneralAdmin} authLoading={authLoading} />
       </div>
 
       <Card className="overflow-hidden rounded-2xl border border-border bg-card shadow-xl dark:border-white/5 dark:bg-white/[0.02]">
