@@ -13,8 +13,10 @@ export default function SettingsDadosBasicosPage() {
         </p>
       </div>
 
-      <AppearanceSettingsForm />
-      <ReportCtaSettingsForm />
+      <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-2 lg:items-start">
+        <AppearanceSettingsForm />
+        <ReportCtaSettingsForm />
+      </div>
     </div>
   );
 }

@@ -158,7 +158,7 @@ export function ReportCtaSettingsForm() {
   };
 
   return (
-    <Card className="border-border bg-card shadow-xl overflow-hidden dark:border-white/5 dark:bg-white/[0.02]">
+    <Card className="min-w-0 border-border bg-card shadow-xl overflow-hidden dark:border-white/5 dark:bg-white/[0.02]">
       <CardHeader className="space-y-2 border-b border-border pb-4 dark:border-white/5">
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-md bg-brand/10 ring-1 ring-brand/20">

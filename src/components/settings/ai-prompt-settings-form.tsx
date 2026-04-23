@@ -265,82 +265,88 @@ export function AiPromptSettingsForm() {
 
   return (
     <div className="space-y-6">
-      <Card className="border-border bg-card shadow-xl overflow-hidden dark:border-white/5 dark:bg-white/[0.02]">
-        <CardHeader className="space-y-2 border-b border-border pb-4 dark:border-white/5">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-brand/10 ring-1 ring-brand/20">
-              <Scale className="size-4 text-brand dark:text-brand" aria-hidden />
+      <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-2 lg:items-stretch">
+        <Card className="min-w-0 border-border bg-card shadow-xl h-full flex flex-col overflow-hidden dark:border-white/5 dark:bg-white/[0.02]">
+          <CardHeader className="space-y-2 border-b border-border pb-4 dark:border-white/5">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-md bg-brand/10 ring-1 ring-brand/20">
+                <Scale className="size-4 text-brand dark:text-brand" aria-hidden />
+              </div>
+              <div className="min-w-0 flex-1">
+                <CardTitle className="text-lg font-bold text-foreground dark:text-white">Exigência nas notas</CardTitle>
+                <CardDescription className="text-xs leading-relaxed text-muted-foreground">
+                  Calibra pontuações de diagnóstico e de maturidade digital no relatório.
+                </CardDescription>
+              </div>
             </div>
-            <div className="min-w-0 flex-1">
-              <CardTitle className="text-lg font-bold text-foreground dark:text-white">Exigência nas notas</CardTitle>
-              <CardDescription className="truncate text-xs leading-snug text-muted-foreground">
-                Calibra pontuações de diagnóstico e de maturidade digital no relatório.
-              </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-1 flex-col justify-center pt-6">
+            {/*
+              Grelha 2×2 (ordem por linhas): Livre | Média / Baixa | Alta → col.1 Livre+Baixa, col.2 Média+Alta.
+            */}
+            <div className="grid grid-cols-2 gap-2">
+              {(["free", "medium", "low", "high"] as const).map((id) => {
+                const opt = SCORING_STRICTNESS_OPTIONS.find((o) => o.id === id)!;
+                const selected = scoringStrictness === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setScoringStrictness(opt.id)}
+                    className={cn(
+                      "relative flex min-h-12 w-full items-center justify-center rounded-md border px-2 py-2.5 text-center transition-all sm:min-h-[3.25rem] sm:px-3 sm:py-3",
+                      selected
+                        ? scoringStrictnessSelectedClasses(opt.id)
+                        : policyUnselectedClasses(),
+                    )}
+                  >
+                    {selected ? (
+                      <SelectedBadge variant={opt.id === "free" ? "brand" : "neutral"} />
+                    ) : null}
+                    <span className="text-xs font-semibold leading-tight sm:text-sm">{opt.label}</span>
+                  </button>
+                );
+              })}
             </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-6 pt-6">
-          <div className="flex flex-nowrap gap-2">
-            {SCORING_STRICTNESS_OPTIONS.map((opt) => {
-              const selected = scoringStrictness === opt.id;
-              return (
-                <button
-                  key={opt.id}
-                  type="button"
-                  onClick={() => setScoringStrictness(opt.id)}
-                  className={cn(
-                    "relative flex min-h-12 flex-1 items-center justify-center rounded-md border px-2 py-2.5 text-center transition-all sm:min-h-[3.25rem] sm:px-3 sm:py-3",
-                    selected
-                      ? scoringStrictnessSelectedClasses(opt.id)
-                      : policyUnselectedClasses(),
-                  )}
-                >
-                  {selected ? (
-                    <SelectedBadge variant={opt.id === "free" ? "brand" : "neutral"} />
-                  ) : null}
-                  <span className="text-xs font-semibold leading-tight sm:text-sm">{opt.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
-      <Card className="border-border bg-card shadow-xl overflow-hidden dark:border-white/5 dark:bg-white/[0.02]">
-        <CardHeader className="space-y-2 border-b border-border pb-4 dark:border-white/5">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-brand/10 ring-1 ring-brand/20">
-              <Bot className="size-4 text-brand dark:text-brand" aria-hidden />
+        <Card className="min-w-0 border-border bg-card shadow-xl h-full flex flex-col overflow-hidden dark:border-white/5 dark:bg-white/[0.02]">
+          <CardHeader className="space-y-2 border-b border-border pb-4 dark:border-white/5">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-md bg-brand/10 ring-1 ring-brand/20">
+                <Bot className="size-4 text-brand dark:text-brand" aria-hidden />
+              </div>
+              <div className="min-w-0 flex-1">
+                <CardTitle className="text-lg font-bold text-foreground dark:text-white">Diretrizes da IA</CardTitle>
+                <CardDescription className="text-xs leading-relaxed text-muted-foreground">
+                  Texto extra fixo; regras de canais e de serviços abaixo entram no prompt automaticamente.
+                </CardDescription>
+              </div>
             </div>
-            <div className="min-w-0 flex-1">
-              <CardTitle className="text-lg font-bold text-foreground dark:text-white">Diretrizes da IA</CardTitle>
-              <CardDescription className="truncate text-xs leading-snug text-muted-foreground">
-                Texto extra fixo; regras de canais e de serviços abaixo entram no prompt automaticamente.
-              </CardDescription>
+          </CardHeader>
+          <CardContent className="flex min-h-0 flex-1 flex-col space-y-4 pt-6">
+            <div className="flex min-h-0 flex-col space-y-2">
+              <Label
+                htmlFor="ai-prompt-guidelines"
+                className="text-xs font-bold uppercase tracking-widest text-muted-foreground"
+              >
+                Prompt base customizado
+              </Label>
+              <Textarea
+                id="ai-prompt-guidelines"
+                value={guidelines}
+                onChange={(e) => setGuidelines(e.target.value)}
+                placeholder="Ex.: priorize tom consultivo, foco em clínicas, evitar termos em inglês..."
+                className="min-h-[100px] resize-y rounded-md border-input bg-background text-foreground placeholder:text-muted-foreground focus-visible:border-brand/50 focus-visible:ring-brand/20 dark:border-white/10 dark:bg-white/5 dark:text-zinc-100 dark:placeholder:text-zinc-600 sm:min-h-[120px] lg:min-h-[128px] lg:max-h-[200px]"
+              />
+              <p className="text-xs text-muted-foreground">
+                {guidelines.length}/{MAX_GUIDELINES_LENGTH} caracteres.
+              </p>
             </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4 pt-6">
-          <div className="space-y-2">
-            <Label
-              htmlFor="ai-prompt-guidelines"
-              className="text-xs font-bold uppercase tracking-widest text-muted-foreground"
-            >
-              Prompt base customizado
-            </Label>
-            <Textarea
-              id="ai-prompt-guidelines"
-              value={guidelines}
-              onChange={(e) => setGuidelines(e.target.value)}
-              placeholder="Ex.: priorize tom consultivo, foco em clínicas, evitar termos em inglês..."
-              className="min-h-[180px] rounded-md border-input bg-background text-foreground placeholder:text-muted-foreground focus-visible:border-brand/50 focus-visible:ring-brand/20 dark:border-white/10 dark:bg-white/5 dark:text-zinc-100 dark:placeholder:text-zinc-600"
-            />
-            <p className="text-xs text-muted-foreground">
-              {guidelines.length}/{MAX_GUIDELINES_LENGTH} caracteres.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
 
       <Card className="border-border bg-card shadow-xl overflow-hidden dark:border-white/5 dark:bg-white/[0.02]">
         <CardHeader className="space-y-2 border-b border-border pb-4 dark:border-white/5">

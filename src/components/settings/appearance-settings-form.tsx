@@ -110,7 +110,7 @@ export function AppearanceSettingsForm() {
   };
 
   return (
-    <Card className="border-border bg-card shadow-xl overflow-hidden dark:border-white/5 dark:bg-white/[0.02]">
+    <Card className="min-w-0 border-border bg-card shadow-xl overflow-hidden dark:border-white/5 dark:bg-white/[0.02]">
       <CardHeader className="space-y-2 border-b border-border pb-4 dark:border-white/5">
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-md bg-brand/10 ring-1 ring-brand/20">
@@ -119,12 +119,12 @@ export function AppearanceSettingsForm() {
           <div>
             <CardTitle className="text-lg font-bold text-foreground dark:text-white">Aparência</CardTitle>
             <CardDescription className="text-sm text-muted-foreground leading-relaxed">
-              Modo claro ou escuro no painel.
+              Tema claro, escuro ou o do dispositivo no painel. A escolha fica na sua conta.
             </CardDescription>
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-6 pt-6">
+      <CardContent className="space-y-4 pt-6">
         {loading ? (
           <div className="flex items-center gap-3 py-10 text-sm text-muted-foreground">
             <Loader2 className="size-5 animate-spin shrink-0 text-brand" aria-hidden />
