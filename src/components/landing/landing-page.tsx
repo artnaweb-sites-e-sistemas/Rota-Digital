@@ -461,14 +461,14 @@ export function LandingPage() {
       {
         name: "Starter",
         price: "0",
-        description: "Grátis, para conhecer a plataforma e validar o funil.",
+        description: "Grátis para conhecer a plataforma e validar o funil.",
         roiAnchor: "Perfeito para testar o método",
         features: [
           "2 diagnósticos (Rota Digital) com IA.",
           "30 prospecções de leads.",
           "2 gerações de propostas",
-          { before: "Link Público", red: "sem a sua marca" },
-          { locked: true, text: "Análise do Google Meu Negócio e concorrentes (disponível no Pro)" },
+          { locked: true, text: "Link Público com a sua marca" },
+          { locked: true, text: "Google Meu Negócio e análise de concorrentes" },
         ],
         buttonText: "Começar Grátis",
         ctaHref: "/cadastro",
@@ -477,14 +477,14 @@ export function LandingPage() {
       {
         name: "Pro",
         price: billingCycle === "monthly" ? "127" : "97",
-        description: "Diagnósticos diários e prospecção consistente para sua agência crescer.",
-        roiAnchor: "Feche 1 proposta a mais no mês e o plano se paga várias vezes",
+        description: "Diagnósticos diários para sua agência crescer.",
+        roiAnchor: "1 proposta fechada e o plano se paga",
         features: [
           "20 diagnósticos (Rota Digital) com IA.",
           "50 prospecções de leads.",
           "30 gerações de propostas",
           { before: "Link Público", gold: "com a sua marca" },
-          "Análise completa do Google Meu Negócio e comparativo com concorrentes",
+          "Google Meu Negócio e análise de concorrentes",
         ],
         buttonText: "Assinar Pro",
         ctaHref: `/assinatura?plan=pro&cycle=${cycle}`,
@@ -493,14 +493,14 @@ export function LandingPage() {
       {
         name: "Agency",
         price: billingCycle === "monthly" ? "347" : "267",
-        description: "Volume máximo para agências com alta demanda de prospecção.",
-        roiAnchor: "Ideal para agências que fecham 3+ clientes por mês",
+        description: "Volume máximo para agências com alta demanda.",
+        roiAnchor: "Ideal para quem fecha 3+ por mês",
         features: [
           "50 diagnósticos (Rota Digital) com IA.",
           "100 prospecções de leads.",
           "Propostas ilimitadas",
           { before: "Link Público", gold: "com a sua marca" },
-          "Análise completa do Google Meu Negócio e comparativo com concorrentes",
+          "Google Meu Negócio e análise de concorrentes",
         ],
         buttonText: "Assinar Agency",
         ctaHref: `/assinatura?plan=agency&cycle=${cycle}`,
@@ -1200,7 +1200,7 @@ export function LandingPage() {
                       </div>
                     </BorderGlow>
                   ) : (
-                    <Card className="flex h-full w-full flex-col overflow-hidden rounded-xl border-border/50 bg-white shadow-sm transition-all hover:shadow-md dark:bg-zinc-950/20">
+                    <Card className="flex h-full w-full flex-col gap-0 overflow-hidden rounded-xl border-border/50 bg-white py-0 shadow-sm transition-all hover:shadow-md dark:bg-zinc-950/20">
                       <div className="flex flex-1 flex-col p-8">
                         <h4 className="flex items-center gap-2 text-xl font-bold">
                           <span>{plan.name}</span>
@@ -1397,11 +1397,11 @@ export function LandingPage() {
 
             <div className="relative z-10 mx-auto flex max-w-2xl flex-col gap-5 sm:gap-6">
               <h2 className="pr-2 text-xl font-bold leading-snug tracking-tight text-zinc-900 sm:text-4xl sm:leading-[1.14] lg:text-5xl">
-                Teste grátis hoje. Feche mais amanhã.
+                Comece grátis. Cresça no seu ritmo.
               </h2>
               <p className="text-sm leading-relaxed text-[#6f5a2f] sm:text-lg">
-                Comece pelo plano Starter sem pagar nada. Faça upgrade só quando estiver fechando mais clientes. Cancele
-                quando quiser, sem multa e sem pegadinha.
+                Entre no plano Starter sem pagar nada. Quando quiser mais diagnósticos, leads e propostas, faça
+                upgrade. Sem fidelidade. Sem multa.
               </p>
 
               <div className="mt-1 flex justify-center sm:mt-10">

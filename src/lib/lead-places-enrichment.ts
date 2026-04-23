@@ -115,7 +115,7 @@ function emptyGmbPayload(nowMs: number) {
     gmbOpenNow: undefined as boolean | undefined,
     gmbListingWebsiteUrl: FieldValue.delete(),
     gmbListingInstagramUrl: FieldValue.delete(),
-    gmbListingLinksVersion: FieldValue.delete(),
+    gmbListingLinksVersion: 1,
   };
 }
 
