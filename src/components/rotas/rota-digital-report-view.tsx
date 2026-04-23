@@ -73,6 +73,7 @@ import {
   ImageUp,
   X,
   Bot,
+  Info,
   Compass,
   Palette,
   Filter,
@@ -2531,6 +2532,13 @@ export function RotaDigitalReportView({
     [report.diagnosticScores],
   );
 
+  /** Reanálises já concluídas: a 1.ª é gratuita (API); da 2.ª em diante consome 1 unidade da cota “rotas”. */
+  const priorReanalysesCount = useMemo(
+    () => (Array.isArray(report.aiUsage?.reanalysis) ? report.aiUsage.reanalysis.length : 0),
+    [report.aiUsage?.reanalysis],
+  );
+  const reanalysisWillConsumeRotasQuota = priorReanalysesCount >= 1;
+
   const headlineMaturity = useMemo(() => {
     const fromTopics = maturityFromDiagnosticScores(report.diagnosticScores);
     if (fromTopics) return fromTopics;
@@ -2935,10 +2943,38 @@ export function RotaDigitalReportView({
               <DialogHeader>
                 <DialogTitle>Reanalisar com IA</DialogTitle>
               </DialogHeader>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <p className="text-sm text-muted-foreground">
                   Escreva o que deseja ajustar. A IA vai usar este relatório como contexto.
                 </p>
+                {reanalysisWillConsumeRotasQuota ? (
+                  <div
+                    role="status"
+                    className="flex gap-2.5 rounded-lg border border-amber-500/40 bg-amber-500/[0.12] px-3 py-2.5 text-sm leading-snug text-foreground dark:border-amber-400/35 dark:bg-amber-400/10"
+                  >
+                    <AlertCircle
+                      className="mt-0.5 size-4 shrink-0 text-amber-700 dark:text-amber-300"
+                      aria-hidden
+                    />
+                    <p>
+                      <span className="font-semibold">Cota:</span> desconta <strong>1 Rota</strong> do ciclo
+                      atual (equivalente a gerar uma Rota). Sem saldo, o pedido é recusado.
+                    </p>
+                  </div>
+                ) : (
+                  <div
+                    role="status"
+                    className="flex gap-2.5 rounded-lg border border-border/80 bg-muted/45 px-3 py-2.5 text-sm leading-snug text-muted-foreground"
+                  >
+                    <Info className="mt-0.5 size-4 shrink-0 text-foreground/80" aria-hidden />
+                    <p>
+                      A <strong className="text-foreground">primeira reanálise</strong> deste relatório{" "}
+                      <strong className="text-foreground">não desconta</strong> da cota. A partir da{" "}
+                      <strong className="text-foreground">segunda</strong>, cada reanálise consome 1 unidade
+                      como na geração de uma Rota.
+                    </p>
+                  </div>
+                )}
                 <Textarea
                   value={reanalyzeNotes}
                   onChange={(e) => setReanalyzeNotes(e.target.value)}

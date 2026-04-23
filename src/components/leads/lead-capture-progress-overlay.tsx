@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { MapPin } from "lucide-react";
+import {
+  ProgressOverlayPageReloadWarning,
+  ProgressOverlayRotaLabLogo,
+} from "@/components/rotas/progress-overlay-shared";
 
 type Props = {
   open: boolean;
@@ -67,9 +70,7 @@ export function LeadCaptureProgressOverlay({ open, progress, hint }: Props) {
         />
 
         <div className="relative flex flex-col items-center text-center">
-          <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#6b5f3a] to-brand">
-            <MapPin className="h-7 w-7 text-white" strokeWidth={1.75} aria-hidden />
-          </div>
+          <ProgressOverlayRotaLabLogo />
 
           <h2
             id="rd-lead-capture-progress-title"
@@ -85,6 +86,8 @@ export function LeadCaptureProgressOverlay({ open, progress, hint }: Props) {
           >
             {label}
           </p>
+
+          <ProgressOverlayPageReloadWarning />
 
           <div className="mt-6 w-full space-y-2">
             <div className="flex items-baseline justify-between gap-3 text-xs text-muted-foreground">
