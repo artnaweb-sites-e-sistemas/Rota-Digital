@@ -5,6 +5,7 @@ import { PublicShareThemeBootstrap } from "@/components/public-share-theme-boots
 import { RotaDigitalReportView } from "@/components/rotas/rota-digital-report-view";
 import { getCachedPublicProposalReportBySlug } from "@/lib/public-report-cache";
 import {
+  getCachedOwnerAccountEmailAdmin,
   getCachedUserCompanyAboutSettingsAdmin,
   getCachedUserReportCtaSettingsAdmin,
 } from "@/lib/user-settings-admin";
@@ -101,6 +102,9 @@ export default async function PublicProposalPage({
   const initialCtaSettings = report.userId
     ? await getCachedUserReportCtaSettingsAdmin(report.userId)
     : null;
+  const initialCtaOwnerAccountEmail = report.userId
+    ? await getCachedOwnerAccountEmailAdmin(report.userId)
+    : null;
   const initialCompanyAboutSettings = report.userId
     ? await getCachedUserCompanyAboutSettingsAdmin(report.userId)
     : null;
@@ -117,6 +121,7 @@ export default async function PublicProposalPage({
             variant="public"
             report={report}
             initialCtaSettings={initialCtaSettings}
+            initialCtaOwnerAccountEmail={initialCtaOwnerAccountEmail}
             initialCompanyAboutSettings={initialCompanyAboutSettings}
           />
         </div>

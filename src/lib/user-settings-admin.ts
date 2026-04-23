@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 
 import type {
@@ -13,12 +14,17 @@ import { coerceProposalPlansArray } from "@/lib/proposal-plan-coerce";
 
 const USER_SETTINGS_COLLECTION = "userSettings";
 
+function coerceCtaMode(raw: unknown): UserReportCtaMode {
+  if (raw === "whatsapp" || raw === "email") return raw;
+  return "url";
+}
+
 function coerceReportCtaSettings(raw: Record<string, unknown>): UserReportCtaSettings {
-  const mode: UserReportCtaMode = raw.ctaMode === "whatsapp" ? "whatsapp" : "url";
   return {
-    ctaMode: mode,
+    ctaMode: coerceCtaMode(raw.ctaMode),
     whatsappPhone: typeof raw.whatsappPhone === "string" ? raw.whatsappPhone : "",
     ctaUrl: typeof raw.ctaUrl === "string" ? raw.ctaUrl : "",
+    ctaEmail: typeof raw.ctaEmail === "string" ? raw.ctaEmail : "",
   };
 }
 
@@ -59,6 +65,23 @@ export async function getUserReportCtaSettingsAdmin(
 
 /** Uma leitura de CTA por `userId` por request (ex.: compartilhamento público). */
 export const getCachedUserReportCtaSettingsAdmin = cache(getUserReportCtaSettingsAdmin);
+
+/**
+ * E-mail de acesso (Firebase Auth) do utilizador — para `mailto` nos CTAs no servidor
+ * (ex.: relação pública ainda sem `userSettings` preenchido).
+ */
+export async function getOwnerAccountEmailAdmin(userId: string): Promise<string | null> {
+  const app = getFirebaseAdminApp();
+  if (!app || !userId?.trim()) return null;
+  try {
+    const u = await getAuth(app).getUser(userId);
+    return u.email?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+export const getCachedOwnerAccountEmailAdmin = cache(getOwnerAccountEmailAdmin);
 
 export async function getUserCompanyAboutSettingsAdmin(
   userId: string

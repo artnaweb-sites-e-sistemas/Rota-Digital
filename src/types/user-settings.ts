@@ -1,6 +1,6 @@
 import type { ProposalPlan } from "@/types/proposal";
 
-export type UserReportCtaMode = "whatsapp" | "url";
+export type UserReportCtaMode = "whatsapp" | "url" | "email";
 
 /** Tema do painel e base para páginas com alternância (ex.: relatório público). */
 export type UserUiTheme = "light" | "dark" | "system";
@@ -12,6 +12,11 @@ export interface UserReportCtaSettings {
   whatsappPhone: string;
   /** URL completa (https://...) quando `ctaMode === "url"`. */
   ctaUrl: string;
+  /**
+   * E-mail de contacto quando `ctaMode === "email"`.
+   * Vazio: usa o e-mail de acesso (conta) ao gerar o `mailto:`.
+   */
+  ctaEmail: string;
 }
 
 /** Dados institucionais da agência usados em propostas comerciais. */

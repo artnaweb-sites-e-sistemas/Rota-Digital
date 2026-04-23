@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { Calendar, X } from "lucide-react";
+import { Calendar, Mail, X } from "lucide-react";
 
 import { WhatsAppIcon } from "@/components/icons/whatsapp-icon";
 import { buttonVariants } from "@/components/ui/button";
@@ -181,6 +181,8 @@ export function PublicReportFloatingCta({ bottomCta }: { bottomCta: BottomCta })
               >
                 {bottomCta.useWhatsAppIcon ? (
                   <WhatsAppIcon className="size-4 shrink-0" />
+                ) : bottomCta.useMailIcon ? (
+                  <Mail className="size-4 shrink-0" aria-hidden />
                 ) : (
                   <Calendar className="size-4 shrink-0" aria-hidden />
                 )}

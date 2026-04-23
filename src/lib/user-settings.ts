@@ -37,12 +37,17 @@ export async function saveUserUiTheme(userId: string, theme: UserUiTheme): Promi
   );
 }
 
+function coerceCtaMode(raw: unknown): UserReportCtaMode {
+  if (raw === "whatsapp" || raw === "email") return raw;
+  return "url";
+}
+
 function coerceSettings(raw: Record<string, unknown>): UserReportCtaSettings {
-  const mode: UserReportCtaMode = raw.ctaMode === "whatsapp" ? "whatsapp" : "url";
   return {
-    ctaMode: mode,
+    ctaMode: coerceCtaMode(raw.ctaMode),
     whatsappPhone: typeof raw.whatsappPhone === "string" ? raw.whatsappPhone : "",
     ctaUrl: typeof raw.ctaUrl === "string" ? raw.ctaUrl : "",
+    ctaEmail: typeof raw.ctaEmail === "string" ? raw.ctaEmail : "",
   };
 }
 
@@ -81,6 +86,7 @@ export async function saveUserReportCtaSettings(
       ctaMode: settings.ctaMode,
       whatsappPhone: settings.whatsappPhone,
       ctaUrl: settings.ctaUrl,
+      ctaEmail: settings.ctaEmail,
       updatedAt: serverTimestamp(),
     },
     { merge: true }

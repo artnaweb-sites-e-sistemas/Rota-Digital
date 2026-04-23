@@ -11,6 +11,10 @@ export interface DiagnosticScore {
   comment: string;
   evidenceTitle?: string;
   evidenceImageUrl?: string;
+  /** Coluna do site no grid tópico (Posicionamento / Clareza): override local; sem alterar o siteHero global. */
+  evidenceSiteImageUrl?: string;
+  /** Coluna do Instagram no mesmo grid: override local. */
+  evidenceInstagramImageUrl?: string;
   evidenceNote?: string;
 }
 

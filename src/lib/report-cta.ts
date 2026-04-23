@@ -1,8 +1,28 @@
 import type { UserReportCtaSettings } from "@/types/user-settings";
 
-const FALLBACK_MAILTO = `mailto:?subject=${encodeURIComponent("Rota Digital — Reunião estratégica")}&body=${encodeURIComponent(
-  "Olá, gostaria de agendar uma reunião para validar prioridades, definir cronograma e dar início à execução do plano com segurança.",
+const STRATEGIC_SUBJECT = "Rota Digital — Reunião estratégica";
+const STRATEGIC_BODY =
+  "Olá, gostaria de agendar uma reunião para validar prioridades, definir cronograma e dar início à execução do plano com segurança.";
+
+const FALLBACK_MAILTO = `mailto:?subject=${encodeURIComponent(STRATEGIC_SUBJECT)}&body=${encodeURIComponent(
+  STRATEGIC_BODY,
 )}`;
+
+export function isValidReportCtaEmail(s: string): boolean {
+  const t = s.trim();
+  if (!t) return false;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t);
+}
+
+/** `mailto` para a reunião estratégica; `to` vazio = cliente de e-mail sem destinatário (comportamento anterior). */
+export function buildStrategicMeetingMailto(to: string | null | undefined): string {
+  const t = to?.trim();
+  const q = (s: string) => encodeURIComponent(s);
+  if (t && isValidReportCtaEmail(t)) {
+    return `mailto:${t}?subject=${q(STRATEGIC_SUBJECT)}&body=${q(STRATEGIC_BODY)}`;
+  }
+  return `mailto:?subject=${q(STRATEGIC_SUBJECT)}&body=${q(STRATEGIC_BODY)}`;
+}
 
 export type ResolvedReportCta = {
   top: {
@@ -10,14 +30,21 @@ export type ResolvedReportCta = {
     label: string;
     openInNewTab: boolean;
     useWhatsAppIcon: boolean;
+    useMailIcon: boolean;
   };
   bottom: {
     href: string;
     label: string;
     openInNewTab: boolean;
     useWhatsAppIcon: boolean;
+    useMailIcon: boolean;
     useCalendarIcon: boolean;
   };
+};
+
+export type ResolveReportCtasOptions = {
+  /** E-mail de registo (Firebase) do dono do relatório — fallback para `mailto` quando CTAs ainda não estão preenchidos. */
+  accountEmail?: string | null;
 };
 
 export function onlyDigitsPhone(input: string): string {
@@ -117,14 +144,28 @@ function normalizeExternalUrl(raw: string): string | null {
   }
 }
 
-/** Resolve CTAs do relatório: config do usuário > env > mailto. */
+function mailtoRecipientForEmailMode(
+  settings: UserReportCtaSettings,
+  accountEmail: string | null | undefined
+): string | null {
+  const fromField = settings.ctaEmail?.trim();
+  if (fromField && isValidReportCtaEmail(fromField)) return fromField;
+  const acc = accountEmail?.trim();
+  if (acc && isValidReportCtaEmail(acc)) return acc;
+  return null;
+}
+
+/** Resolve CTAs do relatório: config do utilizador > env > mailto (e-mail da conta como fallback). */
 export function resolveReportCtas(
   settings: UserReportCtaSettings | null | undefined,
-  envOverrideUrl?: string | null
+  envOverrideUrl?: string | null,
+  options?: ResolveReportCtasOptions
 ): ResolvedReportCta {
+  const accountEmail = options?.accountEmail;
   const envTrim = envOverrideUrl?.trim();
-  const fallbackHref = envTrim || FALLBACK_MAILTO;
+  const fallbackMailHref = envTrim || buildStrategicMeetingMailto(accountEmail ?? null);
   const fallbackNewTab = envTrim ? envTrim.startsWith("http") : false;
+  const mailIconForHref = (href: string) => href.trim().toLowerCase().startsWith("mailto:");
 
   const defaultResult: ResolvedReportCta = {
     top: {
@@ -132,13 +173,15 @@ export function resolveReportCtas(
       label: "Falar com especialista",
       openInNewTab: false,
       useWhatsAppIcon: false,
+      useMailIcon: false,
     },
     bottom: {
-      href: fallbackHref,
+      href: fallbackMailHref,
       label: "Agendar reunião estratégica",
       openInNewTab: fallbackNewTab,
       useWhatsAppIcon: false,
-      useCalendarIcon: true,
+      useMailIcon: mailIconForHref(fallbackMailHref),
+      useCalendarIcon: !mailIconForHref(fallbackMailHref),
     },
   };
 
@@ -146,26 +189,88 @@ export function resolveReportCtas(
 
   if (settings.ctaMode === "whatsapp") {
     const wa = buildWhatsAppHref(settings.whatsappPhone);
-    if (!wa) return defaultResult;
+    if (!wa) {
+      const mh = buildStrategicMeetingMailto(accountEmail);
+      return {
+        top: {
+          href: mh,
+          label: "Falar com especialista",
+          openInNewTab: false,
+          useWhatsAppIcon: false,
+          useMailIcon: true,
+        },
+        bottom: {
+          href: mh,
+          label: "Agendar reunião estratégica",
+          openInNewTab: false,
+          useWhatsAppIcon: false,
+          useMailIcon: true,
+          useCalendarIcon: false,
+        },
+      };
+    }
     return {
       top: {
         href: wa,
         label: "Falar com especialista",
         openInNewTab: true,
         useWhatsAppIcon: true,
+        useMailIcon: false,
       },
       bottom: {
         href: wa,
         label: "Agendar reunião estratégica",
         openInNewTab: true,
         useWhatsAppIcon: true,
+        useMailIcon: false,
+        useCalendarIcon: false,
+      },
+    };
+  }
+
+  if (settings.ctaMode === "email") {
+    const to = mailtoRecipientForEmailMode(settings, accountEmail);
+    const href = buildStrategicMeetingMailto(to);
+    return {
+      top: {
+        href,
+        label: "Falar com especialista",
+        openInNewTab: false,
+        useWhatsAppIcon: false,
+        useMailIcon: true,
+      },
+      bottom: {
+        href,
+        label: "Agendar reunião estratégica",
+        openInNewTab: false,
+        useWhatsAppIcon: false,
+        useMailIcon: true,
         useCalendarIcon: false,
       },
     };
   }
 
   const url = normalizeExternalUrl(settings.ctaUrl);
-  if (!url) return defaultResult;
+  if (!url) {
+    const mh = buildStrategicMeetingMailto(accountEmail);
+    return {
+      top: {
+        href: mh,
+        label: "Falar com especialista",
+        openInNewTab: false,
+        useWhatsAppIcon: false,
+        useMailIcon: true,
+      },
+      bottom: {
+        href: mh,
+        label: "Agendar reunião estratégica",
+        openInNewTab: false,
+        useWhatsAppIcon: false,
+        useMailIcon: true,
+        useCalendarIcon: false,
+      },
+    };
+  }
 
   return {
     top: {
@@ -173,13 +278,18 @@ export function resolveReportCtas(
       label: "Falar com especialista",
       openInNewTab: true,
       useWhatsAppIcon: false,
+      useMailIcon: false,
     },
     bottom: {
       href: url,
       label: "Agendar reunião estratégica",
       openInNewTab: true,
       useWhatsAppIcon: false,
+      useMailIcon: false,
       useCalendarIcon: true,
     },
   };
 }
+
+// compat: tests ou imports antigos
+export { FALLBACK_MAILTO };

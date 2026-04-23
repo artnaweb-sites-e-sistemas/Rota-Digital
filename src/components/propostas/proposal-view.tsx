@@ -18,6 +18,7 @@ import {
   ListChecks,
   Loader2,
   MapPin,
+  Mail,
   MessageCircle,
   Pencil,
   Phone,
@@ -77,13 +78,14 @@ import {
 } from "@/lib/proposal-lead-from-source";
 import { updateProposal } from "@/lib/proposals";
 import { describeManualUploadFailure, uploadUserProposalImage } from "@/lib/evidence-storage";
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
 import { useAuth } from "@/lib/auth-context";
 import { PlanLimitModal, type PlanLimitModalState } from "@/components/limits/plan-limit-modal";
 import { normalizedSubscriptionPlanKey, planAllowsCustomLogo, type PlanKey } from "@/lib/plan-quotas";
 import { getUserCompanyAboutSettings, getUserReportCtaSettings } from "@/lib/user-settings";
 import { maskPhoneDisplayLoose, resolveReportCtas, type ResolvedReportCta } from "@/lib/report-cta";
-import type { UserCompanyAboutSettings } from "@/types/user-settings";
+import type { UserCompanyAboutSettings, UserReportCtaSettings } from "@/types/user-settings";
 import { WhatsAppIcon } from "@/components/icons/whatsapp-icon";
 import { PublicThemeToggle } from "@/components/public-theme-toggle";
 import { PublicThemeToggleHint } from "@/components/public-theme-toggle-hint";
@@ -322,6 +324,8 @@ function ProposalNextStepsSpotlight({
           >
             {bottomCta.useWhatsAppIcon ? (
               <WhatsAppIcon className="size-4 shrink-0" />
+            ) : bottomCta.useMailIcon ? (
+              <Mail className="size-4 shrink-0" aria-hidden />
             ) : (
               <Calendar className="size-4 shrink-0" aria-hidden />
             )}
@@ -1498,7 +1502,9 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
   const [savingProfile, setSavingProfile] = useState(false);
   const [uploadingSlot, setUploadingSlot] = useState<"lead" | "agency" | "cover" | null>(null);
   const [fieldError, setFieldError] = useState<string | null>(null);
-  const [reportCtaClient, setReportCtaClient] = useState<ResolvedReportCta | null>(null);
+  /** Configuração bruta (dashboard); a resolução com `accountEmail` é no `useMemo` abaixo. */
+  const [reportCtaSettingsState, setReportCtaSettingsState] = useState<UserReportCtaSettings | null>(null);
+  const [ctaOwnerAccountEmail, setCtaOwnerAccountEmail] = useState<string | null>(null);
   const [nextStepsEditing, setNextStepsEditing] = useState(false);
   const [nextStepsDraft, setNextStepsDraft] = useState<string[]>([]);
   const [nextStepsSaving, setNextStepsSaving] = useState(false);
@@ -1547,20 +1553,20 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
 
   useEffect(() => {
     if (reportCtaProp != null) {
-      setReportCtaClient(null);
+      setReportCtaSettingsState(null);
       return;
     }
     if (!isDashboard || !proposal.userId) {
-      setReportCtaClient(null);
+      setReportCtaSettingsState(null);
       return;
     }
     let cancelled = false;
     const load = async () => {
       try {
         const settings = await getUserReportCtaSettings(proposal.userId);
-        if (!cancelled) setReportCtaClient(resolveReportCtas(settings));
+        if (!cancelled) setReportCtaSettingsState(settings);
       } catch {
-        if (!cancelled) setReportCtaClient(resolveReportCtas(null));
+        if (!cancelled) setReportCtaSettingsState(null);
       }
     };
     void load();
@@ -1573,6 +1579,15 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
       document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [reportCtaProp, isDashboard, proposal.userId]);
+
+  useEffect(() => {
+    if (!isDashboard || !auth) return;
+    if (!proposal.userId) return;
+    const unsub = onAuthStateChanged(auth, (u) => {
+      if (u?.uid === proposal.userId) setCtaOwnerAccountEmail(u.email?.trim() || null);
+    });
+    return () => unsub();
+  }, [isDashboard, proposal.userId]);
 
   useEffect(() => {
     if (!isDashboard || !proposal.userId) {
@@ -1781,7 +1796,10 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
     return t || null;
   }, [removePlanTarget, proposal.spotPlans, proposal.recurringPlans]);
 
-  const effectiveReportCta = reportCtaProp ?? reportCtaClient ?? resolveReportCtas(null);
+  const effectiveReportCta = useMemo(() => {
+    if (reportCtaProp != null) return reportCtaProp;
+    return resolveReportCtas(reportCtaSettingsState, null, { accountEmail: ctaOwnerAccountEmail });
+  }, [reportCtaProp, reportCtaSettingsState, ctaOwnerAccountEmail]);
 
   const displayNextSteps = useMemo(() => {
     const custom = proposal.nextSteps?.map((s) => s.trim()).filter(Boolean) ?? [];

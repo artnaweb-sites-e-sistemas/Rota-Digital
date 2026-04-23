@@ -82,6 +82,7 @@ import {
   ClipboardList,
   Copy,
   Link2,
+  Mail,
   Plus,
   Minus,
   Pencil,
@@ -905,18 +906,20 @@ function EvidenceReplaceToolbar({
           if (f) void onPickFile(f);
         }}
       />
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        disabled={busy}
-        className="no-print absolute right-2 top-2 z-[35] size-8 rounded-md border border-border/70 bg-background/95 text-muted-foreground shadow-sm backdrop-blur-sm hover:bg-muted hover:text-foreground"
-        aria-label={ariaLabel}
-        title={ariaLabel}
-        onClick={() => inputRef.current?.click()}
-      >
-        {busy ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <ImageUp className="size-3.5" aria-hidden />}
-      </Button>
+      <div className="no-print pointer-events-auto absolute left-1/2 top-1/2 z-[35] -translate-x-1/2 -translate-y-1/2">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          disabled={busy}
+          className="size-12 rounded-xl border-2 border-border/80 bg-background/95 text-zinc-900 shadow-md ring-1 ring-foreground/10 backdrop-blur-sm hover:border-border hover:bg-muted hover:text-zinc-950 active:not-aria-[haspopup]:translate-y-0 dark:border-white/15 dark:text-white dark:ring-white/15 dark:hover:border-white/25 dark:hover:text-white"
+          aria-label={ariaLabel}
+          title={ariaLabel}
+          onClick={() => inputRef.current?.click()}
+        >
+          {busy ? <Loader2 className="size-5 animate-spin" aria-hidden /> : <ImageUp className="size-5" aria-hidden />}
+        </Button>
+      </div>
     </>
   );
 }
@@ -1313,7 +1316,8 @@ function TopicEvidence({
     const combinedGridIdleRatio = topic.includes("clareza da proposta")
       ? FULL_PAGE_SNAPSHOT_IDLE_FROM_TOP_RATIO
       : POSICIONAMENTO_COMBINED_SNAPSHOT_IDLE_CENTER_RATIO;
-    const siteCellSrc = siteSrc || item.evidenceImageUrl;
+    const siteCellSrc = item.evidenceSiteImageUrl?.trim() || siteSrc || item.evidenceImageUrl?.trim();
+    const instagramForCell = item.evidenceInstagramImageUrl?.trim() || instagramSrc;
 
     return (
       <div className="grid h-56 w-full grid-cols-2 gap-2">
@@ -1329,7 +1333,7 @@ function TopicEvidence({
           replaceToolbar={isDashboard ? replaceToolbarSite : undefined}
         />
         <EvidenceImage
-          src={withSnapshotParams(instagramSrc, {
+          src={withSnapshotParams(instagramForCell, {
             variant: topic.includes("clareza da proposta") ? "profile" : "feed",
             start: topic.includes("clareza da proposta") ? 1 : 6,
           })}
@@ -1349,15 +1353,18 @@ function TopicEvidence({
   const siteFallback =
     siteSrc && !isInstagramOnlyDiagnosticTopic(topic) ? siteSrc : undefined;
 
+  /** Prioridade: URL própria do tópico (IA ou “Substituir evidência”); só depois a captura global. Assim, trocar a imagem no bloco principal não força a mesma no diagnóstico. */
+  const perTopicOrGlobalIg =
+    item.evidenceImageUrl?.trim() || item.evidenceInstagramImageUrl?.trim() || instagramSrc;
   const evidenceSrc = (() => {
     if (topic.includes("identidade visual")) {
-      return withSnapshotParams(instagramSrc || item.evidenceImageUrl || siteFallback, {
+      return withSnapshotParams(perTopicOrGlobalIg || siteFallback, {
         variant: "feed",
         start: 6,
       });
     }
     if (topic.includes("consist")) {
-      return withSnapshotParams(instagramSrc || item.evidenceImageUrl || siteFallback, {
+      return withSnapshotParams(perTopicOrGlobalIg || siteFallback, {
         variant: "profile",
         start: 1,
       });
@@ -1835,7 +1842,9 @@ type EvidenceManualSlot =
   | "instagramSnapshot"
   | "siteHero"
   | "instagramBioLink"
-  | `diagnostic:${number}`;
+  | `diagnostic:${number}`
+  | `diagnosticSite:${number}`
+  | `diagnosticInstagram:${number}`;
 
 export type RotaDigitalReportViewVariant = "dashboard" | "public";
 
@@ -1848,6 +1857,8 @@ export type RotaDigitalReportViewProps = {
    * CTAs já resolvidos no servidor (página pública). O cliente anônimo não lê `userSettings`.
    */
   initialCtaSettings?: UserReportCtaSettings | null;
+  /** E-mail de registo (Auth) do dono — leitura no servidor para `mailto` nos CTAs. */
+  initialCtaOwnerAccountEmail?: string | null;
   /** Sobre a empresa (bloco de marca) — leitura no servidor na página pública. */
   initialCompanyAboutSettings?: UserCompanyAboutSettings | null;
 };
@@ -1857,6 +1868,7 @@ export function RotaDigitalReportView({
   variant,
   onReportChange,
   initialCtaSettings,
+  initialCtaOwnerAccountEmail,
   initialCompanyAboutSettings,
 }: RotaDigitalReportViewProps) {
   const router = useRouter();
@@ -1886,6 +1898,9 @@ export function RotaDigitalReportView({
   const [ctaSettings, setCtaSettings] = useState<UserReportCtaSettings | null>(
     () => initialCtaSettings ?? null
   );
+  const [ctaOwnerAccountEmail, setCtaOwnerAccountEmail] = useState<string | null>(
+    () => initialCtaOwnerAccountEmail?.trim() || null
+  );
   const [companyAboutSettings, setCompanyAboutSettings] = useState<UserCompanyAboutSettings | null>(
     () => (variant === "public" ? initialCompanyAboutSettings ?? null : null),
   );
@@ -1913,8 +1928,11 @@ export function RotaDigitalReportView({
   const [leadProposalLoading, setLeadProposalLoading] = useState(false);
 
   const reportCta = useMemo(
-    () => resolveReportCtas(ctaSettings, process.env.NEXT_PUBLIC_ROTA_REPORT_CTA_URL),
-    [ctaSettings]
+    () =>
+      resolveReportCtas(ctaSettings, process.env.NEXT_PUBLIC_ROTA_REPORT_CTA_URL, {
+        accountEmail: ctaOwnerAccountEmail,
+      }),
+    [ctaSettings, ctaOwnerAccountEmail]
   );
 
   useEffect(() => {
@@ -1943,7 +1961,17 @@ export function RotaDigitalReportView({
   useEffect(() => {
     if (variant !== "public") return;
     setCtaSettings(initialCtaSettings ?? null);
-  }, [variant, initialCtaSettings]);
+    setCtaOwnerAccountEmail(initialCtaOwnerAccountEmail?.trim() || null);
+  }, [variant, initialCtaSettings, initialCtaOwnerAccountEmail]);
+
+  useEffect(() => {
+    if (variant === "public" || !auth) return;
+    if (!report.userId) return;
+    const unsub = onAuthStateChanged(auth, (u) => {
+      if (u?.uid === report.userId) setCtaOwnerAccountEmail(u.email?.trim() || null);
+    });
+    return () => unsub();
+  }, [variant, report.userId]);
 
   useEffect(() => {
     if (variant !== "public") return;
@@ -2254,7 +2282,31 @@ export function RotaDigitalReportView({
           return;
         }
         if (slot === "instagramSnapshot") {
-          await applyReportPatch({ evidences: { ...baseEv, instagramSnapshotUrl: result.url } });
+          const prevIg = baseEv.instagramSnapshotUrl?.trim() || "";
+          const existing = report.diagnosticScores || [];
+          let relinkedScores: DiagnosticScore[] | null = null;
+          if (existing.length > 0 && prevIg) {
+            let touched = false;
+            const mapped = existing.map((it) => {
+              const evIg = it.evidenceInstagramImageUrl?.trim() || "";
+              if (evIg !== prevIg) return it;
+              touched = true;
+              return { ...it, evidenceInstagramImageUrl: result.url };
+            });
+            if (touched) relinkedScores = sortDiagnosticScoresByScoreAsc(mapped);
+          }
+          const patch: Partial<RotaDigitalReport> = {
+            evidences: { ...baseEv, instagramSnapshotUrl: result.url },
+          };
+          if (relinkedScores) {
+            patch.diagnosticScores = relinkedScores;
+            const maturityPatch = maturityFromDiagnosticScores(relinkedScores);
+            if (maturityPatch) {
+              patch.digitalMaturityScore = maturityPatch.digitalMaturityScore;
+              patch.digitalMaturityLevel = maturityPatch.digitalMaturityLevel;
+            }
+          }
+          await applyReportPatch(patch);
           return;
         }
         if (slot === "siteHero") {
@@ -2265,11 +2317,14 @@ export function RotaDigitalReportView({
             let touched = false;
             const mapped = existing.map((it) => {
               const ev = it.evidenceImageUrl?.trim() || "";
-              if (ev === prevHero) {
-                touched = true;
-                return { ...it, evidenceImageUrl: result.url };
-              }
-              return it;
+              const evSite = it.evidenceSiteImageUrl?.trim() || "";
+              if (ev !== prevHero && evSite !== prevHero) return it;
+              touched = true;
+              return {
+                ...it,
+                ...(ev === prevHero ? { evidenceImageUrl: result.url } : {}),
+                ...(evSite === prevHero ? { evidenceSiteImageUrl: result.url } : {}),
+              };
             });
             if (touched) relinkedScores = sortDiagnosticScoresByScoreAsc(mapped);
           }
@@ -2289,6 +2344,34 @@ export function RotaDigitalReportView({
         }
         if (slot === "instagramBioLink") {
           await applyReportPatch({ evidences: { ...baseEv, instagramBioLinkSnapshotUrl: result.url } });
+          return;
+        }
+        if (slot.startsWith("diagnosticSite:")) {
+          const i = Number.parseInt(slot.slice("diagnosticSite:".length), 10);
+          const arr = [...(report.diagnosticScores || [])];
+          if (!Number.isFinite(i) || arr[i] === undefined) return;
+          arr[i] = { ...arr[i]!, evidenceSiteImageUrl: result.url };
+          const ordered = sortDiagnosticScoresByScoreAsc(arr);
+          const maturityPatch = maturityFromDiagnosticScores(ordered);
+          await applyReportPatch(
+            maturityPatch
+              ? { diagnosticScores: ordered, ...maturityPatch }
+              : { diagnosticScores: ordered },
+          );
+          return;
+        }
+        if (slot.startsWith("diagnosticInstagram:")) {
+          const i = Number.parseInt(slot.slice("diagnosticInstagram:".length), 10);
+          const arr = [...(report.diagnosticScores || [])];
+          if (!Number.isFinite(i) || arr[i] === undefined) return;
+          arr[i] = { ...arr[i]!, evidenceInstagramImageUrl: result.url };
+          const ordered = sortDiagnosticScoresByScoreAsc(arr);
+          const maturityPatch = maturityFromDiagnosticScores(ordered);
+          await applyReportPatch(
+            maturityPatch
+              ? { diagnosticScores: ordered, ...maturityPatch }
+              : { diagnosticScores: ordered },
+          );
           return;
         }
         if (slot.startsWith("diagnostic:")) {
@@ -3440,12 +3523,16 @@ export function RotaDigitalReportView({
               title={
                 reportCta.top.useWhatsAppIcon
                   ? "Falar com especialista (abre o WhatsApp)"
-                  : "Marque uma conversa com um especialista para executar este plano"
+                  : reportCta.top.useMailIcon
+                    ? "Falar com especialista (abre o e-mail)"
+                    : "Marque uma conversa com um especialista para executar este plano"
               }
               aria-label={
                 reportCta.top.useWhatsAppIcon
                   ? "Falar com especialista pelo WhatsApp"
-                  : "Falar com um especialista da Rota Digital para colocar o plano do relatório em prática"
+                  : reportCta.top.useMailIcon
+                    ? "Falar com especialista por e-mail"
+                    : "Falar com um especialista da Rota Digital para colocar o plano do relatório em prática"
               }
               className={cn(
                 buttonVariants({ variant: "ctaMotionGreen", size: "lg" }),
@@ -3454,6 +3541,8 @@ export function RotaDigitalReportView({
             >
               {reportCta.top.useWhatsAppIcon ? (
                 <WhatsAppIcon className="size-4 shrink-0" />
+              ) : reportCta.top.useMailIcon ? (
+                <Mail className="size-4 shrink-0" aria-hidden />
               ) : (
                 <MessageSquare className="size-4 shrink-0" aria-hidden />
               )}
@@ -3635,6 +3724,41 @@ export function RotaDigitalReportView({
             ) : null}
             {sortedDiagnosticScores.map((item, idx) => {
               const topicGlow = getDiagnosticTopicGlow(item.score);
+              const originalIdx = (report.diagnosticScores || []).findIndex(
+                (x) => x.topic === item.topic,
+              );
+              const diagnosticSlot = `diagnostic:${originalIdx}` as const;
+              const diagnosticSiteSlot =
+                originalIdx >= 0 ? (`diagnosticSite:${originalIdx}` as const) : null;
+              const diagnosticInstagramSlot =
+                originalIdx >= 0 ? (`diagnosticInstagram:${originalIdx}` as const) : null;
+              const topicReplaceSite =
+                isDashboard && diagnosticSiteSlot
+                  ? {
+                      ariaLabel: `Substituir captura da página do site em ${item.topic}`,
+                      busy: evidenceReplaceSlot === diagnosticSiteSlot,
+                      onPickFile: (file: File) =>
+                        void handleReplaceEvidenceImage(diagnosticSiteSlot, file),
+                    }
+                  : undefined;
+              const topicReplaceInstagram =
+                isDashboard && diagnosticInstagramSlot
+                  ? {
+                      ariaLabel: `Substituir imagem do Instagram em ${item.topic}`,
+                      busy: evidenceReplaceSlot === diagnosticInstagramSlot,
+                      onPickFile: (file: File) =>
+                        void handleReplaceEvidenceImage(diagnosticInstagramSlot, file),
+                    }
+                  : undefined;
+              const topicReplaceSingle =
+                isDashboard && originalIdx >= 0
+                  ? {
+                      ariaLabel: `Substituir evidência de ${item.topic}`,
+                      busy: evidenceReplaceSlot === diagnosticSlot,
+                      onPickFile: (file: File) =>
+                        void handleReplaceEvidenceImage(diagnosticSlot, file),
+                    }
+                  : undefined;
               return (
               <BorderGlow
                 key={`${item.topic}-${idx}`}
@@ -3654,7 +3778,14 @@ export function RotaDigitalReportView({
               >
                 <div className={cn("relative rounded-[10px] p-6 sm:p-7", ROTA_REPORT_SURFACE_GLOW_INNER)}>
                   <div className="grid gap-5 md:grid-cols-[360px_minmax(0,1fr)] md:items-start md:gap-6">
-                    <TopicEvidence item={item} report={report} isDashboard={isDashboard} />
+                    <TopicEvidence
+                      item={item}
+                      report={report}
+                      isDashboard={isDashboard}
+                      replaceToolbarSite={topicReplaceSite}
+                      replaceToolbarInstagram={topicReplaceInstagram}
+                      replaceToolbarSingle={topicReplaceSingle}
+                    />
                     <div className="space-y-4">
                       <div className="flex items-center justify-between gap-2 pb-2">
                         <div className="space-y-1.5">
@@ -4843,12 +4974,16 @@ export function RotaDigitalReportView({
               title={
                 reportCta.bottom.useWhatsAppIcon
                   ? "Agendar reunião estratégica (abre o WhatsApp)"
-                  : "Agendar reunião estratégica com a Rota Digital"
+                  : reportCta.bottom.useMailIcon
+                    ? "Agendar reunião estratégica (abre o e-mail)"
+                    : "Agendar reunião estratégica com a Rota Digital"
               }
               aria-label={
                 reportCta.bottom.useWhatsAppIcon
                   ? "Agendar reunião estratégica pelo WhatsApp"
-                  : "Agendar reunião estratégica para validar prioridades e cronograma"
+                  : reportCta.bottom.useMailIcon
+                    ? "Agendar reunião estratégica por e-mail"
+                    : "Agendar reunião estratégica para validar prioridades e cronograma"
               }
               className={cn(
                 buttonVariants({ variant: "ctaMotionGreen", size: "lg" }),
@@ -4859,6 +4994,8 @@ export function RotaDigitalReportView({
             >
               {reportCta.bottom.useWhatsAppIcon ? (
                 <WhatsAppIcon className="size-4 shrink-0" />
+              ) : reportCta.bottom.useMailIcon ? (
+                <Mail className="size-4 shrink-0" aria-hidden />
               ) : (
                 <Calendar className="size-4 shrink-0" aria-hidden />
               )}

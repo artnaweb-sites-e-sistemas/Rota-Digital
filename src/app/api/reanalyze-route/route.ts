@@ -419,15 +419,32 @@ Retorne SOMENTE um JSON válido com os campos atualizados:
 
     const aiData = parseModelJson(responseText);
 
+    const prevDiagnosticByTopic = new Map(
+      (report.diagnosticScores || []).map((d) => [d.topic.toLowerCase(), d] as const),
+    );
     const diagnosticScores = Array.isArray(aiData.diagnosticScores)
-      ? (aiData.diagnosticScores as DiagnosticScore[]).map((item) => ({
-          topic: String(item.topic || "Tópico"),
-          score: Math.max(0, Math.min(10, Number(item.score) || 0)),
-          comment: clampDiagnosticComment(String(item.comment || ""), DIAGNOSTIC_COMMENT_MAX_CHARS),
-          evidenceTitle: item.evidenceTitle,
-          evidenceImageUrl: item.evidenceImageUrl,
-          evidenceNote: item.evidenceNote,
-        }))
+      ? (aiData.diagnosticScores as DiagnosticScore[]).map((item) => {
+          const topic = String(item.topic || "Tópico");
+          const base = {
+            topic,
+            score: Math.max(0, Math.min(10, Number(item.score) || 0)),
+            comment: clampDiagnosticComment(String(item.comment || ""), DIAGNOSTIC_COMMENT_MAX_CHARS),
+            evidenceTitle: item.evidenceTitle,
+            evidenceImageUrl: item.evidenceImageUrl,
+            evidenceNote: item.evidenceNote,
+          } satisfies DiagnosticScore;
+          const prev = prevDiagnosticByTopic.get(topic.toLowerCase());
+          if (!prev) return base;
+          return {
+            ...base,
+            ...(prev.evidenceSiteImageUrl?.trim()
+              ? { evidenceSiteImageUrl: prev.evidenceSiteImageUrl }
+              : {}),
+            ...(prev.evidenceInstagramImageUrl?.trim()
+              ? { evidenceInstagramImageUrl: prev.evidenceInstagramImageUrl }
+              : {}),
+          };
+        })
       : report.diagnosticScores || [];
 
     const maturityFromTopics = maturityFromDiagnosticScores(diagnosticScores);

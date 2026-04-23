@@ -1,7 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, ChevronRight, ExternalLink, Globe, Loader2, Lock, MapPin, Pencil, RefreshCw, Star, Sparkles } from "lucide-react";
+import {
+  AlertTriangle,
+  ChevronRight,
+  Crown,
+  ExternalLink,
+  Globe,
+  Loader2,
+  Lock,
+  MapPin,
+  Pencil,
+  RefreshCw,
+  Star,
+} from "lucide-react";
 
 import { ReportRankingLocalEditDialog } from "@/components/rotas/report-ranking-local-edit-dialog";
 
@@ -321,11 +333,15 @@ function LockedSectionOverlay({
         {children}
       </div>
       <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 bg-background/60 px-5 py-6 backdrop-blur-[2px] dark:bg-background/55">
-        <div className="flex size-10 items-center justify-center rounded-full border border-border/60 bg-muted/80 shadow-sm dark:border-white/15 dark:bg-muted/50">
-          <Lock className="size-4 text-muted-foreground" aria-hidden />
-        </div>
         <div className="max-w-md text-center">
-          <p className="text-sm font-semibold text-foreground">{title}</p>
+          <p className="inline-flex flex-wrap items-center justify-center gap-2 text-sm font-semibold text-foreground">
+            <Lock
+              className="size-4 shrink-0 text-brand dark:text-brand"
+              aria-hidden
+              strokeWidth={2.5}
+            />
+            <span>{title}</span>
+          </p>
           {description ? (
             <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{description}</p>
           ) : null}
@@ -338,7 +354,7 @@ function LockedSectionOverlay({
             onClick={onPlanClick}
             className="min-w-[12.5rem] gap-2 shadow-md dark:shadow-sm"
           >
-            <Sparkles className="size-4" aria-hidden />
+            <Crown className="size-4" aria-hidden />
             Ver planos Pro
           </Button>
         ) : null}

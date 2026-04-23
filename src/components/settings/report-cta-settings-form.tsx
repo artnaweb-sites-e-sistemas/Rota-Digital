@@ -8,12 +8,13 @@ import { useAuth } from "@/lib/auth-context";
 import { getUserReportCtaSettings, saveUserReportCtaSettings } from "@/lib/user-settings";
 import {
   buildWhatsAppHref,
+  isValidReportCtaEmail,
   maskWhatsappBRDisplay,
   normalizeWhatsappDigitsForStorage,
   onlyDigitsPhone,
 } from "@/lib/report-cta";
 import type { UserReportCtaMode, UserReportCtaSettings } from "@/types/user-settings";
-import { Check, Loader2, Link2 } from "lucide-react";
+import { Check, Link2, Loader2, Mail } from "lucide-react";
 import { WhatsAppIcon } from "@/components/icons/whatsapp-icon";
 import { cn } from "@/lib/utils";
 
@@ -21,6 +22,7 @@ const DEFAULT_FORM: UserReportCtaSettings = {
   ctaMode: "url",
   whatsappPhone: "",
   ctaUrl: "",
+  ctaEmail: "",
 };
 
 function ModeChip({
@@ -69,7 +71,15 @@ export function ReportCtaSettingsForm() {
     setError(null);
     try {
       const data = await getUserReportCtaSettings(user.uid);
-      setForm(data ?? DEFAULT_FORM);
+      if (!data) {
+        setForm(DEFAULT_FORM);
+      } else {
+        const base: UserReportCtaSettings = { ...DEFAULT_FORM, ...data };
+        if (base.ctaMode === "email" && !base.ctaEmail.trim() && user.email) {
+          base.ctaEmail = user.email;
+        }
+        setForm(base);
+      }
     } catch (e) {
       console.error(e);
       setError("Não foi possível carregar suas preferências.");
@@ -98,7 +108,12 @@ export function ReportCtaSettingsForm() {
     if (f.ctaMode === "whatsapp") {
       const normalized = normalizeWhatsappDigitsForStorage(f.whatsappPhone);
       if (normalized.length < 12 || !buildWhatsAppHref(normalized)) return null;
-      return { ctaMode: "whatsapp", whatsappPhone: normalized, ctaUrl: "" };
+      return { ctaMode: "whatsapp", whatsappPhone: normalized, ctaUrl: "", ctaEmail: "" };
+    }
+    if (f.ctaMode === "email") {
+      const e = f.ctaEmail.trim();
+      if (e && !isValidReportCtaEmail(e)) return null;
+      return { ctaMode: "email", whatsappPhone: "", ctaUrl: "", ctaEmail: e };
     }
     const t = f.ctaUrl.trim();
     if (!t) return null;
@@ -108,7 +123,7 @@ export function ReportCtaSettingsForm() {
     } catch {
       return null;
     }
-    return { ctaMode: "url", whatsappPhone: "", ctaUrl: withProto };
+    return { ctaMode: "url", whatsappPhone: "", ctaUrl: withProto, ctaEmail: "" };
   }, []);
 
   useEffect(() => {
@@ -152,7 +167,12 @@ export function ReportCtaSettingsForm() {
   }, [form, loading, user, buildReportCtaPayload]);
 
   const setMode = (ctaMode: UserReportCtaMode) => {
-    setForm((f) => ({ ...f, ctaMode }));
+    setForm((f) => {
+      if (ctaMode === "email" && !f.ctaEmail.trim() && user?.email) {
+        return { ...f, ctaMode, ctaEmail: user.email };
+      }
+      return { ...f, ctaMode };
+    });
     setError(null);
     setSavedAt(null);
   };
@@ -180,7 +200,7 @@ export function ReportCtaSettingsForm() {
           </div>
         ) : (
           <>
-            <div className="flex flex-col gap-2 sm:flex-row">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
               <ModeChip active={form.ctaMode === "whatsapp"} onClick={() => setMode("whatsapp")}>
                 <WhatsAppIcon className="size-4 text-brand dark:text-brand" />
                 WhatsApp
@@ -188,6 +208,10 @@ export function ReportCtaSettingsForm() {
               <ModeChip active={form.ctaMode === "url"} onClick={() => setMode("url")}>
                 <Link2 className="size-4 text-brand dark:text-brand" aria-hidden />
                 Link
+              </ModeChip>
+              <ModeChip active={form.ctaMode === "email"} onClick={() => setMode("email")}>
+                <Mail className="size-4 text-brand dark:text-brand" aria-hidden />
+                E-mail
               </ModeChip>
             </div>
 
@@ -213,7 +237,8 @@ export function ReportCtaSettingsForm() {
                   className="h-11 rounded-md border-input bg-background text-foreground placeholder:text-muted-foreground focus-visible:border-brand/50 focus-visible:ring-brand/20 dark:border-white/10 dark:bg-white/5 dark:text-zinc-100 dark:placeholder:text-zinc-600"
                 />
               </div>
-            ) : (
+            ) : null}
+            {form.ctaMode === "url" ? (
               <div className="space-y-2">
                 <Label htmlFor="cta-url" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                   URL
@@ -231,7 +256,29 @@ export function ReportCtaSettingsForm() {
                   className="h-11 rounded-md border-input bg-background text-foreground placeholder:text-muted-foreground focus-visible:border-brand/50 focus-visible:ring-brand/20 dark:border-white/10 dark:bg-white/5 dark:text-zinc-100 dark:placeholder:text-zinc-600"
                 />
               </div>
-            )}
+            ) : null}
+            {form.ctaMode === "email" ? (
+              <div className="space-y-2">
+                <Label htmlFor="cta-email" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                  E-mail
+                </Label>
+                <Input
+                  id="cta-email"
+                  type="email"
+                  name="report_cta_email"
+                  autoComplete="email"
+                  data-1p-ignore
+                  data-lpignore="true"
+                  placeholder={user?.email || "seu@email.com"}
+                  value={form.ctaEmail}
+                  onChange={(e) => setForm((f) => ({ ...f, ctaEmail: e.target.value }))}
+                  className="h-11 rounded-md border-input bg-background text-foreground placeholder:text-muted-foreground focus-visible:border-brand/50 focus-visible:ring-brand/20 dark:border-white/10 dark:bg-white/5 dark:text-zinc-100 dark:placeholder:text-zinc-600"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Por defeito usa o e-mail da sua conta. Pode alterar se quiser outro contacto.
+                </p>
+              </div>
+            ) : null}
 
             {error ? (
               <p className="rounded-md border border-red-500/35 bg-red-500/10 px-3 py-2 text-sm text-red-800 dark:text-red-300">{error}</p>

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { mergeProposalAgencySnapshotForPublicView } from "@/lib/merge-proposal-public-agency";
 import { getCachedPublicProposalBySlug } from "@/lib/public-proposal-cache";
 import {
+  getCachedOwnerAccountEmailAdmin,
   getCachedUserCompanyAboutSettingsAdmin,
   getCachedUserReportCtaSettingsAdmin,
 } from "@/lib/user-settings-admin";
@@ -87,7 +88,8 @@ export default async function PublicProposalPage({
   const companyAbout = await getCachedUserCompanyAboutSettingsAdmin(raw.userId);
   const proposal = mergeProposalAgencySnapshotForPublicView(toClientProposal(raw), companyAbout);
   const reportCtaSettings = await getCachedUserReportCtaSettingsAdmin(raw.userId);
-  const reportCta = resolveReportCtas(reportCtaSettings);
+  const ownerAccountEmail = await getCachedOwnerAccountEmailAdmin(raw.userId);
+  const reportCta = resolveReportCtas(reportCtaSettings, null, { accountEmail: ownerAccountEmail });
 
   return (
     <div className="flex h-dvh max-h-dvh min-h-0 w-full min-w-0 flex-col overflow-hidden bg-background text-foreground">
