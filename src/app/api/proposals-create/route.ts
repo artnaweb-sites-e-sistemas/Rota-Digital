@@ -82,16 +82,16 @@ export async function POST(req: NextRequest) {
 
     if (!quota.isUnlimited) {
       try {
-        const docsUsed = await countProposalsSinceAdmin(uid, periodStartMs);
+        const docsAfterCreate = await countProposalsSinceAdmin(uid, periodStartMs);
         await incrementCycleUsageAdmin({
           uid,
           resource: "propostas",
           cycleStartMs: periodStartMs,
           by: 1,
-          /** Seed com a contagem já existente (inclui a recém-criada) menos 1 para
-           *  preservar o valor incrementado. Evita que o contador regrida em quem
-           *  já tinha propostas criadas antes deste recurso. */
-          seed: Math.max(0, docsUsed),
+          /** A contagem corre depois de gravar a proposta: inclui a recém-criada.
+           *  O `seed` deve ser a base *antes* desta criação, senão `base + by` dobra
+           *  a unidade (ex.: 1 proposta no Firestore mostrava used=2). */
+          seed: Math.max(0, docsAfterCreate - 1),
         });
       } catch (counterErr) {
         console.error("[proposals-create] falha ao incrementar cycleUsage", counterErr);

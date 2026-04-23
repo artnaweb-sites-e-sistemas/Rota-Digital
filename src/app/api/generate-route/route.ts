@@ -2514,8 +2514,8 @@ export async function POST(req: NextRequest) {
           resource: "rotas",
           cycleStartMs: periodStartMs,
           by: 1,
-          /** Reports são gravados client-side; o contador persistente garante que
-           *  exclusões no painel não devolvem cota. Seed preserva valor já existente. */
+          /** O relatório ainda não está no Firestore (gravação client-side após a resposta),
+           *  então `docsUsed` **não** inclui esta geração: `seed + 1` = uso após concluir. */
           seed: Math.max(0, docsUsed),
         });
       } catch (counterErr) {
