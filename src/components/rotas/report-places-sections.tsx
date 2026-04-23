@@ -39,7 +39,9 @@ export type ReportPlacesSectionsProps = {
   patchReport: (patch: Partial<RotaDigitalReport>) => Promise<boolean | void>;
   /** Só o Admin Master vê e usa «Testar busca» (debug de Places). */
   showMasterPlacesSearchTest?: boolean;
-  /** Abre o `PlanLimitModal` para o utilizador assinar (ranking de concorrentes, plano Pro). */
+  /** Abre o `PlanLimitModal` (secção GMB, plano Pro). */
+  onRequestGmbUpgrade?: () => void;
+  /** Abre o `PlanLimitModal` (ranking de concorrentes, plano Pro). */
   onRequestCompetitorUpgrade?: () => void;
 };
 
@@ -309,12 +311,6 @@ function LockedSectionOverlay({
   onPlanClick?: () => void;
   children: React.ReactNode;
 }) {
-  const cta = (
-    <>
-      <Sparkles className="size-3" aria-hidden />
-      <span>Disponível no plano Pro</span>
-    </>
-  );
   return (
     <div className={cn("relative select-none overflow-hidden rounded-md print-white", REPORT_SECTION_SURFACE)}>
       <div
@@ -324,7 +320,7 @@ function LockedSectionOverlay({
       >
         {children}
       </div>
-      <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-background/60 px-6 backdrop-blur-[2px] dark:bg-background/55">
+      <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 bg-background/60 px-5 py-6 backdrop-blur-[2px] dark:bg-background/55">
         <div className="flex size-10 items-center justify-center rounded-full border border-border/60 bg-muted/80 shadow-sm dark:border-white/15 dark:bg-muted/50">
           <Lock className="size-4 text-muted-foreground" aria-hidden />
         </div>
@@ -335,18 +331,17 @@ function LockedSectionOverlay({
           ) : null}
         </div>
         {onPlanClick ? (
-          <button
+          <Button
             type="button"
+            variant="cta"
+            size="lg"
             onClick={onPlanClick}
-            className="mt-1 inline-flex items-center gap-1.5 rounded-full border border-brand/30 bg-brand/8 px-3 py-1.5 text-[11px] font-medium text-brand transition-colors hover:bg-brand/12 dark:border-brand/25 dark:bg-brand/12 dark:hover:bg-brand/18 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/35"
+            className="min-w-[12.5rem] gap-2 shadow-md dark:shadow-sm"
           >
-            {cta}
-          </button>
-        ) : (
-          <div className="mt-1 flex items-center gap-1.5 rounded-full border border-brand/30 bg-brand/8 px-3 py-1.5 text-[11px] font-medium text-brand dark:border-brand/25 dark:bg-brand/12">
-            {cta}
-          </div>
-        )}
+            <Sparkles className="size-4" aria-hidden />
+            Ver planos Pro
+          </Button>
+        ) : null}
       </div>
     </div>
   );
@@ -358,6 +353,7 @@ export function ReportPlacesSections({
   isDashboard,
   patchReport,
   showMasterPlacesSearchTest = false,
+  onRequestGmbUpgrade,
   onRequestCompetitorUpgrade,
 }: ReportPlacesSectionsProps) {
   const features = PLAN_FEATURES[plan];
@@ -515,45 +511,44 @@ export function ReportPlacesSections({
       ) : null}
 
       {!features.gmbAnalysis ? (
-        <LockedSectionOverlay
-          title="Google Meu Negócio"
-          description="Diagnóstico do perfil no Google, nota, avaliações e presença no Maps. Faça upgrade para desbloquear."
-        >
-          <Card className="border-0 bg-transparent py-4 shadow-none ring-0 sm:py-5">
-            <CardHeader className="space-y-0 pb-0">
-              <div className="flex items-start justify-between gap-3 pb-4">
-                <div className="flex min-w-0 items-center gap-2.5">
-                  <MapPin className="size-4 shrink-0 text-brand" aria-hidden />
-                  <CardTitle className="text-xs font-semibold uppercase tracking-wider text-foreground/78 dark:text-muted-foreground">
-                    Google Meu Negócio
-                  </CardTitle>
+        isDashboard ? (
+          <LockedSectionOverlay title="Google Meu Negócio" onPlanClick={onRequestGmbUpgrade}>
+            <Card className="border-0 bg-transparent py-4 shadow-none ring-0 sm:py-5">
+              <CardHeader className="space-y-0 pb-0">
+                <div className="flex items-start justify-between gap-3 pb-4">
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <MapPin className="size-4 shrink-0 text-brand" aria-hidden />
+                    <CardTitle className="text-xs font-semibold uppercase tracking-wider text-foreground/78 dark:text-muted-foreground">
+                      Google Meu Negócio
+                    </CardTitle>
+                  </div>
                 </div>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-0 pb-1">
-              <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-5 lg:gap-6">
-                <div className="flex min-h-[4.5rem] flex-col justify-center gap-2 rounded-xl border border-border/50 bg-muted/20 px-4 py-3.5 dark:border-white/10 dark:bg-white/[0.04]">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-foreground/78 dark:text-muted-foreground">
-                    Nota
-                  </span>
-                  <StarRow value={4.2} />
+              </CardHeader>
+              <CardContent className="pt-0 pb-1">
+                <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-5 lg:gap-6">
+                  <div className="flex min-h-[4.5rem] flex-col justify-center gap-2 rounded-xl border border-border/50 bg-muted/20 px-4 py-3.5 dark:border-white/10 dark:bg-white/[0.04]">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-foreground/78 dark:text-muted-foreground">
+                      Nota
+                    </span>
+                    <StarRow value={4.2} />
+                  </div>
+                  <div className="flex min-h-[4.5rem] flex-col justify-center gap-2 rounded-xl border border-border/50 bg-muted/20 px-4 py-3.5 dark:border-white/10 dark:bg-white/[0.04]">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-foreground/78 dark:text-muted-foreground">
+                      Avaliações
+                    </span>
+                    <span className="text-base font-semibold tabular-nums tracking-tight text-foreground">87</span>
+                  </div>
+                  <div className="flex min-h-[4.5rem] flex-col justify-center gap-2 rounded-xl border border-border/50 bg-muted/20 px-4 py-3.5 dark:border-white/10 dark:bg-white/[0.04]">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-foreground/78 dark:text-muted-foreground">
+                      Fotos
+                    </span>
+                    <span className="text-base font-semibold tabular-nums tracking-tight text-foreground">12 fotos</span>
+                  </div>
                 </div>
-                <div className="flex min-h-[4.5rem] flex-col justify-center gap-2 rounded-xl border border-border/50 bg-muted/20 px-4 py-3.5 dark:border-white/10 dark:bg-white/[0.04]">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-foreground/78 dark:text-muted-foreground">
-                    Avaliações
-                  </span>
-                  <span className="text-base font-semibold tabular-nums tracking-tight text-foreground">87</span>
-                </div>
-                <div className="flex min-h-[4.5rem] flex-col justify-center gap-2 rounded-xl border border-border/50 bg-muted/20 px-4 py-3.5 dark:border-white/10 dark:bg-white/[0.04]">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-foreground/78 dark:text-muted-foreground">
-                    Fotos
-                  </span>
-                  <span className="text-base font-semibold tabular-nums tracking-tight text-foreground">12 fotos</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </LockedSectionOverlay>
+              </CardContent>
+            </Card>
+          </LockedSectionOverlay>
+        ) : null
       ) : (
         <Card className={cn(REPORT_SECTION_SURFACE, REPORT_SECTION_CARD_PAD, "print-white")}>
           <CardHeader className="space-y-0 pb-0">
@@ -627,58 +622,62 @@ export function ReportPlacesSections({
       )}
 
       {!features.competitorAnalysis ? (
-        <LockedSectionOverlay
-          title="Ranking dos concorrentes"
-          onPlanClick={onRequestCompetitorUpgrade}
-        >
-          <Card className="border-0 bg-transparent py-4 shadow-none ring-0 sm:py-5">
-            <CardHeader className="pb-3">
-              <div className="flex items-center gap-2">
-                <MapPin className="size-4 text-brand" aria-hidden />
-                <CardTitle className="text-xs font-semibold uppercase tracking-wider text-foreground/78 dark:text-muted-foreground">
-                  Ranking dos concorrentes
-                </CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-2 pb-1">
-              <div className="overflow-hidden rounded-lg border border-border/60 dark:border-white/10">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/40 hover:bg-transparent dark:bg-white/[0.04]">
-                      <TableHead className="w-12 text-[10px] font-bold uppercase tracking-wider">#</TableHead>
-                      <TableHead className="text-[10px] font-bold uppercase tracking-wider">Nome</TableHead>
-                      <TableHead className="text-right text-[10px] font-bold uppercase tracking-wider">Nota</TableHead>
-                      <TableHead className="text-right text-[10px] font-bold uppercase tracking-wider">Avaliações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {[
-                      { pos: 1, name: "Empresa Exemplo A", rating: 4.8, reviews: 210 },
-                      { pos: 2, name: "Empresa Exemplo B", rating: 4.5, reviews: 142 },
-                      { pos: 3, name: "Seu negócio", rating: 4.2, reviews: 87, isLead: true },
-                      { pos: 4, name: "Empresa Exemplo C", rating: 3.9, reviews: 65 },
-                    ].map((r) => (
-                      <TableRow
-                        key={r.pos}
-                        className={cn(
-                          "dark:border-white/5",
-                          r.isLead ? "border-brand/50 bg-brand/10 font-medium dark:border-brand/40 dark:bg-brand/15" : "",
-                        )}
-                      >
-                        <TableCell className="text-[11px] font-bold tabular-nums text-foreground/80">{r.pos}º</TableCell>
-                        <TableCell className="text-foreground">{r.name}</TableCell>
-                        <TableCell className="text-right">
-                          <StarRow value={r.rating} />
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">{r.reviews}</TableCell>
+        isDashboard ? (
+          <LockedSectionOverlay
+            title="Ranking dos concorrentes"
+            onPlanClick={onRequestCompetitorUpgrade}
+          >
+            <Card className="border-0 bg-transparent py-4 shadow-none ring-0 sm:py-5">
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-2">
+                  <MapPin className="size-4 text-brand" aria-hidden />
+                  <CardTitle className="text-xs font-semibold uppercase tracking-wider text-foreground/78 dark:text-muted-foreground">
+                    Ranking dos concorrentes
+                  </CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-2 pb-1">
+                <div className="overflow-hidden rounded-lg border border-border/60 dark:border-white/10">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/40 hover:bg-transparent dark:bg-white/[0.04]">
+                        <TableHead className="w-12 text-[10px] font-bold uppercase tracking-wider">#</TableHead>
+                        <TableHead className="text-[10px] font-bold uppercase tracking-wider">Nome</TableHead>
+                        <TableHead className="text-right text-[10px] font-bold uppercase tracking-wider">Nota</TableHead>
+                        <TableHead className="text-right text-[10px] font-bold uppercase tracking-wider">Avaliações</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-        </LockedSectionOverlay>
+                    </TableHeader>
+                    <TableBody>
+                      {[
+                        { pos: 1, name: "Empresa Exemplo A", rating: 4.8, reviews: 210 },
+                        { pos: 2, name: "Empresa Exemplo B", rating: 4.5, reviews: 142 },
+                        { pos: 3, name: "Seu negócio", rating: 4.2, reviews: 87, isLead: true },
+                        { pos: 4, name: "Empresa Exemplo C", rating: 3.9, reviews: 65 },
+                      ].map((r) => (
+                        <TableRow
+                          key={r.pos}
+                          className={cn(
+                            "dark:border-white/5",
+                            r.isLead
+                              ? "border-brand/50 bg-brand/10 font-medium dark:border-brand/40 dark:bg-brand/15"
+                              : "",
+                          )}
+                        >
+                          <TableCell className="text-[11px] font-bold tabular-nums text-foreground/80">{r.pos}º</TableCell>
+                          <TableCell className="text-foreground">{r.name}</TableCell>
+                          <TableCell className="text-right">
+                            <StarRow value={r.rating} />
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">{r.reviews}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </LockedSectionOverlay>
+        ) : null
       ) : (
         <Card className={cn("relative", REPORT_SECTION_SURFACE, REPORT_SECTION_CARD_PAD, "print-white")}>
           <CardHeader className="pb-4">

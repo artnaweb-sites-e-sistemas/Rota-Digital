@@ -2102,6 +2102,13 @@ export function RotaDigitalReportView({
     });
   }, [effectiveReportPlan]);
 
+  const openGmbUpgradeModal = useCallback(() => {
+    setLimitModalState({
+      kind: "gmb",
+      plan: normalizedSubscriptionPlanKey(effectiveReportPlan),
+    });
+  }, [effectiveReportPlan]);
+
   const isViewerMasterAdmin = useMemo(() => {
     if (!isDashboard) return false;
     if (!viewerUserSettings) return false;
@@ -3758,6 +3765,7 @@ export function RotaDigitalReportView({
         plan={effectiveReportPlan}
         patchReport={async (patch) => await applyReportPatch(patch)}
         showMasterPlacesSearchTest={isViewerMasterAdmin}
+        onRequestGmbUpgrade={openGmbUpgradeModal}
         onRequestCompetitorUpgrade={openCompetitorUpgradeModal}
       />
 

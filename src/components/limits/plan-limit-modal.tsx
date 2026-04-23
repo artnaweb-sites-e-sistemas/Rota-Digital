@@ -26,7 +26,7 @@ const SALES_EMAIL = "suporte@rotadigital.app";
 
 const QUOTA_RENEWAL_NOTE = "*A cota não é acumulativa e renova a cada mês.";
 
-type Kind = QuotaResource | "logo" | "competitors";
+type Kind = QuotaResource | "logo" | "competitors" | "gmb";
 
 export type PlanLimitModalState = {
   kind: Kind;
@@ -111,6 +111,16 @@ const KIND_COPY: Record<
     checkoutEndpoint: "",
     salesSubject: "Quero assinar um plano para desbloquear o ranking de concorrentes",
   },
+  gmb: {
+    badge: "Recurso Pro",
+    title: "Google Meu Negócio no relatório",
+    description:
+      "Nota, avaliações, fotos e ligação ao perfil no Maps: incluído a partir do plano Pro. Escolha Pro ou Agency abaixo para desbloquear.",
+    unit: "",
+    unitShort: "",
+    checkoutEndpoint: "",
+    salesSubject: "Quero assinar um plano para desbloquear a secção Google Meu Negócio",
+  },
 };
 
 function packsForKind(kind: Kind): AddOnPack[] {
@@ -148,7 +158,7 @@ export function PlanLimitModal({ state, onClose, getIdToken }: Props) {
   const isPro = plan === "pro";
   const isAgency = plan === "agency";
   const isMaster = plan === "master";
-  const isFeatureUpsell = kind === "logo" || kind === "competitors";
+  const isFeatureUpsell = kind === "logo" || kind === "competitors" || kind === "gmb";
   const showPacks = !isStarter && !isMaster && !isFeatureUpsell;
   const showAgencyUpsell = isPro && !isFeatureUpsell;
   const showSubscribeCtas = isStarter || isFeatureUpsell;
