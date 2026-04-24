@@ -31,6 +31,7 @@ import {
   isNovoLeadBlockedFromCurrent,
   leadHasGeneratedRoute,
 } from "@/lib/lead-status-rules";
+import { getLeadFollowupDay, statusUsesFollowupUrgencyColor } from "@/lib/lead-followup";
 import { buildWhatsAppHref, maskWhatsappBRDisplay, onlyDigitsPhone } from "@/lib/report-cta";
 import { WhatsAppIcon } from "@/components/icons/whatsapp-icon";
 import { LEAD_STATUS_MENU_DOT_CLASSES, leadStatusDropdownTriggerSurface } from "@/lib/lead-status-ui";
@@ -42,6 +43,7 @@ import {
   Calendar,
   CheckCircle2,
   ChevronDown,
+  Clock,
   Copy,
   ExternalLink,
   Globe,
@@ -50,6 +52,7 @@ import {
   Mail,
   Phone,
   Pencil,
+  Compass,
   Sparkles,
   User,
 } from "lucide-react";
@@ -276,43 +279,6 @@ export default function LeadDetailPage() {
             <Pencil className="size-3.5 shrink-0" aria-hidden />
             Editar informações
           </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              title="Alterar status"
-              className={cn(
-                "inline-flex h-5 min-h-5 cursor-pointer items-center gap-0.5 rounded-[min(var(--radius-md),12px)] px-1.5 text-[10px] font-semibold uppercase leading-none tracking-wide outline-none transition-all focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50",
-                leadStatusDropdownTriggerSurface(lead.status),
-              )}
-            >
-              <span className="max-w-[8rem] truncate sm:max-w-[11rem]">{lead.status}</span>
-              <ChevronDown className="size-2 shrink-0 opacity-70" aria-hidden />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-[13.5rem] p-1.5">
-              <div className="px-2 pb-1.5 pt-0.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Status do funil
-              </div>
-              {LEAD_STATUSES.map((s) => (
-                <DropdownMenuItem
-                  key={s}
-                  disabled={lead.status === s || !isLeadStatusSelectable(s, hasRoute, lead.status)}
-                  className="gap-2.5 rounded-md py-2"
-                  onClick={() => void handleStatusPick(s)}
-                >
-                  <span
-                    className={cn(
-                      "size-2 shrink-0 rounded-full ring-1 ring-black/8 dark:ring-white/10",
-                      LEAD_STATUS_MENU_DOT_CLASSES[s],
-                    )}
-                    aria-hidden
-                  />
-                  <span className="min-w-0 flex-1 text-left">{s}</span>
-                  {lead.status === s ? (
-                    <span className="text-[10px] font-medium uppercase text-muted-foreground">atual</span>
-                  ) : null}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
       </div>
 
@@ -558,6 +524,46 @@ export default function LeadDetailPage() {
             <CardTitle className="text-sm font-medium text-muted-foreground">Outros Detalhes</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
+            <div className="flex items-center gap-3">
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  title="Alterar status"
+                  className={cn(
+                    "inline-flex h-5 min-h-5 cursor-pointer items-center gap-0.5 rounded-[min(var(--radius-md),12px)] px-1.5 text-[10px] font-semibold uppercase leading-none tracking-wide outline-none transition-all focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50",
+                    leadStatusDropdownTriggerSurface(lead.status),
+                  )}
+                >
+                  <span className="max-w-[8rem] truncate sm:max-w-[11rem]">{lead.status}</span>
+                  <ChevronDown className="size-2 shrink-0 opacity-70" aria-hidden />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="min-w-[13.5rem] p-1.5">
+                  <div className="px-2 pb-1.5 pt-0.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Status do funil
+                  </div>
+                  {LEAD_STATUSES.map((s) => (
+                    <DropdownMenuItem
+                      key={s}
+                      disabled={lead.status === s || !isLeadStatusSelectable(s, hasRoute, lead.status)}
+                      className="gap-2.5 rounded-md py-2"
+                      onClick={() => void handleStatusPick(s)}
+                    >
+                      <span
+                        className={cn(
+                          "size-2 shrink-0 rounded-full ring-1 ring-black/8 dark:ring-white/10",
+                          LEAD_STATUS_MENU_DOT_CLASSES[s],
+                        )}
+                        aria-hidden
+                      />
+                      <span className="min-w-0 flex-1 text-left">{s}</span>
+                      {lead.status === s ? (
+                        <span className="text-[10px] font-medium uppercase text-muted-foreground">atual</span>
+                      ) : null}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+            <LeadDetailFollowupTag lead={lead} />
             <div className="flex items-center gap-3 text-foreground">
               <Calendar size={16} className="shrink-0 text-muted-foreground" />
               <span>
@@ -662,7 +668,7 @@ export default function LeadDetailPage() {
       <Card className="border border-brand/25 bg-gradient-to-br from-brand/10 to-card dark:from-brand/15 dark:to-zinc-900 dark:border-brand/35">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-foreground">
-            <Sparkles size={20} className="text-brand dark:text-brand" />
+            <Compass size={20} className="text-brand dark:text-brand" />
             Rota Digital com IA
           </CardTitle>
         </CardHeader>
@@ -690,13 +696,54 @@ export default function LeadDetailPage() {
                 objetivo.
               </p>
               <QuotaGuardLink href={`/dashboard/rotas/new?leadId=${lead.id}`} quotaKind="rotas" variant="cta" size="lg" className="gap-2">
-                <Sparkles size={16} />
+                <Compass size={16} />
                 Ir para Gerar Rota
               </QuotaGuardLink>
             </div>
           )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function LeadDetailFollowupTag({ lead }: { lead: Lead }) {
+  const day = getLeadFollowupDay(lead);
+  const capped = day > 30;
+  const displayDay = capped ? "30+" : String(day);
+
+  const usesColor = statusUsesFollowupUrgencyColor(lead.status);
+
+  let colorClasses: string;
+  if (!usesColor) {
+    colorClasses =
+      "border-border/80 bg-muted/60 text-muted-foreground dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-400";
+  } else if (day <= 2) {
+    colorClasses =
+      "border-emerald-700/40 bg-emerald-500/12 text-emerald-900 dark:border-emerald-400/45 dark:bg-emerald-500/18 dark:text-emerald-100";
+  } else if (day <= 5) {
+    colorClasses =
+      "border-amber-700/40 bg-amber-500/12 text-amber-900 dark:border-amber-400/45 dark:bg-amber-500/18 dark:text-amber-100";
+  } else {
+    colorClasses =
+      "border-red-700/40 bg-red-500/12 text-red-900 dark:border-red-400/45 dark:bg-red-500/18 dark:text-red-100";
+  }
+
+  return (
+    <div className="flex items-center gap-3 text-foreground">
+      <Clock size={16} className="shrink-0 text-muted-foreground" />
+      <div className="flex items-center gap-2">
+        <span className="text-sm text-muted-foreground">Followup</span>
+        <span
+          className={cn(
+            "inline-flex h-6 min-w-6 items-center justify-center rounded border px-1.5 text-[10px] font-bold uppercase tabular-nums tracking-wide",
+            colorClasses,
+          )}
+          title={`Followup dia ${day}`}
+        >
+          D{displayDay}
+        </span>
+      </div>
     </div>
   );
 }

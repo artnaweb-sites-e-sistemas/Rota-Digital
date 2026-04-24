@@ -599,9 +599,11 @@ function leadFollowupBadgeClass(status: LeadStatus, day: number): string {
 
 function LeadFollowupCell({ lead }: { lead: Lead }) {
   const day = getLeadFollowupDay(lead);
+  const capped = day > 30;
+  const displayDay = capped ? "30+" : String(day);
   return (
     <span className={leadFollowupBadgeClass(lead.status, day)} title={`Followup dia ${day}`}>
-      D{day}
+      D{displayDay}
     </span>
   );
 }
