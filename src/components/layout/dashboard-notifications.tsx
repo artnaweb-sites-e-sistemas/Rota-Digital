@@ -62,18 +62,26 @@ export function DashboardNotifications({ userId, mainCollapsed }: { userId: stri
   now.setHours(0, 0, 0, 0);
 
   const expiringProposals = proposals
-    .filter((p) => {
-      if (!p.validUntilDate) return false;
-      if (dismissedIds.includes(p.id)) return false;
+    .map((p) => {
+      if (!p.validUntilDate) return null;
 
       const end = new Date(p.validUntilDate);
       end.setHours(0, 0, 0, 0);
       const diffDays = Math.ceil((end.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
       
       // Notificamos propostas que vencem amanhã (1), hoje (0) ou já estão vencidas (< 0)
-      return diffDays <= 1;
+      if (diffDays > 1) return null;
+
+      const state = diffDays < 0 ? "expired" : "warning";
+      const signature = `${p.id}_${p.validUntilDate}_${state}`;
+
+      if (dismissedIds.includes(signature)) return null;
+
+      return { ...p, diffDays, signature };
     })
-    .sort((a, b) => b.validUntilDate - a.validUntilDate); // Ordena decrescente: 1, 0, -1, -2... (mais recentes para vencer primeiro)
+    .filter(Boolean) as (Proposal & { diffDays: number; signature: string })[];
+
+  expiringProposals.sort((a, b) => b.validUntilDate - a.validUntilDate); // Ordena decrescente: 1, 0, -1, -2... (mais recentes para vencer primeiro)
 
   const hasNotifications = expiringProposals.length > 0;
 
@@ -108,9 +116,8 @@ export function DashboardNotifications({ userId, mainCollapsed }: { userId: stri
         isOpen={isOpen} 
         setIsOpen={setIsOpen} 
         expiringProposals={expiringProposals} 
-        now={now}
         onDismiss={dismissNotification}
-        onClearAll={() => clearAllNotifications(expiringProposals.map(p => p.id))}
+        onClearAll={() => clearAllNotifications(expiringProposals.map(p => p.signature))}
       />
     </>
   );
@@ -120,15 +127,13 @@ function NotificationsModal({
   isOpen, 
   setIsOpen, 
   expiringProposals, 
-  now,
   onDismiss,
   onClearAll
 }: { 
   isOpen: boolean; 
   setIsOpen: (o: boolean) => void; 
-  expiringProposals: Proposal[]; 
-  now: Date;
-  onDismiss: (id: string) => void;
+  expiringProposals: (Proposal & { diffDays: number; signature: string })[]; 
+  onDismiss: (signature: string) => void;
   onClearAll: () => void;
 }) {
   return (
@@ -159,9 +164,7 @@ function NotificationsModal({
         ) : (
           <div className="-mr-2 flex flex-col gap-3 max-h-[60vh] overflow-y-auto pr-3 pt-4 pb-2">
             {expiringProposals.map((proposal) => {
-              const end = new Date(proposal.validUntilDate);
-              end.setHours(0, 0, 0, 0);
-              const diffDays = Math.ceil((end.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
+              const diffDays = proposal.diffDays;
               const isToday = diffDays === 0;
               const isExpired = diffDays < 0;
 
@@ -179,7 +182,7 @@ function NotificationsModal({
               return (
                 <div key={proposal.id} className="group relative flex flex-col gap-3 rounded-lg border border-border bg-muted/30 p-3.5 shadow-sm transition-colors hover:bg-muted/50 dark:bg-white/[0.02] dark:hover:bg-white/[0.04]">
                   <button
-                    onClick={() => onDismiss(proposal.id)}
+                    onClick={() => onDismiss(proposal.signature)}
                     className="absolute right-2 top-2 rounded-md p-1 text-muted-foreground opacity-40 transition-opacity hover:bg-muted-foreground/20 hover:text-foreground hover:opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
                     title="Excluir notificação"
                   >

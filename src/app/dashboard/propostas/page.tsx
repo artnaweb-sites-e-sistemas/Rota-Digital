@@ -71,9 +71,6 @@ function proposalExpiryCountdownTag(proposal: Proposal): { label: string; tone: 
   if (!proposal.validUntilDate) {
     return { label: "Prazo indefinido", tone: "indefinite" };
   }
-  if (proposalStatus(proposal) === "expiradas") {
-    return { label: "Expirada", tone: "expired" };
-  }
   const d = calendarDaysUntilValid(proposal.validUntilDate);
   if (d < 0) {
     return { label: "Expirada", tone: "expired" };
@@ -81,8 +78,7 @@ function proposalExpiryCountdownTag(proposal: Proposal): { label: string; tone: 
   const inner = d === 0 ? "hoje" : d === 1 ? "1 dia" : `${d} dias`;
   const label = `Vence em: ${inner}`;
   if (d > 3) return { label, tone: "green" };
-  if (d === 3) return { label, tone: "yellow" };
-  return { label, tone: "red" };
+  return { label, tone: "yellow" };
 }
 
 export default function PropostasPage() {

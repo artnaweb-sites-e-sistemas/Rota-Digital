@@ -39,6 +39,10 @@ export function proposalExpiryFloatingBadgeClassName(tone: ProposalExpiryFloatin
         "border-amber-500/50 bg-[oklch(0.97_0.028_85)] text-amber-950 dark:border-transparent dark:bg-[oklch(0.24_0.04_80)] dark:text-amber-50",
       );
     case "red":
+      return cn(
+        layout,
+        "border-red-500/50 bg-[oklch(0.97_0.02_25)] text-red-900 dark:border-transparent dark:bg-[oklch(0.24_0.06_25)] dark:text-red-100",
+      );
     case "expired":
       return cn(
         layout,
