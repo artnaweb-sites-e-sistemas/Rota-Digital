@@ -37,6 +37,7 @@ import {
 } from "@/lib/company-about-defaults";
 import { cn } from "@/lib/utils";
 import { QuotaGateProvider } from "@/components/limits/quota-gate-context";
+import { DashboardNotifications } from "@/components/layout/dashboard-notifications";
 
 const SIDEBAR_COLLAPSED_KEY = "rota-digital-sidebar-collapsed";
 
@@ -295,28 +296,12 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           )}
         >
           {mainCollapsed ? (
-            <div className="mb-3 flex justify-center" title={agencyName}>
-              <div
-                className={cn(
-                  "relative flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-full border border-sidebar-border bg-sidebar-accent/50 shadow-sm",
-                  "dark:border-white/12 dark:bg-white/[0.06]",
-                )}
-              >
-                <img
-                  src={agencyLogoUrl}
-                  alt=""
-                  className="size-full min-h-full min-w-full object-cover object-center"
-                  referrerPolicy="no-referrer"
-                />
-              </div>
-            </div>
-          ) : (
-            <div className="mb-3 rounded-md border border-sidebar-border bg-sidebar-accent/40 p-3 shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:shadow-none">
-              <div className="flex items-center gap-3">
+            <div className="mb-3 flex justify-center relative" title={agencyName}>
+              <div className="relative shrink-0">
                 <div
                   className={cn(
-                    "relative flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-full border border-sidebar-border bg-muted/60 shadow-sm",
-                    "dark:border-white/12 dark:bg-zinc-800/80",
+                    "relative flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-full border border-sidebar-border bg-sidebar-accent/50 shadow-sm",
+                    "dark:border-white/12 dark:bg-white/[0.06]",
                   )}
                 >
                   <img
@@ -325,6 +310,28 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                     className="size-full min-h-full min-w-full object-cover object-center"
                     referrerPolicy="no-referrer"
                   />
+                </div>
+                <DashboardNotifications userId={user.uid} mainCollapsed={true} />
+              </div>
+            </div>
+          ) : (
+            <div className="mb-3 rounded-md border border-sidebar-border bg-sidebar-accent/40 p-3 shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:shadow-none">
+              <div className="flex items-center gap-3">
+                <div className="relative shrink-0">
+                  <div
+                    className={cn(
+                      "relative flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-full border border-sidebar-border bg-muted/60 shadow-sm",
+                      "dark:border-white/12 dark:bg-zinc-800/80",
+                    )}
+                  >
+                    <img
+                      src={agencyLogoUrl}
+                      alt=""
+                      className="size-full min-h-full min-w-full object-cover object-center"
+                      referrerPolicy="no-referrer"
+                    />
+                  </div>
+                  <DashboardNotifications userId={user.uid} mainCollapsed={false} />
                 </div>
                 <div className="min-w-0 flex-1 space-y-2">
                   <div className="space-y-0.5">

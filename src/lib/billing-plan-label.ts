@@ -45,7 +45,7 @@ export function sidebarPlanBadgeLabel(plan: SidebarBillingPlan): string {
 export function planBadgeVisualClasses(plan: SidebarBillingPlan): string {
   switch (plan) {
     case "Master":
-      return "border-amber-400/40 bg-gradient-to-br from-amber-500/15 to-amber-600/10 text-amber-100 shadow-[0_0_0_1px_rgba(251,191,36,0.12)] dark:border-amber-400/45 dark:from-amber-500/20 dark:to-amber-700/10 dark:text-amber-100";
+      return "border-amber-400/40 bg-gradient-to-br from-amber-500/15 to-amber-600/10 text-amber-800 shadow-[0_0_0_1px_rgba(251,191,36,0.12)] dark:border-amber-400/45 dark:from-amber-500/20 dark:to-amber-700/10 dark:text-amber-100";
     case "Starter":
       return "border-border/50 bg-muted/60 text-muted-foreground dark:border-white/10 dark:bg-white/[0.06] dark:text-zinc-400";
     case "Pro":

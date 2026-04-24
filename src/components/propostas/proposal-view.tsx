@@ -20,6 +20,7 @@ import {
   MapPin,
   Mail,
   MessageCircle,
+  Minus,
   Pencil,
   Phone,
   PlayCircle,
@@ -578,20 +579,75 @@ function buildAgencyContactRows(
   return rows;
 }
 
-/** Estado da data de validade para o selo no cartão «Validade». */
 function validityTone(validUntilDate: number): { label: string; className: string } {
-  if (validUntilDate < Date.now()) {
+  if (!validUntilDate) {
+    return {
+      label: "Não definido",
+      className: "border-border bg-muted text-muted-foreground",
+    };
+  }
+
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+
+  const end = new Date(validUntilDate);
+  end.setHours(0, 0, 0, 0);
+
+  const diffDays = Math.ceil((end.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
+
+  if (diffDays < 0) {
     return {
       label: "Expirada",
       className:
         "border-red-500/30 bg-red-500/10 text-red-700 dark:border-red-500/25 dark:bg-red-500/15 dark:text-red-200",
     };
   }
+  
+  if (diffDays <= 1) {
+    return {
+      label: diffDays === 0 ? "Vence hoje" : "Vence amanhã",
+      className:
+        "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:border-amber-500/25 dark:bg-amber-500/15 dark:text-amber-200",
+    };
+  }
+
   return {
     label: "Válida",
     className:
       "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:border-emerald-500/25 dark:bg-emerald-500/15 dark:text-emerald-100",
   };
+}
+
+function InlineCopyButton({ value, label, tooltip }: { value: string; label: string; tooltip?: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <span className="relative inline-flex shrink-0 items-center ml-2 align-middle">
+      <span
+        className={cn(
+          "pointer-events-none absolute -top-6 left-1/2 -translate-x-1/2 rounded border border-emerald-500/40 bg-emerald-500/12 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-200 transition-all duration-200 z-10",
+          copied ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0",
+        )}
+        aria-hidden
+      >
+        Copiado
+      </span>
+      <button
+        type="button"
+        className="inline-flex size-[22px] shrink-0 items-center justify-center rounded border border-border bg-background/70 text-muted-foreground transition-[color,transform] duration-200 hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/40 active:scale-[0.92]"
+        aria-label={`Copiar ${label}`}
+        title={tooltip || `Copiar ${label}`}
+        onClick={(e) => {
+          e.stopPropagation();
+          void navigator.clipboard.writeText(value).then(() => {
+            setCopied(true);
+            window.setTimeout(() => setCopied(false), 1200);
+          });
+        }}
+      >
+        <Copy className="size-3 transition-colors duration-200" aria-hidden />
+      </button>
+    </span>
+  );
 }
 
 function IdentityThumb({
@@ -1516,6 +1572,32 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
   const [companyAboutLive, setCompanyAboutLive] = useState<UserCompanyAboutSettings | null>(null);
   const [linkedLeadLive, setLinkedLeadLive] = useState<Lead | null>(null);
   const [limitModalState, setLimitModalState] = useState<PlanLimitModalState | null>(null);
+
+  const [extendValidityModalOpen, setExtendValidityModalOpen] = useState(false);
+  const [extendDays, setExtendDays] = useState(7);
+  const [extendingValidity, setExtendingValidity] = useState(false);
+
+  const handleExtendValidity = async () => {
+    if (!isDashboard) return;
+    if (extendDays <= 0 || extendDays > 30) return;
+    setExtendingValidity(true);
+    try {
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      const newValidUntil = now.getTime() + extendDays * 24 * 60 * 60 * 1000;
+      await applyProposalPatch({
+        validUntilDate: newValidUntil,
+        updatedAt: Date.now(),
+      });
+      setExtendValidityModalOpen(false);
+      setExtendDays(7);
+    } catch (e) {
+      console.error(e);
+      setFieldError("Não foi possível prorrogar a validade.");
+    } finally {
+      setExtendingValidity(false);
+    }
+  };
   const [planKeyForLogo, setPlanKeyForLogo] = useState<PlanKey>("starter");
   /** null = a carregar; false = Starter sem direito a marca / personalização institucional nesta proposta. */
   const [agencyImageUploadAllowed, setAgencyImageUploadAllowed] = useState<boolean | null>(null);
@@ -2191,6 +2273,54 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
         onClose={() => setLimitModalState(null)}
         getIdToken={user ? () => user.getIdToken() : undefined}
       />
+
+      <Dialog open={extendValidityModalOpen} onOpenChange={setExtendValidityModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Prorrogar Validade</DialogTitle>
+            <DialogDescription>
+              Quantos dias a partir de hoje você deseja adicionar à validade desta proposta?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col items-center justify-center py-6 gap-6">
+            <div className="flex items-center gap-4">
+              <Button 
+                variant="outline" 
+                size="icon" 
+                className="h-10 w-10 rounded-full" 
+                onClick={() => setExtendDays(Math.max(1, extendDays - 1))}
+                disabled={extendDays <= 1 || extendingValidity}
+              >
+                <Minus className="h-4 w-4" />
+              </Button>
+              <div className="text-4xl font-extrabold w-16 text-center tabular-nums text-foreground">
+                {extendDays}
+              </div>
+              <Button 
+                variant="outline" 
+                size="icon" 
+                className="h-10 w-10 rounded-full" 
+                onClick={() => setExtendDays(Math.min(30, extendDays + 1))}
+                disabled={extendDays >= 30 || extendingValidity}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Dias adicionais (máx 30 dias)
+            </p>
+          </div>
+          <DialogFooter className="sm:justify-between">
+            <Button variant="outline" onClick={() => setExtendValidityModalOpen(false)} disabled={extendingValidity}>
+              Cancelar
+            </Button>
+            <Button onClick={handleExtendValidity} disabled={extendingValidity}>
+              {extendingValidity && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Prorrogar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <section className="relative overflow-visible rounded-2xl border border-border bg-card shadow-xl dark:border-white/5 dark:bg-white/[0.02]">
         <div
           className="pointer-events-none absolute inset-0 z-0 overflow-hidden rounded-2xl bg-[radial-gradient(circle_at_top_left,rgba(190,149,83,0.18),transparent_42%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.08),transparent_34%)]"
@@ -2365,9 +2495,52 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
                 <span className="min-w-0 font-medium leading-5 text-foreground">{displayLead.name}</span>
                 <span className="shrink-0">Empresa</span>
                 <span className="min-w-0 font-medium leading-5 text-foreground">{displayLead.company}</span>
+                {displayLead.email?.trim() ? (
+                  <>
+                    <span className="shrink-0 flex items-center">E-mail</span>
+                    <span className="min-w-0 font-medium leading-5 text-foreground flex items-center">
+                      <span className="truncate">{displayLead.email}</span>
+                      <InlineCopyButton value={displayLead.email} label="e-mail" />
+                    </span>
+                  </>
+                ) : null}
+                {displayLead.phone?.trim() ? (
+                  <>
+                    <span className="shrink-0 flex items-center">WhatsApp / Tel.</span>
+                    <span className="min-w-0 font-medium leading-5 text-foreground flex items-center">
+                      <span className="truncate">{maskPhoneDisplayLoose(displayLead.phone)}</span>
+                      <InlineCopyButton 
+                        value={(() => {
+                          const d = displayLead.phone!.replace(/\D/g, "");
+                          return d.length > 11 && d.startsWith("55") ? d.slice(2) : d;
+                        })()} 
+                        label="telefone" 
+                        tooltip="Copiar telefone sem +55" 
+                      />
+                    </span>
+                  </>
+                ) : null}
                 <span className="shrink-0">Validade</span>
-                <span className="min-w-0 font-medium leading-5 text-foreground">
-                  {remainingValidityDisplay(proposal.validUntilDate)}
+                <span className="min-w-0 flex items-center gap-3">
+                  <Badge 
+                    variant="outline" 
+                    className={cn(
+                      "h-5 shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-semibold sm:text-[11px]",
+                      validityTone(proposal.validUntilDate).className,
+                      "[&_.text-muted-foreground]:text-inherit [&_.text-muted-foreground]:opacity-80"
+                    )}
+                  >
+                    {remainingValidityDisplay(proposal.validUntilDate)}
+                  </Badge>
+                  {isDashboard && (
+                    <button
+                      type="button"
+                      onClick={() => setExtendValidityModalOpen(true)}
+                      className="text-[11px] font-semibold text-brand hover:underline tracking-wide"
+                    >
+                      Deseja prorrogar?
+                    </button>
+                  )}
                 </span>
               </div>
             </div>
