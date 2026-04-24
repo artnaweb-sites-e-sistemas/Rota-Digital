@@ -1,14 +1,33 @@
+import { normalizedSubscriptionPlanKey, type PlanKey } from "@/lib/plan-quotas";
+
 /** Plano comercial / Master — usado no painel (sidebar, admin). */
 export type SidebarBillingPlan = "Starter" | "Pro" | "Agency" | "Master";
 
+const PLAN_KEY_TO_SIDEBAR: Record<PlanKey, SidebarBillingPlan> = {
+  starter: "Starter",
+  pro: "Pro",
+  agency: "Agency",
+  master: "Master",
+};
+
+/**
+ * Plano a partir de um único campo (ex.: célula na tabela admin).
+ * Alinhado a `normalizedSubscriptionPlanKey`: vazio / desconhecido → **Starter** (não Pro).
+ */
 export function billingPlanFromUserSettingsRaw(raw: unknown): SidebarBillingPlan {
-  const text = String(raw ?? "")
-    .trim()
-    .toLowerCase();
-  if (text.includes("master")) return "Master";
-  if (text.includes("agency") || text.includes("enterprise")) return "Agency";
-  if (text.includes("starter") || text.includes("free") || text.includes("trial")) return "Starter";
-  return "Pro";
+  return PLAN_KEY_TO_SIDEBAR[normalizedSubscriptionPlanKey(raw)];
+}
+
+/**
+ * Plano a partir do documento `userSettings` completo (sidebar em tempo real).
+ * Respeita `planMasterUnlimited` (Master) como o resto da aplicação.
+ */
+export function billingPlanFromUserSettingsDoc(
+  raw: Record<string, unknown> | null | undefined,
+): SidebarBillingPlan {
+  if (!raw) return "Starter";
+  if (raw.planMasterUnlimited === true) return "Master";
+  return billingPlanFromUserSettingsRaw(raw.subscriptionPlan ?? raw.plan);
 }
 
 /** Texto curto para o chip do sidebar (ex.: "Plano Pro"). */

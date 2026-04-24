@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 /** Logo de marca do topo dos modais de progresso (geração, captura, reanálise) — pulso leve. */
 export function ProgressOverlayRotaLabLogo() {
   return (
-    <div className="mb-5 flex justify-center" aria-hidden>
+    <div className="mb-2 flex justify-center" aria-hidden>
       <Image
         src="/assets/logo/logo-white.png"
         alt=""
@@ -29,16 +29,12 @@ export function ProgressOverlayPageReloadWarning({ className }: ProgressOverlayP
     <p
       role="note"
       className={cn(
-        "flex w-full max-w-full items-start gap-2 text-left text-[11px] leading-relaxed text-muted-foreground/80",
+        "flex w-full max-w-full flex-wrap items-center justify-center gap-2 text-center text-[11px] leading-relaxed text-muted-foreground/80",
         className,
       )}
     >
-      <AlertTriangle
-        className="mt-0.5 size-3.5 shrink-0 text-brand"
-        strokeWidth={2.25}
-        aria-hidden
-      />
-      <span>Aguarde a conclusão; não recarregue a página.</span>
+      <AlertTriangle className="size-3.5 shrink-0 text-brand" strokeWidth={2.25} aria-hidden />
+      <span>Aguarde a conclusão. Não saia da página.</span>
     </p>
   );
 }

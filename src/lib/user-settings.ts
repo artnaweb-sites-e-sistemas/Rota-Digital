@@ -9,7 +9,7 @@ import type {
 } from "@/types/user-settings";
 import { coerceUserAiPromptSettingsRaw } from "@/lib/user-ai-prompt-coerce";
 import { coerceProposalPlansArray, proposalPlanToFirestoreValue } from "@/lib/proposal-plan-coerce";
-import { billingPlanFromUserSettingsRaw, type SidebarBillingPlan } from "@/lib/billing-plan-label";
+import { billingPlanFromUserSettingsDoc, type SidebarBillingPlan } from "@/lib/billing-plan-label";
 
 const USER_SETTINGS_COLLECTION = "userSettings";
 
@@ -108,7 +108,7 @@ export function parseUserSettingsDocForDashboard(raw: Record<string, unknown>): 
 } {
   return {
     companyAbout: coerceCompanyAboutSettings(raw),
-    plan: billingPlanFromUserSettingsRaw(raw.subscriptionPlan ?? raw.plan),
+    plan: billingPlanFromUserSettingsDoc(raw),
   };
 }
 

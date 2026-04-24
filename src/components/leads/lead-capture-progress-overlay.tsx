@@ -82,7 +82,7 @@ export function LeadCaptureProgressOverlay({ open, progress, hint }: Props) {
 
           <p
             id="rd-lead-capture-progress-desc"
-            className="mt-4 min-h-[2.75rem] text-sm leading-relaxed text-muted-foreground"
+            className="mt-4 text-sm leading-relaxed text-muted-foreground"
           >
             {label}
           </p>
@@ -94,7 +94,7 @@ export function LeadCaptureProgressOverlay({ open, progress, hint }: Props) {
             </div>
             <div className="relative h-2.5 overflow-hidden rounded-full bg-muted/80 ring-1 ring-white/5">
               <div
-                className={`relative h-full overflow-hidden rounded-full bg-gradient-to-r from-[#1c1910] via-[#4a422c] to-[#5c5235] shadow-[0_0_24px_-2px_rgba(0,0,0,0.35)] ease-out ${
+                className={`rd-progress-bar-fill relative h-full overflow-hidden rounded-full ease-out ${
                   clamped >= 99 ? "transition-[width] duration-200" : "transition-[width] duration-[480ms]"
                 }`}
                 style={{ width: `${clamped}%` }}

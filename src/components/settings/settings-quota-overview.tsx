@@ -6,6 +6,7 @@ import { BarChart3, FileText, Loader2, Route } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth-context";
 import type { PlanKey } from "@/lib/plan-quotas";
+import { type SidebarBillingPlan, planBadgeVisualClasses } from "@/lib/billing-plan-label";
 import { cn } from "@/lib/utils";
 
 type QuotaSlice = {
@@ -22,6 +23,13 @@ type UserQuotaPayload = {
 };
 
 const PLAN_LABEL: Record<PlanKey, string> = {
+  starter: "Starter",
+  pro: "Pro",
+  agency: "Agency",
+  master: "Master",
+};
+
+const PLAN_KEY_TO_BADGE: Record<PlanKey, SidebarBillingPlan> = {
   starter: "Starter",
   pro: "Pro",
   agency: "Agency",
@@ -64,8 +72,10 @@ function QuotaMeter({
   return (
     <div
       className={cn(
-        "flex flex-col rounded-xl border border-border/80 bg-muted/25 px-4 py-4 dark:border-white/[0.07] dark:bg-white/[0.03]",
-        q.atLimit && "ring-1 ring-amber-500/35 dark:ring-amber-400/25",
+        "flex flex-col rounded-xl border px-4 py-4",
+        q.atLimit
+          ? "border-destructive/55 bg-destructive/[0.08] dark:border-destructive/50 dark:bg-destructive/12"
+          : "border-border/80 bg-muted/25 dark:border-white/[0.07] dark:bg-white/[0.03]",
       )}
     >
       <div className="flex items-start justify-between gap-2">
@@ -79,7 +89,7 @@ function QuotaMeter({
           </div>
         </div>
         {q.atLimit ? (
-          <span className="shrink-0 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-950 dark:text-amber-100">
+          <span className="shrink-0 rounded border border-destructive/45 bg-destructive/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-destructive dark:border-destructive/50 dark:bg-destructive/15">
             Limite
           </span>
         ) : null}
@@ -96,7 +106,7 @@ function QuotaMeter({
       </p>
       <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted/80 ring-1 ring-white/5">
         <div
-          className="h-full rounded-full bg-gradient-to-r from-[#1c1910] via-[#4a422c] to-[#5c5235] transition-[width] duration-500 ease-out"
+          className="rd-progress-bar-fill h-full rounded-full transition-[width] duration-500 ease-out"
           style={{ width: `${pct}%` }}
           role="progressbar"
           aria-valuenow={q.used}
@@ -161,7 +171,10 @@ export function SettingsQuotaOverview() {
           {data ? (
             <div className="sm:pl-2">
               <span
-                className="inline-flex items-center rounded-md border border-brand/35 bg-brand/10 px-2.5 py-1 text-xs font-semibold text-brand dark:border-brand/40 dark:bg-brand/15"
+                className={cn(
+                  "inline-flex items-center rounded px-2.5 py-1 text-xs font-semibold",
+                  planBadgeVisualClasses(PLAN_KEY_TO_BADGE[data.plan] ?? "Pro"),
+                )}
                 title="Plano da sua conta"
               >
                 {PLAN_LABEL[data.plan] ?? data.plan}

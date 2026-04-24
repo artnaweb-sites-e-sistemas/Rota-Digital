@@ -333,18 +333,37 @@ html {
   }
 }
 
-/* Brilho suave na barra de progresso (Gerar Rota) */
+/* Preenchimento da barra (modais Gerar Rota, captura de leads, Dados básicos) — tom da marca. */
+.rd-progress-bar-fill {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--brand) 40%, #141210 60%),
+    var(--brand),
+    color-mix(in srgb, var(--brand) 72%, #f5f0e4 28%)
+  );
+  box-shadow: 0 0 12px -2px color-mix(in srgb, var(--brand) 42%, transparent);
+}
+
+/* Brilho: percorre 100% da *largura do pai* (P). O traço tem largura S ≈ P/3; o movimento
+   de translateX(-100% a +200% do próprio) = 300% * S = P, da entrada completa à saída. */
 @keyframes rd-progress-shine {
   0% {
     transform: translateX(-100%);
   }
   100% {
-    transform: translateX(100%);
+    transform: translateX(200%);
   }
 }
 
 .rd-progress-shine {
-  animation: rd-progress-shine 2.2s ease-in-out infinite;
+  animation: rd-progress-shine 2.2s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rd-progress-shine {
+    animation: none;
+    opacity: 0.35;
+  }
 }
 
 /* Landing #como-funciona: seta vertical entre cards — só em viewport estreita (max 767px).

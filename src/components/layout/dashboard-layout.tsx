@@ -61,7 +61,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const usuariosSection = pathname.startsWith("/dashboard/usuarios");
   const [mainCollapsed, setMainCollapsed] = useState(false);
   const [companyAbout, setCompanyAbout] = useState<UserCompanyAboutSettings | null>(null);
-  const [sidebarPlan, setSidebarPlan] = useState<SidebarBillingPlan>("Pro");
+  const [sidebarPlan, setSidebarPlan] = useState<SidebarBillingPlan>("Starter");
 
   useEffect(() => {
     try {
@@ -74,7 +74,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!user) {
       setCompanyAbout(null);
-      setSidebarPlan("Pro");
+      setSidebarPlan("Starter");
       return;
     }
     let cancelled = false;
@@ -85,7 +85,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         if (cancelled) return;
         if (!snap.exists()) {
           setCompanyAbout(null);
-          setSidebarPlan("Pro");
+          setSidebarPlan("Starter");
           return;
         }
         const parsed = parseUserSettingsDocForDashboard(snap.data() as Record<string, unknown>);
@@ -95,7 +95,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       () => {
         if (!cancelled) {
           setCompanyAbout(null);
-          setSidebarPlan("Pro");
+          setSidebarPlan("Starter");
         }
       },
     );
