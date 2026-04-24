@@ -583,6 +583,8 @@ export default function NewRotaPage() {
           leadId: selectedLead.id,
           reportId,
         });
+        /** Sempre que a rota é gerada (ou o relatório existente é substituído), o funil
+         *  reflete a etapa "Rota Gerada" de novo, mesmo se o lead estava em "Proposta". */
         await updateLead(selectedLead.id, { reportId, status: "Rota Gerada" });
 
         clearProgressTimer();

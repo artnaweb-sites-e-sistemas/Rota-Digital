@@ -11,7 +11,7 @@ import {
   type MouseEvent,
   type SVGProps,
 } from "react";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { doc, onSnapshot } from "firebase/firestore";
 import { useAuth } from "@/lib/auth-context";
 import { db } from "@/lib/firebase";
@@ -559,42 +559,42 @@ function sharedProposalHref(slug: string): string {
 
 /** Chip verde do WhatsApp na tabela (link externo compacto). */
 const TABLE_EXTERNAL_LINK_CHIP_CLASS =
-  "inline-flex size-[22px] shrink-0 items-center justify-center rounded-md border border-[#25D366]/20 bg-[#25D366]/5 text-[#25D366]/80 transition-colors hover:border-[#25D366]/35 hover:bg-[#25D366]/10 hover:text-[#25D366] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#25D366]/30 focus-visible:ring-offset-1 focus-visible:ring-offset-background dark:border-[#25D366]/15 dark:bg-[#25D366]/10 dark:hover:border-[#25D366]/28 dark:hover:bg-[#25D366]/12";
+  "inline-flex size-[20px] shrink-0 items-center justify-center rounded border border-[#25D366]/20 bg-[#25D366]/5 text-[#25D366]/80 transition-colors hover:border-[#25D366]/35 hover:bg-[#25D366]/10 hover:text-[#25D366] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#25D366]/30 focus-visible:ring-offset-1 focus-visible:ring-offset-background dark:border-[#25D366]/15 dark:bg-[#25D366]/10 dark:hover:border-[#25D366]/28 dark:hover:bg-[#25D366]/12";
 
 /** Chip da rota pública / painel — tom marca, distinto do WhatsApp. */
 const TABLE_PUBLIC_ROUTE_CHIP_CLASS =
-  "inline-flex size-[22px] shrink-0 items-center justify-center rounded-md border border-brand/30 bg-brand/10 text-brand transition-colors hover:border-brand/50 hover:bg-brand/18 hover:text-brand focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand/40 focus-visible:ring-offset-1 focus-visible:ring-offset-background dark:border-brand/40 dark:bg-brand/15 dark:text-brand dark:hover:border-brand/50 dark:hover:bg-brand/22";
+  "inline-flex size-[22px] shrink-0 items-center justify-center rounded border border-brand/30 bg-brand/10 text-brand transition-colors hover:border-brand/50 hover:bg-brand/18 hover:text-brand focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand/40 focus-visible:ring-offset-1 focus-visible:ring-offset-background dark:border-brand/40 dark:bg-brand/15 dark:text-brand dark:hover:border-brand/50 dark:hover:bg-brand/22";
 
 /** “Gerar rota” ainda sem rota — apagado, mas clicável (mesmo destino). */
 const TABLE_CREATE_ROUTE_CHIP_DIMMED_CLASS = cn(
-  "inline-flex size-[22px] shrink-0 items-center justify-center rounded-md border border-border/60 bg-muted/45 text-muted-foreground/75 shadow-none transition-[opacity,background-color,border-color,color]",
+  "inline-flex size-[22px] shrink-0 items-center justify-center rounded border border-border/60 bg-muted/45 text-muted-foreground/75 shadow-none transition-[opacity,background-color,border-color,color]",
   "opacity-[0.72] hover:opacity-100 hover:border-amber-500/28 hover:bg-amber-500/[0.08] hover:text-amber-900/80 dark:border-white/[0.1] dark:bg-white/[0.04] dark:text-zinc-500 dark:hover:border-amber-400/22 dark:hover:bg-amber-500/[0.1] dark:hover:text-amber-100/85",
   "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500/30 focus-visible:ring-offset-1 focus-visible:ring-offset-background",
 );
 
 /** Atalho “gerar proposta” — violeta, alinhado ao status Proposta. */
 const TABLE_PROPOSAL_CHIP_CLASS =
-  "inline-flex size-[22px] shrink-0 items-center justify-center rounded-md border border-violet-500/35 bg-violet-500/10 text-violet-700 transition-colors hover:border-violet-500/55 hover:bg-violet-500/16 hover:text-violet-900 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-violet-500/40 focus-visible:ring-offset-1 focus-visible:ring-offset-background dark:border-violet-400/35 dark:bg-violet-500/15 dark:text-violet-200 dark:hover:border-violet-400/50 dark:hover:bg-violet-500/22 dark:hover:text-violet-50";
+  "inline-flex size-[22px] shrink-0 items-center justify-center rounded border border-violet-500/35 bg-violet-500/10 text-violet-700 transition-colors hover:border-violet-500/55 hover:bg-violet-500/16 hover:text-violet-900 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-violet-500/40 focus-visible:ring-offset-1 focus-visible:ring-offset-background dark:border-violet-400/35 dark:bg-violet-500/15 dark:text-violet-200 dark:hover:border-violet-400/50 dark:hover:bg-violet-500/22 dark:hover:text-violet-50";
 
 /** “Gerar proposta” sem proposta ainda — apagado, mas clicável (mesmo destino). */
 const TABLE_PROPOSAL_CHIP_DIMMED_CLASS = cn(
-  "inline-flex size-[22px] shrink-0 items-center justify-center rounded-md border border-border/60 bg-muted/45 text-muted-foreground/75 shadow-none transition-[opacity,background-color,border-color,color]",
+  "inline-flex size-[22px] shrink-0 items-center justify-center rounded border border-border/60 bg-muted/45 text-muted-foreground/75 shadow-none transition-[opacity,background-color,border-color,color]",
   "opacity-[0.72] hover:opacity-100 hover:border-violet-500/25 hover:bg-violet-500/[0.08] hover:text-violet-800/75 dark:border-white/[0.1] dark:bg-white/[0.04] dark:text-zinc-500 dark:hover:border-violet-400/22 dark:hover:bg-violet-500/[0.1] dark:hover:text-violet-100/85",
   "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-violet-500/30 focus-visible:ring-offset-1 focus-visible:ring-offset-background",
 );
 
 const FOLLOWUP_NEUTRAL_BADGE_CLASS =
-  "inline-flex h-8 min-w-8 items-center justify-center rounded-md border border-border/80 bg-muted/60 px-1.5 text-[10px] font-bold uppercase tabular-nums tracking-wide text-muted-foreground dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-400";
+  "inline-flex h-8 min-w-8 items-center justify-center rounded border border-border/80 bg-muted/60 px-1.5 text-[10px] font-bold uppercase tabular-nums tracking-wide text-muted-foreground dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-400";
 
 function leadFollowupBadgeClass(status: LeadStatus, day: number): string {
   if (!statusUsesFollowupUrgencyColor(status)) return FOLLOWUP_NEUTRAL_BADGE_CLASS;
   if (day <= 2) {
-    return "inline-flex h-8 min-w-8 items-center justify-center rounded-md border border-emerald-700/40 bg-emerald-500/12 px-1.5 text-[10px] font-bold uppercase tabular-nums tracking-wide text-emerald-900 dark:border-emerald-400/45 dark:bg-emerald-500/18 dark:text-emerald-100";
+    return "inline-flex h-8 min-w-8 items-center justify-center rounded border border-emerald-700/40 bg-emerald-500/12 px-1.5 text-[10px] font-bold uppercase tabular-nums tracking-wide text-emerald-900 dark:border-emerald-400/45 dark:bg-emerald-500/18 dark:text-emerald-100";
   }
   if (day <= 5) {
-    return "inline-flex h-8 min-w-8 items-center justify-center rounded-md border border-amber-700/40 bg-amber-500/12 px-1.5 text-[10px] font-bold uppercase tabular-nums tracking-wide text-amber-900 dark:border-amber-400/45 dark:bg-amber-500/18 dark:text-amber-100";
+    return "inline-flex h-8 min-w-8 items-center justify-center rounded border border-amber-700/40 bg-amber-500/12 px-1.5 text-[10px] font-bold uppercase tabular-nums tracking-wide text-amber-900 dark:border-amber-400/45 dark:bg-amber-500/18 dark:text-amber-100";
   }
-  return "inline-flex h-8 min-w-8 items-center justify-center rounded-md border border-red-700/40 bg-red-500/12 px-1.5 text-[10px] font-bold uppercase tabular-nums tracking-wide text-red-900 dark:border-red-400/45 dark:bg-red-500/18 dark:text-red-100";
+  return "inline-flex h-8 min-w-8 items-center justify-center rounded border border-red-700/40 bg-red-500/12 px-1.5 text-[10px] font-bold uppercase tabular-nums tracking-wide text-red-900 dark:border-red-400/45 dark:bg-red-500/18 dark:text-red-100";
 }
 
 function LeadFollowupCell({ lead }: { lead: Lead }) {
@@ -779,17 +779,11 @@ function LeadTablePhoneCell({
   phone,
   lastCopiedLeadId,
   onPhoneCopied,
-  rowHasRoute,
-  publicSlugByReportId,
-  latestProposal,
 }: {
   lead: Lead;
   phone: string | undefined;
   lastCopiedLeadId: string | null;
   onPhoneCopied: () => void;
-  rowHasRoute: boolean;
-  publicSlugByReportId: Map<string, string>;
-  latestProposal: { id: string; publicSlug?: string } | null;
 }) {
   const [copied, setCopied] = useState(false);
   const trimmed = phone?.trim() ?? "";
@@ -798,28 +792,13 @@ function LeadTablePhoneCell({
     return (
       <div className="flex w-full min-w-0 items-center gap-2">
         <span
-          className="inline-flex size-[22px] shrink-0 items-center justify-center rounded-md border border-border/50 bg-muted/35 text-muted-foreground/45"
+          className="inline-flex size-[22px] shrink-0 items-center justify-center rounded border border-border/50 bg-muted/35 text-muted-foreground/45"
           aria-hidden
           title="Telefone indisponível"
         >
           <Copy className="size-3" aria-hidden />
         </span>
         <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">Sem telefone</span>
-        <div className="flex shrink-0 items-center gap-1">
-          <span
-            className="inline-flex size-[22px] shrink-0 items-center justify-center rounded-md border border-border/50 bg-muted/35 text-muted-foreground/45"
-            aria-hidden
-            title="WhatsApp indisponível"
-          >
-            <WhatsAppIcon className="size-3" aria-hidden />
-          </span>
-          <LeadTableRouteAndProposalChips
-            lead={lead}
-            rowHasRoute={rowHasRoute}
-            publicSlugByReportId={publicSlugByReportId}
-            latestProposal={latestProposal}
-          />
-        </div>
       </div>
     );
   }
@@ -833,7 +812,7 @@ function LeadTablePhoneCell({
         <span className="relative inline-flex shrink-0 items-center">
           <span
             className={cn(
-              "pointer-events-none absolute -top-6 left-1/2 -translate-x-1/2 rounded-md border border-emerald-500/40 bg-emerald-500/12 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-emerald-200 transition-all duration-200",
+              "pointer-events-none absolute -top-6 left-1/2 -translate-x-1/2 rounded border border-emerald-500/40 bg-emerald-500/12 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-emerald-200 transition-all duration-200",
               copied ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0",
             )}
             aria-hidden
@@ -843,7 +822,7 @@ function LeadTablePhoneCell({
           <button
             type="button"
             className={cn(
-              "inline-flex size-[22px] shrink-0 items-center justify-center rounded-md border border-border bg-background/70 text-muted-foreground transition-[color,transform] duration-200 hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/40 active:scale-[0.92]",
+              "inline-flex size-[22px] shrink-0 items-center justify-center rounded border border-border bg-background/70 text-muted-foreground transition-[color,transform] duration-200 hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/40 active:scale-[0.92]",
             )}
             aria-label={`Copiar telefone ${displayPlus55}`}
             title="Copiar telefone sem +55"
@@ -877,35 +856,6 @@ function LeadTablePhoneCell({
       <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground" title={displayPlus55}>
         {displayPlus55 || trimmed}
       </span>
-      <div className="flex shrink-0 items-center gap-1">
-        {waHref ? (
-          <a
-            href={waHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={TABLE_EXTERNAL_LINK_CHIP_CLASS}
-            aria-label={`Abrir WhatsApp ${displayPlus55}`}
-            title="Abrir no WhatsApp"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <WhatsAppIcon className="size-3" aria-hidden />
-          </a>
-        ) : (
-          <span
-            className="inline-flex size-[22px] shrink-0 items-center justify-center rounded-md border border-border/50 bg-muted/35 text-muted-foreground/45"
-            aria-hidden
-            title="WhatsApp indisponível"
-          >
-            <WhatsAppIcon className="size-3" aria-hidden />
-          </span>
-        )}
-        <LeadTableRouteAndProposalChips
-          lead={lead}
-          rowHasRoute={rowHasRoute}
-          publicSlugByReportId={publicSlugByReportId}
-          latestProposal={latestProposal}
-        />
-      </div>
     </div>
   );
 }
@@ -982,6 +932,16 @@ function LeadsPageContent() {
       setLoading(false);
     }
   }, [user]);
+
+  const leadsPath = usePathname();
+  const previousLeadsPath = useRef<string | null>(null);
+  useEffect(() => {
+    if (!user) return;
+    if (leadsPath === "/dashboard/leads" && previousLeadsPath.current != null && previousLeadsPath.current !== "/dashboard/leads") {
+      void fetchLeads();
+    }
+    previousLeadsPath.current = leadsPath;
+  }, [leadsPath, user, fetchLeads]);
 
   const publicSlugByReportId = useMemo(() => {
     const m = new Map<string, string>();
@@ -2374,15 +2334,27 @@ function LeadsPageContent() {
             <Loader2 className="animate-spin text-muted-foreground" size={40} />
           </div>
         ) : (
-          <Table ref={leadsTableRef} className="table-fixed">
+          <Table ref={leadsTableRef} className="table-fixed overflow-x-auto lg:overflow-hidden min-w-[1076px] w-full">
             <colgroup>
+              {/* Fixed: Checkbox */}
+              <col style={{ width: '44px' }} />
+              {/* Fixed: Followup */}
+              <col style={{ width: '88px' }} />
+              {/* Flexible: Nome, Empresa, E-mail */}
               {leadTableColWidthsPct.map((pct, i) => (
                 <col key={i} style={{ width: `${pct}%` }} />
               ))}
+              {/* Fixed: Redes, Telefone, Status, Chips, Actions */}
+              <col style={{ width: '96px' }} />
+              <col style={{ width: '210px' }} />
+              <col style={{ width: '150px' }} />
+              <col style={{ width: '56px' }} />
+              <col style={{ width: '72px' }} />
             </colgroup>
             <TableHeader>
               <TableRow className="border-border bg-muted/40 hover:bg-transparent dark:border-white/5 dark:bg-white/[0.03]">
-                <TableHead className="relative h-auto w-10 min-w-0 py-3 pl-6 pr-1 align-middle">
+                {/* Fixed: Checkbox */}
+                <TableHead style={{ width: '44px', minWidth: '44px' }} className="h-auto w-10 min-w-0 py-3 pl-6 pr-1 align-middle">
                   <input
                     ref={leadsTableHeaderCheckboxRef}
                     type="checkbox"
@@ -2392,60 +2364,53 @@ function LeadsPageContent() {
                     className="size-4 cursor-pointer rounded border-border accent-brand"
                     aria-label="Selecionar todos os leads desta página"
                   />
+                </TableHead>
+                {/* Fixed: Followup */}
+                <TableHead style={{ width: '88px', minWidth: '88px' }} className="h-auto px-3 py-3 align-middle text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  Followup
+                </TableHead>
+                {/* Flexible: Nome (handle 0 entre Nome|Empresa) */}
+                <TableHead style={{ minWidth: '120px' }} className="relative h-auto px-3 py-3 align-middle text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  Nome
                   <LeadTableColumnResizeHandle
                     leftColumnIndex={0}
                     onResizerMouseDown={onLeadTableColResizeMouseDown}
                   />
                 </TableHead>
-                <TableHead className="relative h-auto px-3 py-3 align-middle text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  Followup
+                {/* Flexible: Empresa (handle 1 entre Empresa|E-mail) */}
+                <TableHead style={{ minWidth: '120px' }} className="relative h-auto px-3 py-3 align-middle text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  Empresa
                   <LeadTableColumnResizeHandle
                     leftColumnIndex={1}
                     onResizerMouseDown={onLeadTableColResizeMouseDown}
                   />
                 </TableHead>
-                <TableHead className="relative h-auto px-3 py-3 align-middle text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  Nome
-                  <LeadTableColumnResizeHandle
-                    leftColumnIndex={2}
-                    onResizerMouseDown={onLeadTableColResizeMouseDown}
-                  />
-                </TableHead>
-                <TableHead className="relative h-auto px-3 py-3 align-middle text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  Empresa
-                  <LeadTableColumnResizeHandle
-                    leftColumnIndex={3}
-                    onResizerMouseDown={onLeadTableColResizeMouseDown}
-                  />
-                </TableHead>
-                <TableHead className="relative h-auto px-3 py-3 align-middle text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                {/* Flexible: E-mail (sem handle à direita — próxima é fixa) */}
+                <TableHead style={{ minWidth: '120px' }} className="h-auto px-3 py-3 align-middle text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                   E-mail
-                  <LeadTableColumnResizeHandle
-                    leftColumnIndex={4}
-                    onResizerMouseDown={onLeadTableColResizeMouseDown}
-                  />
                 </TableHead>
-                <TableHead className="relative h-auto px-3 py-3 align-middle text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                {/* Fixed: Redes */}
+                <TableHead style={{ width: '96px', minWidth: '96px' }} className="h-auto px-3 py-3 align-middle text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  Redes
+                </TableHead>
+                {/* Fixed: Telefone/Whatsapp */}
+                <TableHead style={{ width: '210px', minWidth: '210px' }} className="h-auto px-3 py-3 align-middle text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                   Telefone/Whatsapp
-                  <LeadTableColumnResizeHandle
-                    leftColumnIndex={5}
-                    onResizerMouseDown={onLeadTableColResizeMouseDown}
-                  />
                 </TableHead>
-                <TableHead className="relative h-auto px-3 py-3 align-middle text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                {/* Fixed: Status */}
+                <TableHead style={{ width: '150px', minWidth: '150px' }} className="h-auto px-3 py-3 align-middle text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                   Status
-                  <LeadTableColumnResizeHandle
-                    leftColumnIndex={6}
-                    onResizerMouseDown={onLeadTableColResizeMouseDown}
-                  />
                 </TableHead>
-                <TableHead className="h-auto min-w-[3rem] py-3 pl-3 pr-6 align-middle" />
+                {/* Fixed: Chips (sem título) */}
+                <TableHead style={{ width: '56px', minWidth: '56px' }} className="h-auto px-1 py-3 align-middle" />
+                {/* Fixed: Actions (sem título) */}
+                <TableHead style={{ width: '72px', minWidth: '72px' }} className="h-auto py-3 pl-3 pr-6 align-middle" />
               </TableRow>
             </TableHeader>
             <TableBody>
               {leads.length === 0 ? (
                 <TableRow className="border-b-0 hover:bg-transparent">
-                  <TableCell colSpan={8} className="text-center py-24">
+                  <TableCell colSpan={10} className="text-center py-24">
                     <div className="flex flex-col items-center gap-3">
                       <Users className="size-12 text-muted-foreground/50" />
                       <p className="font-medium text-muted-foreground">Nenhum lead encontrado.</p>
@@ -2454,7 +2419,7 @@ function LeadsPageContent() {
                 </TableRow>
               ) : filteredLeads.length === 0 ? (
                 <TableRow className="border-b-0 hover:bg-transparent">
-                  <TableCell colSpan={8} className="text-center py-16">
+                  <TableCell colSpan={10} className="text-center py-16">
                     <p className="font-medium text-muted-foreground">
                       Nenhum lead corresponde à busca ou ao status selecionado.
                     </p>
@@ -2478,6 +2443,10 @@ function LeadsPageContent() {
                   });
                   const websiteHref = normalizeWebsiteHref(lead.websiteUrl);
                   const instagramHref = normalizeInstagramHref(lead.instagramUrl);
+                  const phoneTrimmed = lead.phone?.trim() ?? "";
+                  const waDigits = phoneTrimmed ? leadPhoneDigitsForWhatsApp(phoneTrimmed) : "";
+                  const waHref = phoneTrimmed && isLikelyWhatsAppBr(phoneTrimmed) ? buildWhatsAppHref(waDigits) : null;
+                  const displayPlus55 = phoneTrimmed ? maskWhatsappBRDisplay(waDigits) : "";
                   return (
                   <TableRow
                     key={lead.id}
@@ -2508,20 +2477,24 @@ function LeadsPageContent() {
                       </Link>
                     </TableCell>
                     <TableCell className="px-3 py-4 align-middle">
-                      <div className="flex w-full min-w-0 items-center gap-2">
-                        <span
-                          className="min-w-0 flex-1 truncate text-sm font-medium text-foreground/90"
-                          title={lead.company}
-                        >
-                          {lead.company}
-                        </span>
-                        <div className="inline-flex shrink-0 items-center gap-1.5">
+                      <span
+                        className="block w-full min-w-0 truncate text-sm font-medium text-foreground/90"
+                        title={lead.company}
+                      >
+                        {lead.company}
+                      </span>
+                    </TableCell>
+                    <TableCell className="px-3 py-4 align-middle">
+                      <span className="block truncate text-sm font-medium text-foreground/90">{lead.email || "Sem e-mail"}</span>
+                    </TableCell>
+                    <TableCell className="px-3 py-4 align-middle">
+                      <div className="inline-flex shrink-0 items-center gap-1.5">
                         {websiteHref ? (
                           <a
                             href={websiteHref}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex size-[20px] shrink-0 items-center justify-center rounded-md border border-sky-500/35 bg-sky-500/12 text-sky-300 transition-colors hover:border-sky-400/45 hover:bg-sky-500/20 hover:text-sky-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sky-400/40"
+                            className="inline-flex size-[20px] shrink-0 items-center justify-center rounded border border-sky-500/35 bg-sky-500/12 text-sky-300 transition-colors hover:border-sky-400/45 hover:bg-sky-500/20 hover:text-sky-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sky-400/40"
                             aria-label={`Abrir site de ${lead.company}`}
                             title="Abrir website"
                             onClick={(e) => e.stopPropagation()}
@@ -2530,7 +2503,7 @@ function LeadsPageContent() {
                           </a>
                         ) : (
                           <span
-                            className="inline-flex size-[20px] shrink-0 items-center justify-center rounded-md border border-border/50 bg-muted/35 text-muted-foreground/45"
+                            className="inline-flex size-[20px] shrink-0 items-center justify-center rounded border border-border/50 bg-muted/35 text-muted-foreground/45"
                             aria-hidden
                             title="Website não cadastrado"
                           >
@@ -2542,7 +2515,7 @@ function LeadsPageContent() {
                             href={instagramHref}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex size-[20px] shrink-0 items-center justify-center rounded-md border border-pink-300/45 bg-gradient-to-r from-fuchsia-500/[0.07] via-rose-500/[0.08] to-amber-500/[0.07] text-pink-600 transition-colors hover:border-pink-300/65 hover:from-fuchsia-500/[0.11] hover:via-rose-500/[0.12] hover:to-amber-500/[0.11] hover:text-pink-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-pink-500/40 dark:border-pink-500/28 dark:from-fuchsia-500/[0.11] dark:via-rose-500/[0.10] dark:to-amber-500/[0.09] dark:text-pink-400"
+                            className="inline-flex size-[20px] shrink-0 items-center justify-center rounded border border-pink-300/45 bg-gradient-to-r from-fuchsia-500/[0.07] via-rose-500/[0.08] to-amber-500/[0.07] text-pink-600 transition-colors hover:border-pink-300/65 hover:from-fuchsia-500/[0.11] hover:via-rose-500/[0.12] hover:to-amber-500/[0.11] hover:text-pink-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-pink-500/40 dark:border-pink-500/28 dark:from-fuchsia-500/[0.11] dark:via-rose-500/[0.10] dark:to-amber-500/[0.09] dark:text-pink-400"
                             aria-label={`Abrir Instagram de ${lead.company}`}
                             title="Abrir Instagram"
                             onClick={(e) => e.stopPropagation()}
@@ -2552,18 +2525,35 @@ function LeadsPageContent() {
                         ) : null}
                         {!instagramHref ? (
                           <span
-                            className="inline-flex size-[20px] shrink-0 items-center justify-center rounded-md border border-border/50 bg-muted/35 text-muted-foreground/45"
+                            className="inline-flex size-[20px] shrink-0 items-center justify-center rounded border border-border/50 bg-muted/35 text-muted-foreground/45"
                             aria-hidden
                             title="Instagram não cadastrado"
                           >
                             <InstagramBrandGlyph className="size-3" aria-hidden />
                           </span>
                         ) : null}
-                        </div>
+                        {waHref ? (
+                          <a
+                            href={waHref}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={TABLE_EXTERNAL_LINK_CHIP_CLASS}
+                            aria-label={`Abrir WhatsApp ${displayPlus55}`}
+                            title="Abrir no WhatsApp"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <WhatsAppIcon className="size-3" aria-hidden />
+                          </a>
+                        ) : (
+                          <span
+                            className="inline-flex size-[20px] shrink-0 items-center justify-center rounded border border-border/50 bg-muted/35 text-muted-foreground/45"
+                            aria-hidden
+                            title="WhatsApp indisponível"
+                          >
+                            <WhatsAppIcon className="size-3" aria-hidden />
+                          </span>
+                        )}
                       </div>
-                    </TableCell>
-                    <TableCell className="px-3 py-4 align-middle">
-                      <span className="block truncate text-sm font-medium text-foreground/90">{lead.email || "Sem e-mail"}</span>
                     </TableCell>
                     <TableCell className="min-w-0 px-3 py-4 align-middle">
                       <LeadTablePhoneCell
@@ -2571,61 +2561,66 @@ function LeadsPageContent() {
                         phone={lead.phone}
                         lastCopiedLeadId={lastPhoneCopyLeadId}
                         onPhoneCopied={() => setLastPhoneCopyLeadId(lead.id)}
-                        rowHasRoute={rowHasRoute}
-                        publicSlugByReportId={publicSlugByReportId}
-                        latestProposal={latestProposalByLeadId.get(lead.id) ?? null}
                       />
                     </TableCell>
-                    <TableCell className="px-3 py-4 align-middle">
-                      <div className="inline-flex max-w-full items-center gap-2">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger
-                            title="Alterar status"
+                    <TableCell className="min-w-0 px-3 py-4 align-middle overflow-hidden">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          title="Alterar status"
+                          className={cn(
+                            "group/badge inline-flex h-5 min-h-5 w-fit max-w-full min-w-0 shrink cursor-pointer items-center justify-center gap-1 overflow-hidden rounded px-2.5 py-0.5 text-left text-[10px] font-bold uppercase tracking-wider shadow-sm outline-none transition-all focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:focus-visible:ring-ring/40",
+                            leadStatusDropdownTriggerSurface(lead.status),
+                          )}
+                        >
+                          <span
                             className={cn(
-                              "group/badge inline-flex h-5 min-h-5 w-fit max-w-full min-w-0 shrink cursor-pointer items-center justify-center gap-1 overflow-hidden rounded-md px-2.5 py-0.5 text-left text-[10px] font-bold uppercase tracking-wider shadow-sm outline-none transition-all focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:focus-visible:ring-ring/40",
-                              leadStatusDropdownTriggerSurface(lead.status),
+                              "mr-0.5 h-1.5 w-1.5 shrink-0 rounded-full",
+                              LEAD_STATUS_DOT_CLASSES[lead.status],
                             )}
-                          >
-                            <span
-                              className={cn(
-                                "mr-0.5 h-1.5 w-1.5 shrink-0 rounded-full",
-                                LEAD_STATUS_DOT_CLASSES[lead.status],
-                              )}
-                              aria-hidden
-                            />
-                            <span className="min-w-0 truncate">{lead.status}</span>
-                            <ChevronDown className="size-3 shrink-0 opacity-70" aria-hidden />
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="start" className="min-w-[13.5rem] p-1.5">
-                            <div className="px-2 pb-1.5 pt-0.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                              Status do funil
-                            </div>
-                            {ALL_STATUSES.map((s) => (
-                              <DropdownMenuItem
-                                key={s}
-                                disabled={
-                                  lead.status === s || !isLeadStatusSelectable(s, rowHasRoute, lead.status)
-                                }
-                                className="gap-2.5 rounded-md py-2"
-                                onClick={() => void handleLeadStatusChange(lead, s)}
-                              >
-                                <span
-                                  className={cn(
-                                    "size-2 shrink-0 rounded-full ring-1 ring-black/8 dark:ring-white/10",
-                                    LEAD_STATUS_MENU_DOT_CLASSES[s],
-                                  )}
-                                  aria-hidden
-                                />
-                                <span className="min-w-0 flex-1 text-left">{s}</span>
-                                {lead.status === s ? (
-                                  <span className="text-[10px] font-medium uppercase text-muted-foreground">
-                                    atual
-                                  </span>
-                                ) : null}
-                              </DropdownMenuItem>
-                            ))}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                            aria-hidden
+                          />
+                          <span className="min-w-0 truncate">{lead.status}</span>
+                          <ChevronDown className="size-3 shrink-0 opacity-70" aria-hidden />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="min-w-[13.5rem] p-1.5">
+                          <div className="px-2 pb-1.5 pt-0.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                            Status do funil
+                          </div>
+                          {ALL_STATUSES.map((s) => (
+                            <DropdownMenuItem
+                              key={s}
+                              disabled={
+                                lead.status === s || !isLeadStatusSelectable(s, rowHasRoute, lead.status)
+                              }
+                              className="gap-2.5 rounded-md py-2"
+                              onClick={() => void handleLeadStatusChange(lead, s)}
+                            >
+                              <span
+                                className={cn(
+                                  "size-2 shrink-0 rounded-full ring-1 ring-black/8 dark:ring-white/10",
+                                  LEAD_STATUS_MENU_DOT_CLASSES[s],
+                                )}
+                                aria-hidden
+                              />
+                              <span className="min-w-0 flex-1 text-left">{s}</span>
+                              {lead.status === s ? (
+                                <span className="text-[10px] font-medium uppercase text-muted-foreground">
+                                  atual
+                                </span>
+                              ) : null}
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                    <TableCell className="px-1 py-4 align-middle">
+                      <div className="flex items-center justify-center gap-1">
+                        <LeadTableRouteAndProposalChips
+                          lead={lead}
+                          rowHasRoute={rowHasRoute}
+                          publicSlugByReportId={publicSlugByReportId}
+                          latestProposal={latestProposalByLeadId.get(lead.id) ?? null}
+                        />
                       </div>
                     </TableCell>
                     <TableCell className="py-4 pl-3 pr-6 text-right align-middle">

@@ -33,5 +33,6 @@ export function isLeadStatusSelectable(
   if (status === "Novo Lead" && hasRoute) return false;
   if (status === "Em Contato" && hasRoute) return false;
   if (status === "Rota Gerada" && !hasRoute) return false;
+  // Proposta → Rota Gerada é permitido (e após re-gerar a rota o cliente força "Rota Gerada").
   return true;
 }

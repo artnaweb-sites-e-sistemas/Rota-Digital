@@ -7,20 +7,31 @@ import {
   type RefObject,
 } from "react";
 
-export const LEADS_TABLE_COLUMN_COUNT = 8;
+/**
+ * Número de colunas FLEXÍVEIS (Nome, Empresa, E-mail).
+ * As colunas fixas (Checkbox, Followup, Redes, Telefone, Status, Chips, Actions)
+ * são definidas em pixel no page.tsx.
+ */
+export const LEADS_TABLE_COLUMN_COUNT = 3;
 
-const STORAGE_KEY = "rota-digital.leads-table-column-widths-pct.v2";
+const STORAGE_KEY = "rota-digital.leads-table-column-widths-pct.v6";
 
-/** Percentuais iniciais: coluna 0 = seleção (somatório 100). */
-const DEFAULT_WIDTHS_PCT: readonly number[] = [3, 10, 16, 17, 21, 15, 11, 7];
+/** Percentuais das 3 colunas flexíveis (somatório 100). */
+const DEFAULT_WIDTHS_PCT: readonly number[] = [30, 30, 40];
 
-const MIN_COL_PCT = 3;
+const MIN_COL_PCT = 10;
+
+/**
+ * Soma total das colunas fixas em pixels.
+ * Checkbox(44) + Followup(88) + Redes(96) + Telefone(210) + Status(150) + Chips(56) + Actions(72) = 716
+ */
+export const LEADS_TABLE_FIXED_TOTAL_PX = 716;
 
 function round1(n: number): number {
   return Math.round(n * 10) / 10;
 }
 
-/** Garante 8 valores, mínimos e soma 100. */
+/** Garante 3 valores, mínimos e soma 100. */
 export function normalizeLeadTableWidths(input: unknown): number[] {
   if (!Array.isArray(input) || input.length !== LEADS_TABLE_COLUMN_COUNT) {
     return [...DEFAULT_WIDTHS_PCT];
@@ -57,7 +68,7 @@ export function saveLeadTableWidths(widths: readonly number[]): void {
 
 /**
  * Ajusta o par de colunas adjacentes `leftIndex` e `leftIndex + 1` mantendo a soma do par.
- * `dPct` é a variação em pontos percentuais da largura da tabela (positivo = coluna da esquerda cresce).
+ * `dPct` é a variação em pontos percentuais do ESPAÇO FLEXÍVEL (positivo = coluna da esquerda cresce).
  */
 export function applyAdjacentColumnResize(
   startWidths: readonly number[],
@@ -106,8 +117,10 @@ export function useLeadTableColumnWidths(
       const d = dragRef.current;
       if (!d || !tableRef.current) return;
       const tw = tableRef.current.getBoundingClientRect().width;
-      if (tw < 80) return;
-      const dPct = ((e.clientX - d.startX) / tw) * 100;
+      const flexiblePx = tw - LEADS_TABLE_FIXED_TOTAL_PX;
+      if (flexiblePx < 80) return;
+      // Calcular dPct em relação ao espaço FLEXÍVEL (não da tabela inteira)
+      const dPct = ((e.clientX - d.startX) / flexiblePx) * 100;
       const next = applyAdjacentColumnResize(d.startWidths, d.leftIndex, dPct);
       widthsRef.current = next;
       setWidths(next);
