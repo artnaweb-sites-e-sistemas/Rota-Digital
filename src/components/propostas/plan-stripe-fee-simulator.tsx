@@ -67,7 +67,7 @@ export function PlanStripeFeeSimulator({
         </div>
         <div className="flex justify-between">
           <span>Condição (estimativa):</span>
-          <span>{n === 1 ? "À vista" : `Até ${n}x no cartão`}</span>
+          <span>{n === 1 ? "À vista" : `${n}x no cartão`}</span>
         </div>
         <div className="flex justify-between">
           <span>Taxa Stripe estimada:</span>

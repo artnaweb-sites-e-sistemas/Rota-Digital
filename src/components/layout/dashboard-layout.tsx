@@ -424,7 +424,12 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             </p>
           </div>
           <nav className="flex-1 space-y-1 p-3">
-            {settingsSubItems.map((sub) => {
+            {settingsSubItems
+              .filter(
+                (sub) =>
+                  sub.href !== "/dashboard/settings/pagamentos" || sidebarPlan === "Master",
+              )
+              .map((sub) => {
               const subActive = pathname === sub.href;
               return (
                 <Link

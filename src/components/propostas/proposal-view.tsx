@@ -15,6 +15,7 @@ import {
   FileText,
   Globe,
   ImagePlus,
+  Link2,
   ListChecks,
   Loader2,
   MapPin,
@@ -59,6 +60,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { formatCurrencyInput, normalizePriceForCurrencyInput } from "@/lib/currency-brl-input";
 import { DEFAULT_PROPOSAL_NEXT_STEPS } from "@/lib/proposal-default-next-steps";
@@ -83,6 +85,7 @@ import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { useAuth } from "@/lib/auth-context";
 import { PlanLimitModal, type PlanLimitModalState } from "@/components/limits/plan-limit-modal";
+import { planIdFromUserSettings } from "@/lib/plan-limits";
 import { normalizedSubscriptionPlanKey, planAllowsCustomLogo, type PlanKey } from "@/lib/plan-quotas";
 import { getUserCompanyAboutSettings, getUserReportCtaSettings } from "@/lib/user-settings";
 import { maskPhoneDisplayLoose, resolveReportCtas, type ResolvedReportCta } from "@/lib/report-cta";
@@ -319,7 +322,7 @@ function ProposalNextStepsSpotlight({
             aria-label={ctaCopy.ariaLabel}
             className={cn(
               buttonVariants({ variant: "ctaMotionGreen", size: "lg" }),
-              "no-print box-border h-10 min-h-10 items-center justify-center gap-2 overflow-hidden px-4 md:px-5",
+              "rd-cta-hover-glow no-print box-border h-10 min-h-10 items-center justify-center gap-2 rounded-full px-4 md:px-5",
               "flex w-full min-w-0 max-w-full md:inline-flex md:w-auto md:max-w-none md:shrink-0",
             )}
           >
@@ -776,6 +779,26 @@ function planToEditDraft(p: ProposalPlan, kind: "spot" | "recurring"): ProposalP
   };
 }
 
+/** Rótulo no select de parcelas (o trigger precisa do texto explícito — senão mostra só o value "1"). */
+function installmentSelectLabel(raw: unknown): string {
+  const n = normalizeMaxCardInstallments(raw);
+  return n === 1 ? "À vista" : `${n}×`;
+}
+
+/** URL guardada: `https://` se faltar; vazio remove o link. */
+function proposalPlanPaymentUrlForSave(raw: string | undefined): string | undefined {
+  let t = (raw ?? "").trim();
+  if (!t) return undefined;
+  if (!/^https?:\/\//i.test(t)) t = `https://${t}`;
+  return t;
+}
+
+function paymentUrlForLink(raw: string | undefined): string {
+  const t = (raw ?? "").trim();
+  if (!t) return "";
+  return /^https?:\/\//i.test(t) ? t : `https://${t}`;
+}
+
 /** 1 → I, 2 → II, … (numeração por coluna: só pontuais ou só recorrentes). */
 function planOrdinalRoman(ordinal: number): string {
   if (!Number.isFinite(ordinal) || ordinal < 1) return "I";
@@ -864,6 +887,7 @@ function ProposalPlanCard({
         maxCardInstallments: recurring ? 1 : normalizeMaxCardInstallments(draft.maxCardInstallments),
         paymentTerms: draft.paymentTerms.trim(),
         paymentMethods: sortPaymentMethods(normalizePlanPaymentMethods(draft.paymentMethods)),
+        paymentUrl: proposalPlanPaymentUrlForSave(draft.paymentUrl),
       });
       setEditing(false);
     } finally {
@@ -1013,7 +1037,12 @@ function ProposalPlanCard({
                 placeholder="Liste os entregáveis incluídos neste plano."
               />
             </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div
+              className={cn(
+                "grid grid-cols-1 gap-3",
+                isSpot ? "sm:grid-cols-3" : "sm:grid-cols-2",
+              )}
+            >
               <div className="space-y-2">
                 <Label htmlFor={`plan-price-${plan.id}`} className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Valor
@@ -1045,10 +1074,34 @@ function ProposalPlanCard({
                 />
               </div>
               {isSpot ? (
-                <p className="text-xs leading-relaxed text-muted-foreground sm:col-span-2">
-                  O total e as parcelas de exemplo (até {normalizeMaxCardInstallments(draft.maxCardInstallments)}×) aparecem
-                  na proposta; o cliente escolhe o número de parcelas no pagamento.
-                </p>
+                <div className="space-y-2">
+                  <Label
+                    htmlFor={`plan-max-installments-${plan.id}`}
+                    className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                  >
+                    Parcelas
+                  </Label>
+                  <Select
+                    value={String(normalizeMaxCardInstallments(draft.maxCardInstallments))}
+                    onValueChange={(v) =>
+                      setDraft((d) => ({
+                        ...d,
+                        maxCardInstallments: normalizeMaxCardInstallments(Number(v)),
+                      }))
+                    }
+                  >
+                    <SelectTrigger id={`plan-max-installments-${plan.id}`} className="h-10 w-full">
+                      <SelectValue>{installmentSelectLabel(draft.maxCardInstallments)}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: PROPOSAL_PLAN_MAX_INSTALLMENTS }, (_, i) => i + 1).map((n) => (
+                        <SelectItem key={n} value={String(n)}>
+                          {installmentSelectLabel(n)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               ) : null}
             </div>
             <div className="space-y-2">
@@ -1069,6 +1122,35 @@ function ProposalPlanCard({
                 onChange={(next) => setDraft((d) => ({ ...d, paymentMethods: next }))}
                 disabled={saving}
               />
+            </div>
+
+            <div
+              className="border-t border-border/60 pt-4 dark:border-white/10"
+              role="separator"
+              aria-hidden
+            />
+            <div className="space-y-2">
+              <Label
+                htmlFor={`plan-payment-url-${plan.id}`}
+                className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+              >
+                Link de pagamento <span className="font-normal normal-case text-muted-foreground/80">(opcional)</span>
+              </Label>
+              <div className="relative">
+                <Link2
+                  className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                  aria-hidden
+                />
+                <Input
+                  id={`plan-payment-url-${plan.id}`}
+                  value={draft.paymentUrl ?? ""}
+                  onChange={(e) => setDraft((d) => ({ ...d, paymentUrl: e.target.value }))}
+                  placeholder="https://"
+                  className="h-10 pl-9"
+                  inputMode="url"
+                  autoComplete="off"
+                />
+              </div>
             </div>
           </div>
         ) : (
@@ -1225,20 +1307,29 @@ function ProposalPlanCard({
               );
             })()}
 
-            {variant === "public" && plan.paymentUrl?.trim() ? (
-              <div className="border-t border-white/10 pt-4 mt-4">
+            {plan.paymentUrl?.trim() ? (
+              <div
+                className={cn(
+                  "border-t border-border/60 pt-4 dark:border-white/10",
+                  variant === "public" && "mt-1",
+                )}
+              >
                 <a
-                  href={plan.paymentUrl}
+                  href={paymentUrlForLink(plan.paymentUrl)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className={cn(
-                    buttonVariants({ variant: "cta", size: "lg" }),
-                    "w-full justify-center",
+                    buttonVariants({
+                      variant: isSpot ? "ctaMotion" : "ctaMotionGreen",
+                      size: "lg",
+                    }),
+                    "no-print flex w-full min-h-11 items-center justify-center gap-2 rounded-full px-6 py-3.5 text-base font-semibold",
                   )}
                 >
                   {isSpot && normalizeMaxCardInstallments(plan.maxCardInstallments) > 1
                     ? "Pagar (parcelas no checkout)"
                     : "Contratar este plano"}
+                  <ExternalLink className="size-4 shrink-0 opacity-95" aria-hidden />
                 </a>
               </div>
             ) : null}
@@ -1539,6 +1630,8 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
     }
   };
   const [planKeyForLogo, setPlanKeyForLogo] = useState<PlanKey>("starter");
+  /** Integração Stripe/MP (painel de links) só para contas com plano Master. */
+  const [showPaymentIntegrationsForMaster, setShowPaymentIntegrationsForMaster] = useState(false);
   /** null = a carregar; false = Starter sem direito a marca / personalização institucional nesta proposta. */
   const [agencyImageUploadAllowed, setAgencyImageUploadAllowed] = useState<boolean | null>(null);
   const [editingAgencySummary, setEditingAgencySummary] = useState(false);
@@ -1639,6 +1732,7 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
   useEffect(() => {
     if (!isDashboard || !proposal.userId) {
       setAgencyImageUploadAllowed(null);
+      setShowPaymentIntegrationsForMaster(false);
       return;
     }
     let cancelled = false;
@@ -1649,13 +1743,18 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
         if (!snap.exists()) {
           setPlanKeyForLogo("starter");
           setAgencyImageUploadAllowed(false);
+          setShowPaymentIntegrationsForMaster(false);
           return;
         }
         const raw = snap.data() as Record<string, unknown>;
         setPlanKeyForLogo(normalizedSubscriptionPlanKey(raw.subscriptionPlan ?? raw.plan));
+        setShowPaymentIntegrationsForMaster(planIdFromUserSettings(raw) === "master");
         setAgencyImageUploadAllowed(planAllowsCustomLogo(raw));
       } catch {
-        if (!cancelled) setAgencyImageUploadAllowed(false);
+        if (!cancelled) {
+          setAgencyImageUploadAllowed(false);
+          setShowPaymentIntegrationsForMaster(false);
+        }
       }
     };
     void load();
@@ -2431,46 +2530,6 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
                 Proposta para:
               </p>
               <div className="mt-4 grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-3.5 text-sm text-muted-foreground sm:gap-x-5 sm:gap-y-4">
-                {(displayLead.websiteUrl || displayLead.instagramUrl || displayLead.gmbUrl) && (
-                  <>
-                    <span className="shrink-0 flex items-center">Links</span>
-                    <div className="flex items-center gap-2">
-                      {displayLead.websiteUrl && (
-                        <a 
-                          href={displayLead.websiteUrl.startsWith("http") ? displayLead.websiteUrl : `https://${displayLead.websiteUrl}`} 
-                          target="_blank" 
-                          rel="noreferrer" 
-                          title="Site"
-                          className="flex h-6 w-6 items-center justify-center rounded-md border border-[#3B82F6]/30 bg-[#3B82F6]/5 text-[#3B82F6] transition-colors hover:border-[#3B82F6]/50 hover:bg-[#3B82F6]/10"
-                        >
-                          <Globe className="size-3.5" />
-                        </a>
-                      )}
-                      {displayLead.instagramUrl && (
-                        <a 
-                          href={displayLead.instagramUrl.startsWith("http") ? displayLead.instagramUrl : `https://instagram.com/${displayLead.instagramUrl.replace(/^@/, "")}`} 
-                          target="_blank" 
-                          rel="noreferrer" 
-                          title="Instagram"
-                          className="flex h-6 w-6 items-center justify-center rounded-md border-[#E4405F]/30 bg-[#E4405F]/5 text-[#E4405F] transition-colors hover:border-[#E4405F]/50 hover:bg-[#E4405F]/10"
-                        >
-                          <AtSign className="size-3.5" />
-                        </a>
-                      )}
-                      {displayLead.gmbUrl && (
-                        <a 
-                          href={displayLead.gmbUrl} 
-                          target="_blank" 
-                          rel="noreferrer" 
-                          title="Google Meu Negócio"
-                          className="flex h-6 w-6 items-center justify-center rounded-md border-[#8B5CF6]/30 bg-[#8B5CF6]/5 text-[#8B5CF6] transition-colors hover:border-[#8B5CF6]/50 hover:bg-[#8B5CF6]/10"
-                        >
-                          <MapPin className="size-3.5" />
-                        </a>
-                      )}
-                    </div>
-                  </>
-                )}
                 <span className="shrink-0">Cliente</span>
                 <span className="min-w-0 font-medium leading-5 text-foreground">{displayLead.name}</span>
                 <span className="shrink-0">Empresa</span>
@@ -2522,6 +2581,69 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
                     </button>
                   )}
                 </span>
+                {(displayLead.websiteUrl || displayLead.instagramUrl || displayLead.gmbUrl) ? (
+                  <span
+                    className="col-span-2 -mx-0.5 mt-0.5 border-t border-border/70 dark:border-white/12"
+                    aria-hidden
+                  />
+                ) : null}
+                {displayLead.websiteUrl ? (
+                  <>
+                    <span className="shrink-0 flex items-center gap-1.5">
+                      <Globe className="size-4 text-brand" aria-hidden />
+                      Website:
+                    </span>
+                    <a
+                      href={hrefIfWebsite(displayLead.websiteUrl)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex min-w-0 w-fit max-w-full items-center gap-1.5 font-medium text-foreground underline decoration-brand/35 underline-offset-2 transition-colors hover:text-brand"
+                    >
+                      Acessar
+                      <ExternalLink className="size-3.5 shrink-0" aria-hidden />
+                    </a>
+                  </>
+                ) : null}
+                {displayLead.instagramUrl ? (
+                  <>
+                    <span className="shrink-0 flex items-center gap-1.5">
+                      <AtSign className="size-4 text-brand" aria-hidden />
+                      Instagram:
+                    </span>
+                    <a
+                      href={hrefIfInstagram(displayLead.instagramUrl)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex min-w-0 w-fit max-w-full items-center gap-1.5 font-medium text-foreground underline decoration-brand/35 underline-offset-2 transition-colors hover:text-brand"
+                    >
+                      @{displayLead.instagramUrl
+                        .trim()
+                        .replace(/^@/, "")
+                        .replace(/^https?:\/\/(www\.)?instagram\.com\//i, "")
+                        .replace(/^instagram\.com\//i, "")
+                        .replace(/[?#].*$/, "")
+                        .replace(/\/+$/, "")}
+                      <ExternalLink className="size-3.5 shrink-0" aria-hidden />
+                    </a>
+                  </>
+                ) : null}
+                {displayLead.gmbUrl ? (
+                  <>
+                    <span className="shrink-0 flex items-center gap-1.5">
+                      <MapPin className="size-4 text-brand" aria-hidden />
+                      Google Meu Negócio:
+                    </span>
+                    <a
+                      href={hrefIfWebsite(displayLead.gmbUrl)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex min-w-0 w-fit max-w-full items-center gap-1.5 font-medium text-foreground underline decoration-brand/35 underline-offset-2 transition-colors hover:text-brand"
+                    >
+                      Acessar
+                      <ExternalLink className="size-3.5 shrink-0" aria-hidden />
+                    </a>
+                  </>
+                ) : null}
               </div>
             </div>
 
@@ -2938,7 +3060,7 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
         }
       />
 
-      {isDashboard ? (
+      {isDashboard && showPaymentIntegrationsForMaster ? (
         <PaymentLinksPanel proposal={proposal} onProposalChange={onProposalChange} />
       ) : null}
 

@@ -17,7 +17,7 @@ export function proposalPlanPromoBadgeClassName(): string {
   return cn(
     "pointer-events-none absolute right-3 top-0 z-[1] inline-flex shrink-0 items-center justify-center gap-0.5 rounded-t-md rounded-b-none border-x border-t border-b-0 px-1.5 py-0.5 text-[10px] font-semibold leading-none whitespace-nowrap tabular-nums sm:right-5 sm:px-2 sm:py-0.5 sm:text-[11px] shadow-sm dark:shadow-none",
     "-translate-y-[calc(100%-3px)]",
-    "!border-red-800 !bg-red-600 !text-white dark:!border-red-500 dark:!bg-red-600 dark:!text-white",
+    "!border-rose-900/85 !bg-rose-700 !text-rose-50 dark:!border-rose-400/55 dark:!bg-rose-600 dark:!text-white",
   );
 }
 

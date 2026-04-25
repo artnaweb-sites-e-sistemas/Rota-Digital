@@ -73,12 +73,11 @@ export function PlanPriceHero({
             multClass,
           )}
         >
-          até {n}
+          {n}
           <span className="translate-y-px text-[0.82em] font-bold" aria-hidden>
             ×
           </span>
         </span>
-        <span className="text-sm font-medium text-muted-foreground sm:text-base">de</span>
         <span className={heroPriceClass}>{installmentAmountLabel}</span>
       </p>
       <p className="text-[11px] font-medium tabular-nums text-muted-foreground sm:text-xs">

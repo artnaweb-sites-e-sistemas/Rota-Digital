@@ -294,6 +294,35 @@ html {
   }
 }
 
+/* CTA: brilho único no hover (sem scale) para destaque elegante. */
+@keyframes rd-cta-hover-glow-once {
+  0% {
+    box-shadow:
+      0 0 0 0 color-mix(in srgb, var(--brand) 0%, transparent),
+      0 0 0 0 color-mix(in srgb, var(--brand) 0%, transparent);
+  }
+  40% {
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--brand) 42%, transparent),
+      0 0 26px 2px color-mix(in srgb, var(--brand) 48%, transparent);
+  }
+  100% {
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--brand) 26%, transparent),
+      0 0 10px -2px color-mix(in srgb, var(--brand) 24%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .rd-cta-hover-glow {
+    will-change: box-shadow;
+    transform: translateZ(0);
+  }
+  .rd-cta-hover-glow:hover {
+    animation: rd-cta-hover-glow-once 560ms cubic-bezier(0.16, 1, 0.3, 1) 1;
+  }
+}
+
 /* BorderGlow mobile: brilho “estrela” nas bordas (radiais em movimento). */
 @keyframes rota-star-movement-bottom {
   0% {
