@@ -15,13 +15,7 @@ type CreatePaymentLinkBody = {
   discountAmount?: number;
 };
 
-async function createLink(
-  stripe: Stripe,
-  accountId: string,
-  name: string,
-  amountCents: number,
-  installments?: number,
-) {
+async function createLink(stripe: Stripe, accountId: string, name: string, amountCents: number) {
   const product = await stripe.products.create(
     { name },
     { stripeAccount: accountId },
@@ -41,14 +35,10 @@ async function createLink(
   ];
   const requestOptions: Stripe.RequestOptions = { stripeAccount: accountId };
 
-  // Payment Link `create` only allows a small subset in `payment_intent_data` (metadata, capture_method, etc.).
-  // Não suporta `payment_method_options` — a API devolve "unknown parameter" se enviarmos.
-  // Parcelas no cartão (BR) seguem a configuração da conta conectada no Dashboard Stripe.
-  const params: Stripe.PaymentLinkCreateParams =
-    installments && installments > 1
-      ? { line_items: lineItems, payment_method_types: ["card"] }
-      : { line_items: lineItems };
-
+  // Não passar `payment_method_types: ['card']` na conta conectada: se o cartão não estiver
+  // ativado exatamente nesse modo, a Stripe responde "No valid payment method types".
+  // Sem o parâmetro, a Stripe mostra os métodos ativos e compatíveis com BRL (doc: Payment Link create).
+  const params: Stripe.PaymentLinkCreateParams = { line_items: lineItems };
   const paymentLink = await stripe.paymentLinks.create(params, requestOptions);
   return paymentLink.url;
 }
@@ -77,20 +67,14 @@ export async function POST(req: NextRequest) {
   }
 
   const body = (await req.json().catch(() => ({}))) as CreatePaymentLinkBody;
-  const { accountId, planName, amount, installments, discountAmount } = body;
+  const { accountId, planName, amount, discountAmount } = body;
 
   if (!accountId || !planName || !amount || amount <= 0) {
     return NextResponse.json({ error: "Parâmetros inválidos." }, { status: 400 });
   }
 
   try {
-    const url = await createLink(
-      stripe,
-      accountId,
-      planName,
-      amount,
-      installments,
-    );
+    const url = await createLink(stripe, accountId, planName, amount);
 
     let urlDiscount: string | undefined;
     if (discountAmount && discountAmount > 0 && discountAmount < amount) {
