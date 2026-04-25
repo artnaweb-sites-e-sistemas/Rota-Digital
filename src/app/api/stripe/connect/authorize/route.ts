@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuth } from "firebase-admin/auth";
 import { getFirebaseAdminApp } from "@/lib/firebase-admin-app";
+import { resolvePublicAppBaseUrl } from "@/lib/request-origin";
 
 export const runtime = "nodejs";
 
@@ -14,13 +15,17 @@ export async function GET(req: NextRequest) {
   }
 
   const clientId = process.env.STRIPE_CONNECT_CLIENT_ID?.trim();
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL?.trim();
-  if (!clientId || !baseUrl) {
+  if (!clientId) {
     return NextResponse.json(
-      { error: "STRIPE_CONNECT_CLIENT_ID ou NEXT_PUBLIC_BASE_URL não configurados." },
+      {
+        error:
+          "STRIPE_CONNECT_CLIENT_ID não configurado. No Dashboard Stripe: Connect → obtenha o Client ID (ca_…) e adicione no .env ou nas variáveis de ambiente da Vercel.",
+      },
       { status: 503 },
     );
   }
+
+  const baseUrl = resolvePublicAppBaseUrl(req);
 
   const authHeader = req.headers.get("authorization") ?? "";
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";

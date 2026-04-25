@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 import { getFirebaseAdminApp } from "@/lib/firebase-admin-app";
+import { resolvePublicAppBaseUrl } from "@/lib/request-origin";
 
 export const runtime = "nodejs";
 
@@ -11,7 +12,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL("/dashboard/settings/pagamentos?error=server", req.url));
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL?.trim() ?? "";
+  const baseUrl = resolvePublicAppBaseUrl(req);
   const stripeSecret = process.env.STRIPE_SECRET_KEY?.trim();
   if (!stripeSecret) {
     return NextResponse.redirect(new URL("/dashboard/settings/pagamentos?error=config", baseUrl || req.url));
