@@ -9,6 +9,11 @@ export function proposalLeadSnapshotFromLead(lead: Lead): ProposalLeadSnapshot {
     ...(lead.phone?.trim() ? { phone: lead.phone.trim() } : {}),
     ...(lead.websiteUrl?.trim() ? { websiteUrl: lead.websiteUrl.trim() } : {}),
     ...(lead.instagramUrl?.trim() ? { instagramUrl: lead.instagramUrl.trim() } : {}),
+    ...(lead.gmbGoogleMapsUri?.trim()
+      ? { gmbUrl: lead.gmbGoogleMapsUri.trim() }
+      : lead.gmbPlaceId?.trim()
+        ? { gmbUrl: `https://www.google.com/maps/search/?api=1&query=Google&query_place_id=${lead.gmbPlaceId.trim()}` }
+        : {}),
   };
 }
 
@@ -23,7 +28,8 @@ export function proposalLeadSnapshotsDiffer(a: ProposalLeadSnapshot, b: Proposal
     norm(a.email) !== norm(b.email) ||
     norm(a.phone) !== norm(b.phone) ||
     norm(a.websiteUrl) !== norm(b.websiteUrl) ||
-    norm(a.instagramUrl) !== norm(b.instagramUrl)
+    norm(a.instagramUrl) !== norm(b.instagramUrl) ||
+    norm(a.gmbUrl) !== norm(b.gmbUrl)
   );
 }
 

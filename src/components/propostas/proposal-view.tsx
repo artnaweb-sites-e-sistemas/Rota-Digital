@@ -2491,6 +2491,46 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
                 Proposta para:
               </p>
               <div className="mt-4 grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-3.5 text-sm text-muted-foreground sm:gap-x-5 sm:gap-y-4">
+                {(displayLead.websiteUrl || displayLead.instagramUrl || displayLead.gmbUrl) && (
+                  <>
+                    <span className="shrink-0 flex items-center">Links</span>
+                    <div className="flex items-center gap-2">
+                      {displayLead.websiteUrl && (
+                        <a 
+                          href={displayLead.websiteUrl.startsWith("http") ? displayLead.websiteUrl : `https://${displayLead.websiteUrl}`} 
+                          target="_blank" 
+                          rel="noreferrer" 
+                          title="Site"
+                          className="flex h-6 w-6 items-center justify-center rounded-md border border-[#3B82F6]/30 bg-[#3B82F6]/5 text-[#3B82F6] transition-colors hover:border-[#3B82F6]/50 hover:bg-[#3B82F6]/10"
+                        >
+                          <Globe className="size-3.5" />
+                        </a>
+                      )}
+                      {displayLead.instagramUrl && (
+                        <a 
+                          href={displayLead.instagramUrl.startsWith("http") ? displayLead.instagramUrl : `https://instagram.com/${displayLead.instagramUrl.replace(/^@/, "")}`} 
+                          target="_blank" 
+                          rel="noreferrer" 
+                          title="Instagram"
+                          className="flex h-6 w-6 items-center justify-center rounded-md border-[#E4405F]/30 bg-[#E4405F]/5 text-[#E4405F] transition-colors hover:border-[#E4405F]/50 hover:bg-[#E4405F]/10"
+                        >
+                          <AtSign className="size-3.5" />
+                        </a>
+                      )}
+                      {displayLead.gmbUrl && (
+                        <a 
+                          href={displayLead.gmbUrl} 
+                          target="_blank" 
+                          rel="noreferrer" 
+                          title="Google Meu Negócio"
+                          className="flex h-6 w-6 items-center justify-center rounded-md border-[#8B5CF6]/30 bg-[#8B5CF6]/5 text-[#8B5CF6] transition-colors hover:border-[#8B5CF6]/50 hover:bg-[#8B5CF6]/10"
+                        >
+                          <MapPin className="size-3.5" />
+                        </a>
+                      )}
+                    </div>
+                  </>
+                )}
                 <span className="shrink-0">Cliente</span>
                 <span className="min-w-0 font-medium leading-5 text-foreground">{displayLead.name}</span>
                 <span className="shrink-0">Empresa</span>

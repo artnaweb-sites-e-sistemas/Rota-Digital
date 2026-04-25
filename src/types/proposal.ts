@@ -27,6 +27,7 @@ export type ProposalLeadSnapshot = {
   phone?: string;
   websiteUrl?: string;
   instagramUrl?: string;
+  gmbUrl?: string;
 };
 
 export type ProposalCompanyProfileSnapshot = {
