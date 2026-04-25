@@ -8,7 +8,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { doc, getDoc } from "firebase/firestore";
 import { useAuth } from "@/lib/auth-context";
+import { db } from "@/lib/firebase";
 import { createEmptyProposalPlan } from "@/lib/proposal-plan-factory";
 import { normalizeInstallmentCount } from "@/lib/proposal-plan-installments";
 import { clonePlansForNewProposal, normalizeRecurringPlansForSave } from "@/lib/proposal-plan-coerce";
@@ -170,6 +172,7 @@ export default function NewProposalPage() {
   const [recurringPlans, setRecurringPlans] = useState<ProposalPlan[]>([newPlan()]);
 
   const [companyAboutSettings, setCompanyAboutSettings] = useState<UserCompanyAboutSettings | null>(null);
+  const [stripeConnected, setStripeConnected] = useState(false);
   const plansSeededRef = useRef(false);
 
   const selectedLead = useMemo(
@@ -229,12 +232,17 @@ export default function NewProposalPage() {
       if (!user) return;
       setLoadingContext(true);
       try {
-        const [companyAbout, report] = await Promise.all([
+        const [companyAbout, report, settingsSnap] = await Promise.all([
           getUserCompanyAboutSettings(user.uid),
           leadId ? getReportByLead(leadId, user.uid) : Promise.resolve(null),
+          getDoc(doc(db, "userSettings", user.uid)),
         ]);
         setCompanyAboutSettings(companyAbout);
         setLinkedReport(report);
+        if (settingsSnap.exists()) {
+          const data = settingsSnap.data() as Record<string, unknown>;
+          setStripeConnected(typeof data.stripeConnectAccountId === "string" && data.stripeConnectAccountId.length > 0);
+        }
 
         if (!plansSeededRef.current) {
           plansSeededRef.current = true;
@@ -360,10 +368,26 @@ export default function NewProposalPage() {
       return;
     }
 
-    const cleanSpotPlans = spotPlans.filter(planHasContent);
-    const cleanRecurringPlans = recurringPlans.filter(planHasContent);
+    const cleanSpotPlans = spotPlans.filter(planHasContent).map((p) => {
+      const url = p.paymentUrl?.trim();
+      return { ...p, paymentUrl: url && url.startsWith("https://") ? url : undefined };
+    });
+    const cleanRecurringPlans = recurringPlans.filter(planHasContent).map((p) => {
+      const url = p.paymentUrl?.trim();
+      return { ...p, paymentUrl: url && url.startsWith("https://") ? url : undefined };
+    });
     if (!cleanSpotPlans.length && !cleanRecurringPlans.length) {
       setError("Preencha pelo menos um plano na proposta.");
+      return;
+    }
+
+    const allPlans = [...cleanSpotPlans, ...cleanRecurringPlans];
+    const invalidUrl = allPlans.find((p) => {
+      const raw = spotPlans.concat(recurringPlans).find((o) => o.id === p.id)?.paymentUrl?.trim();
+      return raw && !raw.startsWith("https://");
+    });
+    if (invalidUrl) {
+      setError("Links de pagamento devem iniciar com https://");
       return;
     }
 
@@ -725,6 +749,7 @@ export default function NewProposalPage() {
         onPaymentMethodsChange={(planId, methods) => updatePlanPaymentMethods("spot", planId, methods)}
         onAdd={() => addPlan("spot")}
         onRemove={(planId) => removePlan("spot", planId)}
+        stripeConnected={stripeConnected}
       />
 
       <ProposalPlanSectionEditor
@@ -739,6 +764,7 @@ export default function NewProposalPage() {
         onPaymentMethodsChange={(planId, methods) => updatePlanPaymentMethods("recurring", planId, methods)}
         onAdd={() => addPlan("recurring")}
         onRemove={(planId) => removePlan("recurring", planId)}
+        stripeConnected={stripeConnected}
       />
 
       <div className="flex flex-wrap items-center justify-end gap-3">

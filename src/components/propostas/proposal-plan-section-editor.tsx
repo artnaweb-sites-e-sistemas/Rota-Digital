@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { LucideIcon } from "lucide-react";
-import { ChevronDown, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, Link2, Plus, Trash2 } from "lucide-react";
 
 import { DeliverablesFormatHint } from "@/components/propostas/deliverables-format-hint";
 import { PlanPaymentMethodsPicker, normalizePlanPaymentMethods, sortPaymentMethods } from "@/components/propostas/plan-payment-methods";
+import { PlanStripeFeeSimulator } from "@/components/propostas/plan-stripe-fee-simulator";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -32,6 +33,7 @@ export function ProposalPlanSectionEditor({
   onRemove,
   hideInstallments = false,
   accent,
+  stripeConnected = false,
 }: {
   title: string;
   description: string;
@@ -45,6 +47,8 @@ export function ProposalPlanSectionEditor({
   /** Planos recorrentes: sem parcelas / à vista (valor mensal). */
   hideInstallments?: boolean;
   accent?: ProposalPlanSectionAccent;
+  /** True se o dono da conta tem stripeConnectAccountId — mostra campos Stripe; senão, link manual. */
+  stripeConnected?: boolean;
 }) {
   const [collapsedByPlanId, setCollapsedByPlanId] = useState<Record<string, boolean>>({});
 
@@ -329,6 +333,46 @@ export function ProposalPlanSectionEditor({
                 onChange={(next) => onPaymentMethodsChange(plan.id, next)}
               />
             </div>
+
+            {!hideInstallments && stripeConnected ? (
+              <PlanStripeFeeSimulator
+                priceText={plan.price}
+                installments={normalizeInstallmentCount(plan.installmentCount)}
+                discountPriceText={
+                  normalizeInstallmentCount(plan.installmentCount) > 1
+                    ? plan.cashPrice
+                    : undefined
+                }
+              />
+            ) : null}
+
+            {!stripeConnected ? (
+              <div className="space-y-2">
+                <Label htmlFor={`${plan.id}-payment-url`}>
+                  Link de pagamento{" "}
+                  <span className="font-normal text-muted-foreground">(opcional)</span>
+                </Label>
+                <div className="relative">
+                  <Link2
+                    className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                    aria-hidden
+                  />
+                  <Input
+                    id={`${plan.id}-payment-url`}
+                    value={plan.paymentUrl ?? ""}
+                    onChange={(e) => onChange(plan.id, "paymentUrl", e.target.value)}
+                    placeholder="https://buy.stripe.com/..."
+                    className="h-10 pl-9"
+                  />
+                </div>
+                {plan.paymentUrl?.trim() ? (
+                  <p className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
+                    <Link2 className="size-3" aria-hidden />
+                    Link manual ativo
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
             </div>
           </div>
         );
