@@ -11,7 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
@@ -205,11 +205,16 @@ function NotificationsModal({
                       {badgeText}
                     </span>
                   </div>
-                  <Button asChild variant="outline" size="sm" className="w-full text-xs h-8 bg-background/50 hover:bg-background" onClick={() => setIsOpen(false)}>
-                    <Link href={`/dashboard/propostas/${proposal.id}`}>
-                      Ver proposta
-                    </Link>
-                  </Button>
+                  <Link
+                    href={`/dashboard/propostas/${proposal.id}`}
+                    className={cn(
+                      buttonVariants({ variant: "outline", size: "sm" }),
+                      "h-8 w-full bg-background/50 text-xs hover:bg-background",
+                    )}
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Ver proposta
+                  </Link>
                 </div>
               );
             })}

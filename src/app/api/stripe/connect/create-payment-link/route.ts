@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import type Stripe from "stripe";
 import { getAuth } from "firebase-admin/auth";
 import { getFirebaseAdminApp } from "@/lib/firebase-admin-app";
 import { getStripe } from "@/lib/stripe-server";
@@ -15,7 +16,7 @@ type CreatePaymentLinkBody = {
 };
 
 async function createLink(
-  stripe: ReturnType<typeof getStripe> & object,
+  stripe: Stripe,
   accountId: string,
   name: string,
   amountCents: number,
@@ -35,13 +36,14 @@ async function createLink(
     { stripeAccount: accountId },
   );
 
-  const linkParams: Record<string, unknown> = {
-    line_items: [{ price: price.id, quantity: 1 }],
-  };
+  const lineItems: Stripe.PaymentLinkCreateParams.LineItem[] = [
+    { price: price.id, quantity: 1 },
+  ];
+  const requestOptions: Stripe.RequestOptions = { stripeAccount: accountId };
 
   if (installments && installments > 1) {
-    linkParams.payment_method_types = ["card"];
-    linkParams.payment_intent_data = {
+    // SDK types for PaymentLink `payment_intent_data` are narrower than the API (installments on card).
+    const paymentIntentData = {
       payment_method_options: {
         card: {
           installments: {
@@ -49,14 +51,18 @@ async function createLink(
           },
         },
       },
+    } as unknown as Stripe.PaymentLinkCreateParams.PaymentIntentData;
+    const params: Stripe.PaymentLinkCreateParams = {
+      line_items: lineItems,
+      payment_method_types: ["card"],
+      payment_intent_data: paymentIntentData,
     };
+    const paymentLink = await stripe.paymentLinks.create(params, requestOptions);
+    return paymentLink.url;
   }
 
-  const paymentLink = await stripe.paymentLinks.create(
-    linkParams as Parameters<typeof stripe.paymentLinks.create>[0],
-    { stripeAccount: accountId },
-  );
-
+  const params: Stripe.PaymentLinkCreateParams = { line_items: lineItems };
+  const paymentLink = await stripe.paymentLinks.create(params, requestOptions);
   return paymentLink.url;
 }
 
