@@ -32,14 +32,24 @@ export async function GET(req: NextRequest) {
   }
 
   let uid: string;
-  try {
-    const decoded = await getAuth(adminApp).verifyIdToken(state);
-    uid = decoded.uid;
-  } catch {
+  const db = getFirestore(adminApp);
+  const stateRef = db.doc(`oauthStates/${state}`);
+  const stateSnap = await stateRef.get();
+  const stateData = stateSnap.data() as Record<string, unknown> | undefined;
+  if (
+    !stateSnap.exists ||
+    stateData?.provider !== "mercadopago" ||
+    typeof stateData?.uid !== "string" ||
+    typeof stateData?.expiresAt !== "number" ||
+    Date.now() > stateData.expiresAt
+  ) {
     return NextResponse.redirect(
       new URL("/dashboard/settings/pagamentos?mp_error=auth", baseUrl || req.url),
     );
   }
+  uid = stateData.uid;
+  // Estado OAuth de uso único
+  await stateRef.delete().catch(() => null);
 
   const redirectUri = `${baseUrl}/api/mercadopago/connect/callback`;
 
@@ -78,7 +88,6 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const db = getFirestore(adminApp);
     await db.doc(`userSettings/${uid}`).set(
       {
         mpAccessToken: data.access_token,
