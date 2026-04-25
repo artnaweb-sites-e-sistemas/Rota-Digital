@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 import { getFirebaseAdminApp } from "@/lib/firebase-admin-app";
-import { resolvePublicAppBaseUrl } from "@/lib/request-origin";
+import { getMercadoPagoOAuthRedirectUri } from "@/lib/mercadopago-oauth-redirect";
 
 export const runtime = "nodejs";
 
@@ -23,8 +23,6 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const baseUrl = resolvePublicAppBaseUrl(req);
-
   const authHeader = req.headers.get("authorization") ?? "";
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
   if (!token) {
@@ -39,17 +37,19 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Sessão inválida." }, { status: 401 });
   }
 
+  const redirectUri = getMercadoPagoOAuthRedirectUri(req);
+
   // Mercado Pago pode rejeitar `state` muito grande; usar nonce curto persistido.
   const state = `mp-${crypto.randomUUID().replace(/-/g, "")}`;
   const db = getFirestore(adminApp);
   await db.doc(`oauthStates/${state}`).set({
     uid,
     provider: "mercadopago",
+    /** Deve bater com o usado no POST /oauth/token. */
+    mpRedirectUri: redirectUri,
     createdAt: new Date(),
     expiresAt: Date.now() + 10 * 60 * 1000,
   });
-
-  const redirectUri = `${baseUrl}/api/mercadopago/connect/callback`;
   const url = new URL("https://auth.mercadopago.com.br/authorization");
   url.searchParams.set("client_id", appId);
   url.searchParams.set("response_type", "code");

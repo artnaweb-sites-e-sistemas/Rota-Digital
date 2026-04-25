@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 import { getFirebaseAdminApp } from "@/lib/firebase-admin-app";
 import { resolvePublicAppBaseUrl } from "@/lib/request-origin";
+import { getMercadoPagoOAuthRedirectUri } from "@/lib/mercadopago-oauth-redirect";
 
 export const runtime = "nodejs";
 
@@ -48,10 +48,14 @@ export async function GET(req: NextRequest) {
     );
   }
   uid = stateData.uid;
+  const storedRedirect =
+    typeof stateData.mpRedirectUri === "string" && stateData.mpRedirectUri
+      ? stateData.mpRedirectUri
+      : getMercadoPagoOAuthRedirectUri(req);
   // Estado OAuth de uso único
   await stateRef.delete().catch(() => null);
 
-  const redirectUri = `${baseUrl}/api/mercadopago/connect/callback`;
+  const redirectUri = storedRedirect;
 
   try {
     const tokenRes = await fetch("https://api.mercadopago.com/oauth/token", {
