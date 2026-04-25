@@ -18,6 +18,11 @@ export type ProposalPlan = {
   paymentTerms: string;
   /** Meios de pagamento aceites (PIX, cartão, boleto). Opcional para propostas antigas. */
   paymentMethods?: ProposalPaymentMethodId[];
+
+  /** URL do Payment Link gerado pelo Stripe Connect (ou link manual). */
+  paymentUrl?: string;
+  /** URL do Payment Link com desconto à vista (quando parcelamento + desconto). */
+  paymentUrlDiscount?: string;
 };
 
 export type ProposalLeadSnapshot = {
@@ -79,4 +84,6 @@ export interface Proposal {
   evidences?: ProposalEvidences;
   /** Próximos passos na proposta; se vazio ou ausente, usa texto padrão na UI. */
   nextSteps?: string[];
+  /** Timestamp de quando os links de pagamento foram ativados pela última vez. */
+  paymentLinksActivatedAt?: number;
 }

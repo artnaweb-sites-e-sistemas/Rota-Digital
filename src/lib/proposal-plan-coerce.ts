@@ -39,6 +39,9 @@ export function coerceProposalPlan(raw: unknown): ProposalPlan | null {
     );
   }
 
+  const paymentUrl = typeof o.paymentUrl === "string" && o.paymentUrl.trim() ? o.paymentUrl.trim() : undefined;
+  const paymentUrlDiscount = typeof o.paymentUrlDiscount === "string" && o.paymentUrlDiscount.trim() ? o.paymentUrlDiscount.trim() : undefined;
+
   return {
     id,
     title,
@@ -49,6 +52,8 @@ export function coerceProposalPlan(raw: unknown): ProposalPlan | null {
     ...(cashPrice.trim() ? { cashPrice } : {}),
     paymentTerms,
     paymentMethods,
+    ...(paymentUrl ? { paymentUrl } : {}),
+    ...(paymentUrlDiscount ? { paymentUrlDiscount } : {}),
   };
 }
 
@@ -86,7 +91,7 @@ export function normalizeRecurringPlansForSave(plans: ProposalPlan[]): ProposalP
 
 /** Objeto seguro para gravar no Firestore (sem `undefined`). */
 export function proposalPlanToFirestoreValue(plan: ProposalPlan): Record<string, unknown> {
-  return {
+  const base: Record<string, unknown> = {
     id: plan.id,
     title: plan.title,
     deliverables: plan.deliverables,
@@ -97,4 +102,7 @@ export function proposalPlanToFirestoreValue(plan: ProposalPlan): Record<string,
     paymentTerms: plan.paymentTerms,
     paymentMethods: plan.paymentMethods ?? [],
   };
+  if (plan.paymentUrl) base.paymentUrl = plan.paymentUrl;
+  if (plan.paymentUrlDiscount) base.paymentUrlDiscount = plan.paymentUrlDiscount;
+  return base;
 }

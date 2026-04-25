@@ -8,6 +8,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Compass,
+  CreditCard,
   FileText,
   LayoutDashboard,
   Users,
@@ -52,6 +53,7 @@ const settingsSubItems = [
   { name: "Sobre a Empresa", href: "/dashboard/settings/sobre-a-empresa", icon: Building2 },
   { name: "Inteligência Artificial", href: "/dashboard/settings/inteligencia-artificial", icon: Bot },
   { name: "Dados básicos", href: "/dashboard/settings/dados-basicos", icon: SlidersHorizontal },
+  { name: "Pagamentos", href: "/dashboard/settings/pagamentos", icon: CreditCard },
 ] as const;
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
