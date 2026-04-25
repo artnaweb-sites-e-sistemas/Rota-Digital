@@ -840,6 +840,7 @@ function ProposalPlanCard({
   onSave,
   onAbandonEmptyPlan,
   onDeletePlan,
+  variant = "dashboard",
 }: {
   plan: ProposalPlan;
   kind: "spot" | "recurring";
@@ -851,6 +852,7 @@ function ProposalPlanCard({
   onAbandonEmptyPlan?: () => void | Promise<void>;
   /** Remove o plano após confirmação (dashboard). */
   onDeletePlan?: () => void | Promise<void>;
+  variant?: "dashboard" | "public";
 }) {
   const [editing, setEditing] = useState(!readOnly && planLooksEmpty(plan, kind));
   const [saving, setSaving] = useState(false);
@@ -1307,6 +1309,49 @@ function ProposalPlanCard({
                 </div>
               );
             })()}
+
+            {variant === "public" && plan.paymentUrl?.trim() ? (
+              <div className="border-t border-white/10 pt-4 mt-4">
+                {plan.paymentUrlDiscount?.trim() ? (
+                  <div className="flex flex-col gap-2.5">
+                    <a
+                      href={plan.paymentUrlDiscount}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={cn(
+                        buttonVariants({ variant: "cta", size: "lg" }),
+                        "w-full justify-center",
+                      )}
+                    >
+                      Pagar à vista com desconto
+                    </a>
+                    <a
+                      href={plan.paymentUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={cn(
+                        buttonVariants({ variant: "outline", size: "lg" }),
+                        "w-full justify-center",
+                      )}
+                    >
+                      Parcelar em até {normalizeInstallmentCount(plan.installmentCount)}x
+                    </a>
+                  </div>
+                ) : (
+                  <a
+                    href={plan.paymentUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={cn(
+                      buttonVariants({ variant: "cta", size: "lg" }),
+                      "w-full justify-center",
+                    )}
+                  >
+                    Contratar este plano
+                  </a>
+                )}
+              </div>
+            ) : null}
           </>
         )}
       </div>
@@ -1322,6 +1367,7 @@ function ProposalPlansSection({
   onAddPlan,
   onAbandonEmptyPlan,
   onDeletePlan,
+  variant = "dashboard",
 }: {
   proposal: Proposal;
   readOnly: boolean;
@@ -1329,6 +1375,7 @@ function ProposalPlansSection({
   onAddPlan?: (kind: "spot" | "recurring") => void | Promise<void>;
   onAbandonEmptyPlan?: (kind: "spot" | "recurring", planId: string) => void | Promise<void>;
   onDeletePlan?: (kind: "spot" | "recurring", planId: string) => void | Promise<void>;
+  variant?: "dashboard" | "public";
 }) {
   const spots = proposal.spotPlans ?? [];
   const recurring = proposal.recurringPlans ?? [];
@@ -1396,6 +1443,7 @@ function ProposalPlansSection({
                       kind="spot"
                       planOrdinal={index + 1}
                       readOnly={readOnly}
+                      variant={variant}
                       onSave={readOnly ? undefined : (next) => onSavePlan?.("spot", next)}
                       onAbandonEmptyPlan={
                         readOnly || !onAbandonEmptyPlan ? undefined : () => void onAbandonEmptyPlan("spot", plan.id)
@@ -1454,6 +1502,7 @@ function ProposalPlansSection({
                       kind="recurring"
                       planOrdinal={index + 1}
                       readOnly={readOnly}
+                      variant={variant}
                       onSave={readOnly ? undefined : (next) => onSavePlan?.("recurring", next)}
                       onAbandonEmptyPlan={
                         readOnly || !onAbandonEmptyPlan ? undefined : () => void onAbandonEmptyPlan("recurring", plan.id)
@@ -2969,6 +3018,7 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
       <ProposalPlansSection
         proposal={proposal}
         readOnly={!isDashboard}
+        variant={variant}
         onAddPlan={isDashboard ? (kind) => void handleAddPlan(kind) : undefined}
         onAbandonEmptyPlan={isDashboard ? (kind, planId) => void handleAbandonEmptyPlan(kind, planId) : undefined}
         onDeletePlan={isDashboard ? (kind, planId) => void handleDeletePlan(kind, planId) : undefined}
