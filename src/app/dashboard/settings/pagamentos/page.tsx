@@ -2,6 +2,7 @@
 
 import { Suspense } from "react";
 import { StripeConnectSettingsForm } from "@/components/settings/stripe-connect-settings-form";
+import { MercadoPagoConnectSettingsForm } from "@/components/settings/mercadopago-connect-settings-form";
 
 function PageContent() {
   return (
@@ -11,11 +12,12 @@ function PageContent() {
           Pagamentos
         </h1>
         <p className="max-w-2xl text-base text-muted-foreground">
-          Gerencie a conexão com o Stripe para gerar links de pagamento nas propostas comerciais.
+          Gerencie suas integrações de pagamento para gerar links nas propostas comerciais.
         </p>
       </div>
 
       <div className="grid min-w-0 grid-cols-1 gap-6 lg:max-w-2xl">
+        <MercadoPagoConnectSettingsForm />
         <StripeConnectSettingsForm />
       </div>
     </div>

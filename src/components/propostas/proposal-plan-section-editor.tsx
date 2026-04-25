@@ -254,9 +254,9 @@ export function ProposalPlanSectionEditor({
                 </div>
                 {!hideInstallments ? (
                   <p className="text-xs leading-relaxed text-muted-foreground sm:col-span-2">
-                    Na proposta, mostramos o total e, no cartão, parcelas de exemplo (até{" "}
+                    Na proposta, mostramos o total e parcelas de exemplo (até{" "}
                     {normalizeMaxCardInstallments(plan.maxCardInstallments)}×). O lead escolhe o número de parcelas
-                    no pagamento Stripe.
+                    no checkout do Mercado Pago ou Stripe.
                   </p>
                 ) : null}
               </div>

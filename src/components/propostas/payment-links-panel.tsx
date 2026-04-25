@@ -27,6 +27,7 @@ import { useAuth } from "@/lib/auth-context";
 import { db } from "@/lib/firebase";
 import { updateProposal } from "@/lib/proposals";
 import { getEffectiveProposalPlanAmountCents } from "@/lib/proposal-plan-pricing";
+import { normalizeMaxCardInstallments } from "@/lib/proposal-plan-installments";
 import { cn } from "@/lib/utils";
 import type { Proposal, ProposalPlan } from "@/types/proposal";
 
@@ -78,6 +79,7 @@ export function PaymentLinksPanel({
 }) {
   const { user } = useAuth();
   const [stripeAccountId, setStripeAccountId] = useState<string | null>(null);
+  const [mpConnected, setMpConnected] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activating, setActivating] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -91,8 +93,10 @@ export function PaymentLinksPanel({
       const snap = await getDoc(doc(db, "userSettings", user.uid));
       if (snap.exists()) {
         const data = snap.data() as Record<string, unknown>;
-        const id = typeof data.stripeConnectAccountId === "string" ? data.stripeConnectAccountId : null;
-        setStripeAccountId(id);
+        const stripeId = typeof data.stripeConnectAccountId === "string" ? data.stripeConnectAccountId : null;
+        setStripeAccountId(stripeId);
+        const mpId = typeof data.mpUserId === "number" && data.mpUserId > 0;
+        setMpConnected(mpId);
       }
     } catch (e) {
       console.error(e);
@@ -105,7 +109,8 @@ export function PaymentLinksPanel({
     void loadAccount();
   }, [loadAccount]);
 
-  if (loading || !stripeAccountId) return null;
+  const hasAnyGateway = Boolean(stripeAccountId) || mpConnected;
+  if (loading || !hasAnyGateway) return null;
 
   const allPlans = [...(proposal.spotPlans ?? []), ...(proposal.recurringPlans ?? [])];
   const hasAnyPaymentUrl = allPlans.some((p) => p.paymentUrl?.trim());
@@ -123,7 +128,7 @@ export function PaymentLinksPanel({
   };
 
   const generateLinks = async () => {
-    if (!user || !stripeAccountId) return;
+    if (!user) return;
     setActivating(true);
     setError(null);
 
@@ -132,19 +137,81 @@ export function PaymentLinksPanel({
       const updatedSpotPlans = [...(proposal.spotPlans ?? [])];
       const updatedRecurringPlans = [...(proposal.recurringPlans ?? [])];
 
-      const processPlan = async (plan: ProposalPlan, isRecurring: boolean) => {
+      const processSpotPlan = async (plan: ProposalPlan) => {
         const priceCents = getEffectiveProposalPlanAmountCents(plan);
         if (!priceCents || priceCents <= 0) return plan;
 
-        const path = isRecurring ? "/api/stripe/connect/create-payment-link" : "/api/stripe/connect/create-checkout-session";
+        if (mpConnected) {
+          const body: Record<string, unknown> = {
+            planName: plan.title || "Plano",
+            amount: priceCents,
+            maxInstallments: normalizeMaxCardInstallments(plan.maxCardInstallments),
+            proposalId: proposal.id,
+            planId: plan.id,
+          };
+
+          const res = await fetch("/api/mercadopago/connect/create-preference", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${idToken}`,
+            },
+            body: JSON.stringify(body),
+          });
+
+          if (!res.ok) {
+            const data = (await res.json().catch(() => ({}))) as { error?: string };
+            throw new Error(data.error ?? "Erro ao criar link de pagamento no Mercado Pago.");
+          }
+
+          const data = (await res.json()) as { url: string };
+          return { ...plan, paymentUrl: data.url };
+        }
+
+        if (stripeAccountId) {
+          const body: Record<string, unknown> = {
+            accountId: stripeAccountId,
+            planName: plan.title || "Plano",
+            amount: priceCents,
+            proposalId: proposal.id,
+            planId: plan.id,
+          };
+
+          const res = await fetch("/api/stripe/connect/create-checkout-session", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${idToken}`,
+            },
+            body: JSON.stringify(body),
+          });
+
+          if (!res.ok) {
+            const data = (await res.json().catch(() => ({}))) as { error?: string };
+            throw new Error(data.error ?? "Erro ao criar link de pagamento no Stripe.");
+          }
+
+          const data = (await res.json()) as { url: string };
+          return { ...plan, paymentUrl: data.url };
+        }
+
+        return plan;
+      };
+
+      const processRecurringPlan = async (plan: ProposalPlan) => {
+        const priceCents = getEffectiveProposalPlanAmountCents(plan);
+        if (!priceCents || priceCents <= 0) return plan;
+
+        if (!stripeAccountId) return plan;
+
         const body: Record<string, unknown> = {
           accountId: stripeAccountId,
           planName: plan.title || "Plano",
           amount: priceCents,
-          ...(isRecurring ? { planType: "recurring" } : { proposalId: proposal.id, planId: plan.id }),
+          planType: "recurring",
         };
 
-        const res = await fetch(path, {
+        const res = await fetch("/api/stripe/connect/create-payment-link", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -155,21 +222,18 @@ export function PaymentLinksPanel({
 
         if (!res.ok) {
           const data = (await res.json().catch(() => ({}))) as { error?: string };
-          throw new Error(data.error ?? "Erro ao criar link de pagamento.");
+          throw new Error(data.error ?? "Erro ao criar link de pagamento recorrente.");
         }
 
         const data = (await res.json()) as { url: string };
-        return {
-          ...plan,
-          paymentUrl: data.url,
-        };
+        return { ...plan, paymentUrl: data.url };
       };
 
       for (let i = 0; i < updatedSpotPlans.length; i++) {
-        updatedSpotPlans[i] = await processPlan(updatedSpotPlans[i], false);
+        updatedSpotPlans[i] = await processSpotPlan(updatedSpotPlans[i]);
       }
       for (let i = 0; i < updatedRecurringPlans.length; i++) {
-        updatedRecurringPlans[i] = await processPlan(updatedRecurringPlans[i], true);
+        updatedRecurringPlans[i] = await processRecurringPlan(updatedRecurringPlans[i]);
       }
 
       const now = Date.now();
@@ -243,23 +307,25 @@ export function PaymentLinksPanel({
     }
   };
 
+  const spotGatewayLabel = mpConnected ? "Mercado Pago" : "Stripe";
+  const hasRecurringGateway = Boolean(stripeAccountId);
+
   const confirmMessages = {
     activate: {
       title: "Ativar links de pagamento",
-      description:
-        "Isso vai gerar os links de pagamento no Stripe e ativá-los na proposta pública. Deseja continuar?",
+      description: `Planos pontuais via ${spotGatewayLabel}${hasRecurringGateway ? " e recorrentes via Stripe" : ""}. Deseja continuar?`,
       button: "Confirmar",
     },
     regenerate: {
       title: "Regenerar links de pagamento",
       description:
-        "Isso vai gerar novos links de pagamento no Stripe e substituir os anteriores. Os links antigos permanecerão funcionais no Stripe. Deseja continuar?",
+        "Isso vai gerar novos links e substituir os anteriores. Os links antigos continuarão funcionando no gateway original. Deseja continuar?",
       button: "Regenerar",
     },
     deactivate: {
       title: "Desativar links de pagamento",
       description:
-        "Os botões de pagamento serão removidos da proposta pública. Os links continuarão funcionando no Stripe, mas não serão exibidos ao lead.",
+        "Os botões de pagamento serão removidos da proposta pública. Os links continuarão funcionando nos gateways, mas não serão exibidos ao lead.",
       button: "Desativar",
     },
   };
@@ -344,27 +410,39 @@ export function PaymentLinksPanel({
             <div className="mt-4 space-y-2 border-t border-border/30 pt-3 dark:border-white/6">
               {allPlans
                 .filter((p) => p.paymentUrl?.trim())
-                .map((plan) => (
-                  <div
-                    key={plan.id}
-                    className="flex flex-wrap items-center gap-2 rounded-md bg-background/60 px-3 py-2 dark:bg-white/[0.03]"
-                  >
-                    <Link2 className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
-                    <span className="text-xs font-medium text-foreground">
-                      {plan.title || "Plano"}
-                    </span>
-                    <TruncatedUrl url={plan.paymentUrl!} />
-                    <CopyButton text={plan.paymentUrl!} />
-                    <a
-                      href={plan.paymentUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-muted-foreground hover:text-foreground"
+                .map((plan) => {
+                  const isMpLink = plan.paymentUrl?.includes("mercadopago");
+                  return (
+                    <div
+                      key={plan.id}
+                      className="flex flex-wrap items-center gap-2 rounded-md bg-background/60 px-3 py-2 dark:bg-white/[0.03]"
                     >
-                      <ExternalLink className="size-3" />
-                    </a>
-                  </div>
-                ))}
+                      <Link2 className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
+                      <span className="text-xs font-medium text-foreground">
+                        {plan.title || "Plano"}
+                      </span>
+                      {isMpLink ? (
+                        <span className="rounded bg-sky-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 dark:text-sky-400">
+                          MP
+                        </span>
+                      ) : (
+                        <span className="rounded bg-brand/10 px-1.5 py-0.5 text-[10px] font-semibold text-brand">
+                          Stripe
+                        </span>
+                      )}
+                      <TruncatedUrl url={plan.paymentUrl!} />
+                      <CopyButton text={plan.paymentUrl!} />
+                      <a
+                        href={plan.paymentUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-muted-foreground hover:text-foreground"
+                      >
+                        <ExternalLink className="size-3" />
+                      </a>
+                    </div>
+                  );
+                })}
             </div>
           ) : null}
         </div>
