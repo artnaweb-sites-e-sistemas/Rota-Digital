@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
+import { PaymentLinksPanel } from "@/components/propostas/payment-links-panel";
 import { PlanPriceHero } from "@/components/propostas/plan-installment-summary";
 import { DeliverablesFormatHint } from "@/components/propostas/deliverables-format-hint";
 import { PlanPaymentMethodsChips, PlanPaymentMethodsPicker, normalizePlanPaymentMethods, sortPaymentMethods } from "@/components/propostas/plan-payment-methods";
@@ -2996,6 +2997,10 @@ export function ProposalView({ proposal, variant, onProposalChange, reportCta: r
             : undefined
         }
       />
+
+      {isDashboard ? (
+        <PaymentLinksPanel proposal={proposal} onProposalChange={onProposalChange} />
+      ) : null}
 
       <ProposalNextStepsSpotlight
         stepsForList={nextStepsEditing ? nextStepsDraft : displayNextSteps}
