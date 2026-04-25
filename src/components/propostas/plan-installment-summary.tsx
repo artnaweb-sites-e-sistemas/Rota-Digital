@@ -1,14 +1,13 @@
 "use client";
 
 import { formatCentsAsBrl, parseCurrencyInputToCents } from "@/lib/currency-brl-input";
-import { normalizeInstallmentCount } from "@/lib/proposal-plan-installments";
+import { normalizeMaxCardInstallments } from "@/lib/proposal-plan-installments";
 import { cn } from "@/lib/utils";
 
 type PlanPriceHeroProps = {
   priceText: string;
-  installmentCount?: number;
-  /** Valor à vista alternativo com parcelamento; se válido, substitui a linha do total. */
-  cashPriceText?: string;
+  /** Máximo de parcelas no cartão (texto comercial; 1 = só total). */
+  maxCardInstallments?: number;
   accent: "brand" | "emerald";
   className?: string;
   /** Valor de lista / original (riscado) quando há preço promocional em `priceText`. */
@@ -23,18 +22,13 @@ const heroPriceClass =
 export function PlanPriceHero({
   priceText,
   struckOriginalText,
-  installmentCount,
-  cashPriceText,
+  maxCardInstallments,
   accent,
   className,
   priceSuffix,
 }: PlanPriceHeroProps) {
-  const n = normalizeInstallmentCount(installmentCount);
+  const n = normalizeMaxCardInstallments(maxCardInstallments);
   const cents = parseCurrencyInputToCents(priceText);
-  const cashTrim = cashPriceText?.trim() ?? "";
-  const cashCents = cashTrim ? parseCurrencyInputToCents(cashTrim) : null;
-  const showCashInsteadOfTotal =
-    n > 1 && cashCents !== null && cashCents > 0;
   const multClass =
     accent === "brand" ? "text-brand" : "text-emerald-600 dark:text-emerald-400";
 
@@ -66,7 +60,6 @@ export function PlanPriceHero({
     );
   }
 
-  /** Valor base por parcela (sem mostrar faixa por arredondamento de centavos entre parcelas). */
   const perInstallmentCents = Math.floor(cents / n);
   const installmentAmountLabel = formatCentsAsBrl(perInstallmentCents);
 
@@ -80,7 +73,7 @@ export function PlanPriceHero({
             multClass,
           )}
         >
-          {n}
+          até {n}
           <span className="translate-y-px text-[0.82em] font-bold" aria-hidden>
             ×
           </span>
@@ -89,17 +82,7 @@ export function PlanPriceHero({
         <span className={heroPriceClass}>{installmentAmountLabel}</span>
       </p>
       <p className="text-[11px] font-medium tabular-nums text-muted-foreground sm:text-xs">
-        {showCashInsteadOfTotal ? (
-          <>
-            Ou à vista sem juros:{" "}
-            <span className="text-foreground/90">{formatCentsAsBrl(cashCents)}</span>
-          </>
-        ) : (
-          <>
-            Total:{" "}
-            <span className="text-foreground/90">{formatCentsAsBrl(cents)}</span>
-          </>
-        )}
+        Total: <span className="text-foreground/90">{formatCentsAsBrl(cents)}</span>
       </p>
     </div>
   );

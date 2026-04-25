@@ -3,14 +3,17 @@ import type Stripe from "stripe";
 import { getAuth } from "firebase-admin/auth";
 import { getFirebaseAdminApp } from "@/lib/firebase-admin-app";
 import { getStripe } from "@/lib/stripe-server";
+import { resolvePublicAppBaseUrl } from "@/lib/request-origin";
 
 export const runtime = "nodejs";
 
-type CreatePaymentLinkBody = {
+type CreateCheckoutSessionBody = {
   accountId: string;
   planName: string;
   amount: number;
-  planType?: "spot" | "recurring";
+  /** Metadados opcionais para conciliação */
+  proposalId?: string;
+  planId?: string;
 };
 
 function humanizeStripeError(error: unknown): string {
@@ -31,52 +34,11 @@ function humanizeStripeError(error: unknown): string {
   if (msg.includes("invalid request: invalid redirect uri")) {
     return "A URL de retorno do Stripe está diferente da configurada no Connect. Verifique se a URI de callback da aplicação Connect corresponde exatamente ao domínio em produção.";
   }
-  if (msg.includes("standard oauth is disabled")) {
-    return "O fluxo OAuth padrão do Stripe Connect está desativado na aplicação. Ative o Standard OAuth nas configurações do Connect da Stripe.";
-  }
   if (msg.includes("invalid integer")) {
     return "Valor de pagamento inválido para criar o link. Revise os valores do plano e tente novamente.";
   }
-  if (msg.includes("unknown parameter")) {
-    return "Falha de integração com a Stripe ao montar os parâmetros de pagamento. Tente novamente; se persistir, contacte o suporte técnico.";
-  }
 
   return defaultMessage;
-}
-
-async function createLink(
-  stripe: Stripe,
-  accountId: string,
-  name: string,
-  amountCents: number,
-  planType: "spot" | "recurring",
-) {
-  const product = await stripe.products.create(
-    { name },
-    { stripeAccount: accountId },
-  );
-
-  const price = await stripe.prices.create(
-    {
-      product: product.id,
-      unit_amount: amountCents,
-      currency: "brl",
-      ...(planType === "recurring" ? { recurring: { interval: "month" as const } } : {}),
-    },
-    { stripeAccount: accountId },
-  );
-
-  const lineItems: Stripe.PaymentLinkCreateParams.LineItem[] = [
-    { price: price.id, quantity: 1 },
-  ];
-  const requestOptions: Stripe.RequestOptions = { stripeAccount: accountId };
-
-  // Não passar `payment_method_types: ['card']` na conta conectada: se o cartão não estiver
-  // ativado exatamente nesse modo, a Stripe responde "No valid payment method types".
-  // Sem o parâmetro, a Stripe mostra os métodos ativos e compatíveis com BRL (doc: Payment Link create).
-  const params: Stripe.PaymentLinkCreateParams = { line_items: lineItems };
-  const paymentLink = await stripe.paymentLinks.create(params, requestOptions);
-  return paymentLink.url;
 }
 
 export async function POST(req: NextRequest) {
@@ -102,19 +64,64 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Sessão inválida." }, { status: 401 });
   }
 
-  const body = (await req.json().catch(() => ({}))) as CreatePaymentLinkBody;
-  const { accountId, planName, amount, planType = "spot" } = body;
+  const body = (await req.json().catch(() => ({}))) as CreateCheckoutSessionBody;
+  const { accountId, planName, amount, proposalId, planId } = body;
 
   if (!accountId || !planName || !amount || amount <= 0) {
     return NextResponse.json({ error: "Parâmetros inválidos." }, { status: 400 });
   }
 
+  const base = resolvePublicAppBaseUrl(req);
+  const meta: Record<string, string> = {};
+  if (proposalId) meta.rota_proposalId = proposalId;
+  if (planId) meta.rota_planId = planId;
+
+  const requestOptions: Stripe.RequestOptions = { stripeAccount: accountId };
+
   try {
-    const url = await createLink(stripe, accountId, planName, amount, planType);
-    return NextResponse.json({ url });
+    const session = await stripe.checkout.sessions.create(
+      {
+        mode: "payment",
+        adaptive_pricing: { enabled: false },
+        locale: "pt-BR",
+        line_items: [
+          {
+            price_data: {
+              currency: "brl",
+              unit_amount: amount,
+              product_data: { name: planName },
+            },
+            quantity: 1,
+          },
+        ],
+        payment_method_types: ["card"],
+        success_url: `${base}/dashboard?spot_checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${base}/dashboard?spot_checkout=cancel`,
+        metadata: Object.keys(meta).length ? meta : undefined,
+        payment_intent_data:
+          Object.keys(meta).length > 0
+            ? {
+                metadata: meta,
+              }
+            : undefined,
+        payment_method_options: {
+          card: {
+            installments: {
+              enabled: true,
+            },
+          },
+        },
+      },
+      requestOptions,
+    );
+
+    if (!session.url) {
+      return NextResponse.json({ error: "Stripe não devolveu URL de checkout." }, { status: 500 });
+    }
+
+    return NextResponse.json({ url: session.url });
   } catch (e) {
-    console.error("[create-payment-link] Error:", e);
-    const message = humanizeStripeError(e);
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("[create-checkout-session] Error:", e);
+    return NextResponse.json({ error: humanizeStripeError(e) }, { status: 500 });
   }
 }

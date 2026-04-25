@@ -59,16 +59,15 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  formatCurrencyInput,
-  normalizePriceForCurrencyInput,
-  parseCurrencyInputToCents,
-} from "@/lib/currency-brl-input";
+import { formatCurrencyInput, normalizePriceForCurrencyInput } from "@/lib/currency-brl-input";
 import { DEFAULT_PROPOSAL_NEXT_STEPS } from "@/lib/proposal-default-next-steps";
 import { createEmptyProposalPlan, planLooksEmpty } from "@/lib/proposal-plan-factory";
-import { PROPOSAL_PLAN_MAX_INSTALLMENTS, normalizeInstallmentCount } from "@/lib/proposal-plan-installments";
+import {
+  PROPOSAL_PLAN_MAX_INSTALLMENTS,
+  normalizeMaxCardInstallments,
+} from "@/lib/proposal-plan-installments";
+import { planHasValidPromotionalOffer, resolvePlanDisplayPrices } from "@/lib/proposal-plan-pricing";
 import { parsePlanDeliverablesForDisplay } from "@/lib/proposal-plan-deliverables-display";
 import { cn } from "@/lib/utils";
 import { proposalPlanPromoBadgeClassName } from "@/lib/proposal-floating-badges";
@@ -770,41 +769,11 @@ function planToEditDraft(p: ProposalPlan, kind: "spot" | "recurring"): ProposalP
     promotionalPrice: p.promotionalPrice?.trim()
       ? normalizePriceForCurrencyInput(p.promotionalPrice)
       : "",
-    cashPrice: recurring ? "" : p.cashPrice?.trim() ? normalizePriceForCurrencyInput(p.cashPrice) : "",
     paymentMethods: sortPaymentMethods(normalizePlanPaymentMethods(p.paymentMethods)),
-    installmentCount: recurring ? 1 : normalizeInstallmentCount(p.installmentCount),
+    maxCardInstallments: recurring
+      ? 1
+      : normalizeMaxCardInstallments(p.maxCardInstallments ?? PROPOSAL_PLAN_MAX_INSTALLMENTS),
   };
-}
-
-/** Promoção aplicável: preço promocional válido e inferior ao normal (ou só promocional preenchido). */
-function planHasValidPromotionalOffer(plan: ProposalPlan): boolean {
-  const listTrim = plan.price.trim();
-  const promoTrim = plan.promotionalPrice?.trim() ?? "";
-  const listCents = listTrim ? parseCurrencyInputToCents(listTrim) : null;
-  const promoCents = promoTrim ? parseCurrencyInputToCents(promoTrim) : null;
-  return (
-    promoCents !== null &&
-    promoCents > 0 &&
-    (listCents === null || listCents <= 0 || promoCents < listCents)
-  );
-}
-
-/** Preço mostrado no herói e, se aplicável, valor de lista riscado (promo válida abaixo do valor normal). */
-function resolvePlanDisplayPrices(plan: ProposalPlan): {
-  displayPriceText: string;
-  struckOriginalText?: string;
-} {
-  const listTrim = plan.price.trim();
-  const promoTrim = plan.promotionalPrice?.trim() ?? "";
-  const listCents = listTrim ? parseCurrencyInputToCents(listTrim) : null;
-
-  if (planHasValidPromotionalOffer(plan)) {
-    return {
-      displayPriceText: promoTrim,
-      ...(listTrim && listCents !== null && listCents > 0 ? { struckOriginalText: listTrim } : {}),
-    };
-  }
-  return { displayPriceText: listTrim };
 }
 
 /** 1 → I, 2 → II, … (numeração por coluna: só pontuais ou só recorrentes). */
@@ -886,15 +855,13 @@ function ProposalPlanCard({
     setSaving(true);
     try {
       const recurring = kind === "recurring";
-      const inst = recurring ? 1 : normalizeInstallmentCount(draft.installmentCount);
       await onSave({
         ...plan,
         title: draft.title.trim(),
         deliverables: draft.deliverables.trim(),
         price: draft.price.trim(),
         promotionalPrice: (draft.promotionalPrice ?? "").trim(),
-        cashPrice: recurring ? "" : inst > 1 ? (draft.cashPrice ?? "").trim() : "",
-        installmentCount: inst,
+        maxCardInstallments: recurring ? 1 : normalizeMaxCardInstallments(draft.maxCardInstallments),
         paymentTerms: draft.paymentTerms.trim(),
         paymentMethods: sortPaymentMethods(normalizePlanPaymentMethods(draft.paymentMethods)),
       });
@@ -1046,12 +1013,7 @@ function ProposalPlanCard({
                 placeholder="Liste os entregáveis incluídos neste plano."
               />
             </div>
-            <div
-              className={cn(
-                "grid gap-3 grid-cols-1 sm:grid-cols-2",
-                isSpot && "lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(7.25rem,8.5rem)]",
-              )}
-            >
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor={`plan-price-${plan.id}`} className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Valor
@@ -1083,56 +1045,10 @@ function ProposalPlanCard({
                 />
               </div>
               {isSpot ? (
-                <>
-                  <div className="space-y-2 sm:col-span-2 lg:col-span-1">
-                    <Label htmlFor={`plan-installments-${plan.id}`} className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Parcelas
-                    </Label>
-                    <Select
-                      value={String(normalizeInstallmentCount(draft.installmentCount))}
-                      onValueChange={(v) => {
-                        const n = normalizeInstallmentCount(Number(v));
-                        setDraft((d) => ({
-                          ...d,
-                          installmentCount: n,
-                          ...(n <= 1 ? { cashPrice: "" } : {}),
-                        }));
-                      }}
-                      disabled={saving}
-                    >
-                      <SelectTrigger id={`plan-installments-${plan.id}`} className="h-10 w-full lg:max-w-none">
-                        <SelectValue placeholder="Parcelas" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Array.from({ length: PROPOSAL_PLAN_MAX_INSTALLMENTS }, (_, i) => i + 1).map((n) => (
-                          <SelectItem key={n} value={String(n)}>
-                            {n === 1 ? "À vista" : `${n}×`}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {normalizeInstallmentCount(draft.installmentCount) > 1 ? (
-                    <div className="col-span-full space-y-2">
-                      <Label htmlFor={`plan-cash-${plan.id}`} className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                        À vista <span className="font-normal normal-case text-muted-foreground/80">(opcional)</span>
-                      </Label>
-                      <p className="text-xs text-muted-foreground">
-                        Valor único se for menor que o total parcelado (ex.: à vista sem juros).
-                      </p>
-                      <Input
-                        id={`plan-cash-${plan.id}`}
-                        value={draft.cashPrice ?? ""}
-                        inputMode="numeric"
-                        autoComplete="off"
-                        placeholder="R$ 0,00"
-                        onChange={(e) => setDraft((d) => ({ ...d, cashPrice: formatCurrencyInput(e.target.value) }))}
-                        className="h-10 w-full"
-                        disabled={saving}
-                      />
-                    </div>
-                  ) : null}
-                </>
+                <p className="text-xs leading-relaxed text-muted-foreground sm:col-span-2">
+                  O total e as parcelas de exemplo (até {normalizeMaxCardInstallments(draft.maxCardInstallments)}×) aparecem
+                  na proposta; o cliente escolhe o número de parcelas no pagamento.
+                </p>
               ) : null}
             </div>
             <div className="space-y-2">
@@ -1260,8 +1176,7 @@ function ProposalPlanCard({
                           <PlanPriceHero
                             priceText={displayPriceText}
                             struckOriginalText={struckOriginalText}
-                            installmentCount={isSpot ? plan.installmentCount : 1}
-                            cashPriceText={isSpot ? plan.cashPrice : undefined}
+                            maxCardInstallments={isSpot ? plan.maxCardInstallments : 1}
                             accent={isSpot ? "brand" : "emerald"}
                             className="shrink-0"
                             priceSuffix={isSpot ? undefined : "/mensal"}
@@ -1312,44 +1227,19 @@ function ProposalPlanCard({
 
             {variant === "public" && plan.paymentUrl?.trim() ? (
               <div className="border-t border-white/10 pt-4 mt-4">
-                {plan.paymentUrlDiscount?.trim() ? (
-                  <div className="flex flex-col gap-2.5">
-                    <a
-                      href={plan.paymentUrlDiscount}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={cn(
-                        buttonVariants({ variant: "cta", size: "lg" }),
-                        "w-full justify-center",
-                      )}
-                    >
-                      Pagar à vista com desconto
-                    </a>
-                    <a
-                      href={plan.paymentUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={cn(
-                        buttonVariants({ variant: "outline", size: "lg" }),
-                        "w-full justify-center",
-                      )}
-                    >
-                      Parcelar em até {normalizeInstallmentCount(plan.installmentCount)}x
-                    </a>
-                  </div>
-                ) : (
-                  <a
-                    href={plan.paymentUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={cn(
-                      buttonVariants({ variant: "cta", size: "lg" }),
-                      "w-full justify-center",
-                    )}
-                  >
-                    Contratar este plano
-                  </a>
-                )}
+                <a
+                  href={plan.paymentUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={cn(
+                    buttonVariants({ variant: "cta", size: "lg" }),
+                    "w-full justify-center",
+                  )}
+                >
+                  {isSpot && normalizeMaxCardInstallments(plan.maxCardInstallments) > 1
+                    ? "Pagar (parcelas no checkout)"
+                    : "Contratar este plano"}
+                </a>
               </div>
             ) : null}
           </>

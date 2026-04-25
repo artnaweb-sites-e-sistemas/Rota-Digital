@@ -12,7 +12,6 @@ import { doc, getDoc } from "firebase/firestore";
 import { useAuth } from "@/lib/auth-context";
 import { db } from "@/lib/firebase";
 import { createEmptyProposalPlan } from "@/lib/proposal-plan-factory";
-import { normalizeInstallmentCount } from "@/lib/proposal-plan-installments";
 import { clonePlansForNewProposal, normalizeRecurringPlansForSave } from "@/lib/proposal-plan-coerce";
 import { createLead, getLeads } from "@/lib/leads";
 import { getReportByLead } from "@/lib/reports";
@@ -125,7 +124,6 @@ function planHasContent(plan: ProposalPlan): boolean {
       plan.deliverables.trim() ||
       plan.price.trim() ||
       plan.promotionalPrice?.trim() ||
-      plan.cashPrice?.trim() ||
       plan.paymentTerms.trim() ||
       (plan.paymentMethods?.length ?? 0) > 0,
   );
@@ -283,18 +281,6 @@ export default function NewProposalPage() {
     const next = sortPaymentMethods(methods);
     setter((prev) =>
       prev.map((plan) => (plan.id === planId ? { ...plan, paymentMethods: next } : plan)),
-    );
-  };
-
-  const updatePlanInstallmentCount = (kind: "spot" | "recurring", planId: string, count: number) => {
-    const setter = kind === "spot" ? setSpotPlans : setRecurringPlans;
-    const n = normalizeInstallmentCount(count);
-    setter((prev) =>
-      prev.map((plan) =>
-        plan.id === planId
-          ? { ...plan, installmentCount: n, ...(n <= 1 ? { cashPrice: "" } : {}) }
-          : plan,
-      ),
     );
   };
 
@@ -745,7 +731,6 @@ export default function NewProposalPage() {
         icon={FileText}
         plans={spotPlans}
         onChange={(planId, field, value) => updatePlan("spot", planId, field, value)}
-        onInstallmentCountChange={(planId, count) => updatePlanInstallmentCount("spot", planId, count)}
         onPaymentMethodsChange={(planId, methods) => updatePlanPaymentMethods("spot", planId, methods)}
         onAdd={() => addPlan("spot")}
         onRemove={(planId) => removePlan("spot", planId)}
@@ -760,7 +745,6 @@ export default function NewProposalPage() {
         plans={recurringPlans}
         hideInstallments
         onChange={(planId, field, value) => updatePlan("recurring", planId, field, value)}
-        onInstallmentCountChange={(planId, count) => updatePlanInstallmentCount("recurring", planId, count)}
         onPaymentMethodsChange={(planId, methods) => updatePlanPaymentMethods("recurring", planId, methods)}
         onAdd={() => addPlan("recurring")}
         onRemove={(planId) => removePlan("recurring", planId)}

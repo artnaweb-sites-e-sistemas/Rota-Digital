@@ -19,7 +19,6 @@ import { normalizedSubscriptionPlanKey, planAllowsCustomLogo, type PlanKey } fro
 import { PlanLimitModal, type PlanLimitModalState } from "@/components/limits/plan-limit-modal";
 import { createEmptyProposalPlan } from "@/lib/proposal-plan-factory";
 import { normalizeRecurringPlansForSave } from "@/lib/proposal-plan-coerce";
-import { normalizeInstallmentCount } from "@/lib/proposal-plan-installments";
 import {
   DEFAULT_COMPANY_ABOUT_NAME,
   resolveCompanyAboutNameForDisplay,
@@ -350,20 +349,6 @@ export function CompanyAboutSettingsForm() {
     [],
   );
 
-  const updateDefaultInstallments = useCallback(
-    (kind: "spot" | "recurring", planId: string, count: number) => {
-      const key = kind === "spot" ? "defaultSpotPlans" : "defaultRecurringPlans";
-      const n = normalizeInstallmentCount(count);
-      setForm((prev) => ({
-        ...prev,
-        [key]: prev[key].map((plan) =>
-          plan.id === planId ? { ...plan, installmentCount: n, ...(n <= 1 ? { cashPrice: "" } : {}) } : plan,
-        ),
-      }));
-    },
-    [],
-  );
-
   const updateDefaultPaymentMethods = useCallback(
     (kind: "spot" | "recurring", planId: string, methods: ProposalPaymentMethodId[]) => {
       const key = kind === "spot" ? "defaultSpotPlans" : "defaultRecurringPlans";
@@ -633,7 +618,6 @@ export function CompanyAboutSettingsForm() {
                 icon={FileText}
                 plans={form.defaultSpotPlans}
                 onChange={(planId, field, value) => updateDefaultPlan("spot", planId, field, value)}
-                onInstallmentCountChange={(planId, count) => updateDefaultInstallments("spot", planId, count)}
                 onPaymentMethodsChange={(planId, methods) => updateDefaultPaymentMethods("spot", planId, methods)}
                 onAdd={() => addDefaultPlan("spot")}
                 onRemove={(planId) => removeDefaultPlan("spot", planId)}
@@ -647,7 +631,6 @@ export function CompanyAboutSettingsForm() {
                 plans={form.defaultRecurringPlans}
                 hideInstallments
                 onChange={(planId, field, value) => updateDefaultPlan("recurring", planId, field, value)}
-                onInstallmentCountChange={(planId, count) => updateDefaultInstallments("recurring", planId, count)}
                 onPaymentMethodsChange={(planId, methods) => updateDefaultPaymentMethods("recurring", planId, methods)}
                 onAdd={() => addDefaultPlan("recurring")}
                 onRemove={(planId) => removeDefaultPlan("recurring", planId)}

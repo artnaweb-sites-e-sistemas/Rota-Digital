@@ -26,8 +26,7 @@ import {
 import { useAuth } from "@/lib/auth-context";
 import { db } from "@/lib/firebase";
 import { updateProposal } from "@/lib/proposals";
-import { parseCurrencyInputToCents } from "@/lib/currency-brl-input";
-import { normalizeInstallmentCount } from "@/lib/proposal-plan-installments";
+import { getEffectiveProposalPlanAmountCents } from "@/lib/proposal-plan-pricing";
 import { cn } from "@/lib/utils";
 import type { Proposal, ProposalPlan } from "@/types/proposal";
 
@@ -134,26 +133,18 @@ export function PaymentLinksPanel({
       const updatedRecurringPlans = [...(proposal.recurringPlans ?? [])];
 
       const processPlan = async (plan: ProposalPlan, isRecurring: boolean) => {
-        const priceCents = parseCurrencyInputToCents(plan.price);
+        const priceCents = getEffectiveProposalPlanAmountCents(plan);
         if (!priceCents || priceCents <= 0) return plan;
 
-        const installments = isRecurring ? 1 : normalizeInstallmentCount(plan.installmentCount);
-        const cashPriceCents = !isRecurring && plan.cashPrice
-          ? parseCurrencyInputToCents(plan.cashPrice)
-          : null;
-
+        const path = isRecurring ? "/api/stripe/connect/create-payment-link" : "/api/stripe/connect/create-checkout-session";
         const body: Record<string, unknown> = {
           accountId: stripeAccountId,
           planName: plan.title || "Plano",
           amount: priceCents,
+          ...(isRecurring ? { planType: "recurring" } : { proposalId: proposal.id, planId: plan.id }),
         };
 
-        if (installments > 1) body.installments = installments;
-        if (cashPriceCents && cashPriceCents > 0 && cashPriceCents < priceCents) {
-          body.discountAmount = cashPriceCents;
-        }
-
-        const res = await fetch("/api/stripe/connect/create-payment-link", {
+        const res = await fetch(path, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -167,11 +158,10 @@ export function PaymentLinksPanel({
           throw new Error(data.error ?? "Erro ao criar link de pagamento.");
         }
 
-        const data = (await res.json()) as { url: string; urlDiscount?: string };
+        const data = (await res.json()) as { url: string };
         return {
           ...plan,
           paymentUrl: data.url,
-          paymentUrlDiscount: data.urlDiscount,
         };
       };
 
@@ -214,7 +204,7 @@ export function PaymentLinksPanel({
 
     try {
       const clearUrl = (plan: ProposalPlan) => {
-        const { paymentUrl: _u, paymentUrlDiscount: _d, ...rest } = plan;
+        const { paymentUrl: _u, ...rest } = plan;
         return rest as ProposalPlan;
       };
 
@@ -373,21 +363,6 @@ export function PaymentLinksPanel({
                     >
                       <ExternalLink className="size-3" />
                     </a>
-                    {plan.paymentUrlDiscount ? (
-                      <div className="flex w-full items-center gap-2 pl-5 pt-1">
-                        <span className="text-xs text-muted-foreground">À vista:</span>
-                        <TruncatedUrl url={plan.paymentUrlDiscount} />
-                        <CopyButton text={plan.paymentUrlDiscount} />
-                        <a
-                          href={plan.paymentUrlDiscount}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-muted-foreground hover:text-foreground"
-                        >
-                          <ExternalLink className="size-3" />
-                        </a>
-                      </div>
-                    ) : null}
                   </div>
                 ))}
             </div>

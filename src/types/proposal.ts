@@ -8,21 +8,17 @@ export type ProposalPlan = {
   price: string;
   /** Valor promocional (BRL); se preenchido e menor que `price`, o valor original aparece riscado na proposta. */
   promotionalPrice?: string;
-  /** Número de parcelas (1 = à vista). Opcional em propostas antigas. */
-  installmentCount?: number;
   /**
-   * Valor à vista quando há parcelamento (opcional).
-   * Se preenchido, substitui a linha “Total” por “Ou à vista sem juros” na visualização.
+   * Máximo de parcelas no cartão mostrado ao lead (ex.: “até 12x”); 1 = só exibe valor total.
+   * O número exato de parcelas o cliente escolhe no checkout Stripe. Migra de `installmentCount` em dados antigos.
    */
-  cashPrice?: string;
+  maxCardInstallments?: number;
   paymentTerms: string;
   /** Meios de pagamento aceites (PIX, cartão, boleto). Opcional para propostas antigas. */
   paymentMethods?: ProposalPaymentMethodId[];
 
-  /** URL do Payment Link gerado pelo Stripe Connect (ou link manual). */
+  /** URL do pagamento: Payment Link (recorrente) ou Checkout Session (plano pontual) ou link manual. */
   paymentUrl?: string;
-  /** URL do Payment Link com desconto à vista (quando parcelamento + desconto). */
-  paymentUrlDiscount?: string;
 };
 
 export type ProposalLeadSnapshot = {

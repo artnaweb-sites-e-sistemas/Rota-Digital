@@ -1,6 +1,6 @@
 import type { ProposalPaymentMethodId, ProposalPlan } from "@/types/proposal";
 import { PROPOSAL_PAYMENT_METHOD_IDS } from "@/types/proposal";
-import { normalizeInstallmentCount } from "@/lib/proposal-plan-installments";
+import { normalizeMaxCardInstallments } from "@/lib/proposal-plan-installments";
 
 function newPlanId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -23,13 +23,14 @@ export function coerceProposalPlan(raw: unknown): ProposalPlan | null {
   const paymentTerms = typeof o.paymentTerms === "string" ? o.paymentTerms : "";
 
   const promotionalPrice = typeof o.promotionalPrice === "string" ? o.promotionalPrice : "";
-  const cashPrice = typeof o.cashPrice === "string" ? o.cashPrice : "";
 
-  let installmentCount: number | undefined;
-  if (typeof o.installmentCount === "number" && Number.isFinite(o.installmentCount)) {
-    installmentCount = normalizeInstallmentCount(o.installmentCount);
+  let maxCardInstallments: number;
+  if (typeof o.maxCardInstallments === "number" && Number.isFinite(o.maxCardInstallments)) {
+    maxCardInstallments = normalizeMaxCardInstallments(o.maxCardInstallments);
+  } else if (typeof o.installmentCount === "number" && Number.isFinite(o.installmentCount)) {
+    maxCardInstallments = normalizeMaxCardInstallments(o.installmentCount);
   } else {
-    installmentCount = 1;
+    maxCardInstallments = 12;
   }
 
   let paymentMethods: ProposalPaymentMethodId[] | undefined;
@@ -40,7 +41,6 @@ export function coerceProposalPlan(raw: unknown): ProposalPlan | null {
   }
 
   const paymentUrl = typeof o.paymentUrl === "string" && o.paymentUrl.trim() ? o.paymentUrl.trim() : undefined;
-  const paymentUrlDiscount = typeof o.paymentUrlDiscount === "string" && o.paymentUrlDiscount.trim() ? o.paymentUrlDiscount.trim() : undefined;
 
   return {
     id,
@@ -48,12 +48,10 @@ export function coerceProposalPlan(raw: unknown): ProposalPlan | null {
     deliverables,
     price,
     promotionalPrice,
-    installmentCount,
-    ...(cashPrice.trim() ? { cashPrice } : {}),
+    maxCardInstallments,
     paymentTerms,
     paymentMethods,
     ...(paymentUrl ? { paymentUrl } : {}),
-    ...(paymentUrlDiscount ? { paymentUrlDiscount } : {}),
   };
 }
 
@@ -80,8 +78,7 @@ export function clonePlansForNewProposal(plans: ProposalPlan[]): ProposalPlan[] 
 export function normalizeRecurringPlanForSave(plan: ProposalPlan): ProposalPlan {
   return {
     ...plan,
-    installmentCount: 1,
-    cashPrice: "",
+    maxCardInstallments: 1,
   };
 }
 
@@ -97,12 +94,10 @@ export function proposalPlanToFirestoreValue(plan: ProposalPlan): Record<string,
     deliverables: plan.deliverables,
     price: plan.price,
     promotionalPrice: plan.promotionalPrice ?? "",
-    installmentCount: normalizeInstallmentCount(plan.installmentCount),
-    cashPrice: plan.cashPrice?.trim() ?? "",
+    maxCardInstallments: normalizeMaxCardInstallments(plan.maxCardInstallments),
     paymentTerms: plan.paymentTerms,
     paymentMethods: plan.paymentMethods ?? [],
   };
   if (plan.paymentUrl) base.paymentUrl = plan.paymentUrl;
-  if (plan.paymentUrlDiscount) base.paymentUrlDiscount = plan.paymentUrlDiscount;
   return base;
 }

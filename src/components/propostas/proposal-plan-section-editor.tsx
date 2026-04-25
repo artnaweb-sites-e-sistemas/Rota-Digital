@@ -11,11 +11,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { formatCurrencyInput } from "@/lib/currency-brl-input";
-import { PROPOSAL_PLAN_MAX_INSTALLMENTS, normalizeInstallmentCount } from "@/lib/proposal-plan-installments";
+import { normalizeMaxCardInstallments } from "@/lib/proposal-plan-installments";
 import type { ProposalPaymentMethodId, ProposalPlan } from "@/types/proposal";
 
 /** Pontual = ouro da marca; recorrente = verde (como na vista da proposta). */
@@ -27,7 +26,6 @@ export function ProposalPlanSectionEditor({
   icon: Icon,
   plans,
   onChange,
-  onInstallmentCountChange,
   onPaymentMethodsChange,
   onAdd,
   onRemove,
@@ -40,7 +38,6 @@ export function ProposalPlanSectionEditor({
   icon: LucideIcon;
   plans: ProposalPlan[];
   onChange: (planId: string, field: keyof ProposalPlan, value: string) => void;
-  onInstallmentCountChange: (planId: string, count: number) => void;
   onPaymentMethodsChange: (planId: string, methods: ProposalPaymentMethodId[]) => void;
   onAdd: () => void;
   onRemove: (planId: string) => void;
@@ -230,12 +227,7 @@ export function ProposalPlanSectionEditor({
                   className="h-10"
                 />
               </div>
-              <div
-                className={cn(
-                  "grid grid-cols-1 gap-4 sm:grid-cols-2 md:col-span-2",
-                  !hideInstallments && "lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(7.25rem,8.5rem)]",
-                )}
-              >
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:col-span-2">
                 <div className="space-y-2">
                   <Label htmlFor={`${plan.id}-price`}>Valor</Label>
                   <Input
@@ -261,44 +253,13 @@ export function ProposalPlanSectionEditor({
                   />
                 </div>
                 {!hideInstallments ? (
-                  <div className="space-y-2 sm:col-span-2 lg:col-span-1">
-                    <Label htmlFor={`${plan.id}-installments`}>Parcelas</Label>
-                    <Select
-                      value={String(normalizeInstallmentCount(plan.installmentCount))}
-                      onValueChange={(v) => onInstallmentCountChange(plan.id, Number(v))}
-                    >
-                      <SelectTrigger id={`${plan.id}-installments`} className="h-10 w-full">
-                        <SelectValue placeholder="Parcelas" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Array.from({ length: PROPOSAL_PLAN_MAX_INSTALLMENTS }, (_, i) => i + 1).map((n) => (
-                          <SelectItem key={n} value={String(n)}>
-                            {n === 1 ? "À vista" : `${n}×`}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <p className="text-xs leading-relaxed text-muted-foreground sm:col-span-2">
+                    Na proposta, mostramos o total e, no cartão, parcelas de exemplo (até{" "}
+                    {normalizeMaxCardInstallments(plan.maxCardInstallments)}×). O lead escolhe o número de parcelas
+                    no pagamento Stripe.
+                  </p>
                 ) : null}
               </div>
-              {!hideInstallments && normalizeInstallmentCount(plan.installmentCount) > 1 ? (
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor={`${plan.id}-cash`}>
-                    À vista <span className="font-normal text-muted-foreground">(opcional)</span>
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    Valor se pagar em uma só vez, quando for diferente do total parcelado (ex.: sem juros do cartão).
-                  </p>
-                  <Input
-                    id={`${plan.id}-cash`}
-                    value={plan.cashPrice ?? ""}
-                    inputMode="numeric"
-                    onChange={(e) => onChange(plan.id, "cashPrice", formatCurrencyInput(e.target.value))}
-                    placeholder="Ex.: R$ 1.200,00"
-                    className="h-10 max-w-md"
-                  />
-                </div>
-              ) : null}
             </div>
 
             <div className="space-y-2">
@@ -334,17 +295,7 @@ export function ProposalPlanSectionEditor({
               />
             </div>
 
-            {!hideInstallments && stripeConnected ? (
-              <PlanStripeFeeSimulator
-                priceText={plan.price}
-                installments={normalizeInstallmentCount(plan.installmentCount)}
-                discountPriceText={
-                  normalizeInstallmentCount(plan.installmentCount) > 1
-                    ? plan.cashPrice
-                    : undefined
-                }
-              />
-            ) : null}
+            {!hideInstallments && stripeConnected ? <PlanStripeFeeSimulator plan={plan} /> : null}
 
             {!stripeConnected ? (
               <div className="space-y-2">

@@ -1,6 +1,6 @@
 import type { ProposalPlan } from "@/types/proposal";
 
-import { normalizeInstallmentCount } from "@/lib/proposal-plan-installments";
+import { PROPOSAL_PLAN_MAX_INSTALLMENTS } from "@/lib/proposal-plan-installments";
 
 export function createEmptyProposalPlan(): ProposalPlan {
   return {
@@ -9,25 +9,20 @@ export function createEmptyProposalPlan(): ProposalPlan {
     deliverables: "",
     price: "",
     promotionalPrice: "",
-    installmentCount: 1,
+    maxCardInstallments: PROPOSAL_PLAN_MAX_INSTALLMENTS,
     paymentTerms: "",
     paymentMethods: [],
   };
 }
 
 export function planLooksEmpty(plan: ProposalPlan, kind: "spot" | "recurring" = "spot"): boolean {
-  const installments = normalizeInstallmentCount(plan.installmentCount);
-  const recurring = kind === "recurring";
-  const installmentsMatter = !recurring && installments > 1;
-  const cashMatter = !recurring && Boolean(plan.cashPrice?.trim());
+  void kind;
   return !(
     plan.title.trim() ||
     plan.deliverables.trim() ||
     plan.price.trim() ||
     plan.promotionalPrice?.trim() ||
-    cashMatter ||
     plan.paymentTerms.trim() ||
-    (plan.paymentMethods?.length ?? 0) > 0 ||
-    installmentsMatter
+    (plan.paymentMethods?.length ?? 0) > 0
   );
 }
