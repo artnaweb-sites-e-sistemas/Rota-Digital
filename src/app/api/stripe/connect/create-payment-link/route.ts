@@ -41,27 +41,14 @@ async function createLink(
   ];
   const requestOptions: Stripe.RequestOptions = { stripeAccount: accountId };
 
-  if (installments && installments > 1) {
-    // SDK types for PaymentLink `payment_intent_data` are narrower than the API (installments on card).
-    const paymentIntentData = {
-      payment_method_options: {
-        card: {
-          installments: {
-            enabled: true,
-          },
-        },
-      },
-    } as unknown as Stripe.PaymentLinkCreateParams.PaymentIntentData;
-    const params: Stripe.PaymentLinkCreateParams = {
-      line_items: lineItems,
-      payment_method_types: ["card"],
-      payment_intent_data: paymentIntentData,
-    };
-    const paymentLink = await stripe.paymentLinks.create(params, requestOptions);
-    return paymentLink.url;
-  }
+  // Payment Link `create` only allows a small subset in `payment_intent_data` (metadata, capture_method, etc.).
+  // Não suporta `payment_method_options` — a API devolve "unknown parameter" se enviarmos.
+  // Parcelas no cartão (BR) seguem a configuração da conta conectada no Dashboard Stripe.
+  const params: Stripe.PaymentLinkCreateParams =
+    installments && installments > 1
+      ? { line_items: lineItems, payment_method_types: ["card"] }
+      : { line_items: lineItems };
 
-  const params: Stripe.PaymentLinkCreateParams = { line_items: lineItems };
   const paymentLink = await stripe.paymentLinks.create(params, requestOptions);
   return paymentLink.url;
 }
